@@ -57,6 +57,30 @@ def load_teams_index() -> List[TeamIndexRow]:
     return rows
 
 
+def load_team_map_names() -> dict:
+    """
+    Reads TeamMap from MASTER sheet and returns {TEAM_ID: display_name}.
+    Expects TeamMap columns:
+      A = team_id
+      B = display_name
+    """
+    service = get_sheets_service(settings.GOOGLE_SERVICE_ACCOUNT_JSON)
+    values = read_range(service, settings.MASTER_SHEET_ID, "TeamMap!A1:B2000")
+    if not values:
+        return {}
+
+    # skip header
+    out = {}
+    for r in values[1:]:
+        if len(r) < 2:
+            continue
+        tid = str(r[0]).strip().upper()
+        name = str(r[1]).strip()
+        if tid:
+            out[tid] = name if name else tid
+    return out
+
+
 def read_schedule_export(team_sheet_id: str, export_tab: str) -> List[dict]:
     """
     Reads ScheduleExport by HEADER NAMES (order doesn't matter; extra columns allowed).
@@ -111,6 +135,7 @@ def read_schedule_export(team_sheet_id: str, export_tab: str) -> List[dict]:
             "opp_name": get_cell(r, "opp_name") if "opp_name" in hmap else "",
             "opp_norm_key": get_cell(r, "opp_norm_key") if "opp_norm_key" in hmap else "",
             "raw_matchup": get_cell(r, "raw_matchup") if "raw_matchup" in hmap else "",
+            "date_key": get_cell(r, "date_key") if "date_key" in hmap else "",
         })
     return out
 
@@ -190,6 +215,7 @@ def ingest_preview_for_one_team(team_sheet_id: str, export_tab: str):
         opp_id = str(row.get("opponent_team_id", "")).strip()
         phase = str(row.get("phase", "")).strip()
         site = str(row.get("site", "")).strip()
+        date_key = str(row.get("date_key", "")).strip()
 
         # Valid Row Rule: week not blank AND error blank AND opponent_team_id not blank
         if week == "" or err != "" or opp_id == "":
@@ -227,9 +253,14 @@ def ingest_preview_for_one_team(team_sheet_id: str, export_tab: str):
                 "away_id": away_id,
                 "a_score": a_score,
                 "b_score": b_score,
+                "date_key": date_key,
             }
         else:
-            # Fill missing scores if we get them later
+            # upsert missing date key
+            if (not unique[game_key].get("date_key")) and date_key:
+                unique[game_key]["date_key"] = date_key
+
+            # upsert missing scores
             if unique[game_key]["a_score"] is None and a_score is not None:
                 unique[game_key]["a_score"] = a_score
                 unique[game_key]["b_score"] = b_score
