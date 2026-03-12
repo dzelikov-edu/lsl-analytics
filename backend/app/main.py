@@ -1,5 +1,14 @@
 from fastapi import FastAPI, HTTPException
-from app.ingest import load_teams_index, ingest_preview_for_one_team, ingest_league, load_polls
+from app.ingest import (
+    load_teams_index,
+    ingest_preview_for_one_team,
+    ingest_league,
+    load_polls,
+    load_conference_membership,
+    load_conferences_map,
+    load_records_snapshot,
+    load_conf_games_snapshot,
+)
 
 import json
 import os
@@ -36,29 +45,74 @@ def teams_index_preview():
 
 
 @app.get("/teams")
-def list_teams(active_only: bool = True):
+def teams(week: int | None = None):
     """
-    Lists teams from TeamsIndex (master sheet).
-    Query param:
-      - active_only: if true, only return teams where active==TRUE (default True)
+    List teams (from TeamsIndex), plus LSL poll badge (latest poll week) for mobile list simplicity.
     """
     teams = load_teams_index()
-    if active_only:
-        teams = [t for t in teams if t.active]
+    active = [t for t in teams if t.active]
 
-    # stable ordering
-    teams_sorted = sorted(teams, key=lambda t: (t.team_name.lower(), t.team_id))
+    # ---- LSL poll badge maps (latest week) ----
+    lsl_top25_rank = {}   # team_id -> 1..25
+    lsl_next5_order = {}  # team_id -> 1..5 (display-only; not an official rank)
+    poll_week = None
+
+    try:
+        rows = load_polls()
+        if rows:
+            available_weeks = sorted({r["week"] for r in rows})
+            poll_week = week if week is not None else available_weeks[-1]
+
+            if poll_week not in available_weeks:
+                raise HTTPException(status_code=404, detail=f"Poll week {poll_week} not found")
+
+            lsl_rows = [r for r in rows if r["week"] == poll_week and r["poll"] == "LSL"]
+            for r in lsl_rows:
+                tid = str(r["team_id"]).strip().upper()
+                if r["bucket"] == "TOP25":
+                    lsl_top25_rank[tid] = int(r["bucket_order"])
+                elif r["bucket"] == "NEXT5":
+                    lsl_next5_order[tid] = int(r["bucket_order"])
+    except Exception:
+        # polls are optional; if anything fails, we just return null badges
+        lsl_top25_rank, lsl_next5_order, poll_week = {}, {}, None
+
+    # Build response
+    out = []
+    for t in active:
+        tid = t.team_id.strip().upper()
+        out.append({
+            "team_id": tid,
+            "team_name": t.team_name,
+            "sheet_id": t.sheet_id,
+            "export_tab": t.export_tab,
+            "polls": {
+                "week": poll_week,
+                "LSL": {
+                    "rank": lsl_top25_rank.get(tid),             # 1..25 or None
+                    "next5_order": lsl_next5_order.get(tid),     # 1..5 or None
+                }
+            }
+        })
+
+    # Sort list so ranked teams appear first, then alphabetical
+    def _sort_key(x):
+        rank = x["polls"]["LSL"]["rank"]
+        next5 = x["polls"]["LSL"]["next5_order"]
+        # ranked first (rank asc), then next5 (order asc), then name
+        if rank is not None:
+            return (0, rank, 999, x["team_name"])
+        if next5 is not None:
+            return (1, 999, next5, x["team_name"])
+        return (2, 999, 999, x["team_name"])
+
+    out_sorted = sorted(out, key=_sort_key)
 
     return {
-        "count": len(teams_sorted),
-        "teams": [
-            {
-                "team_id": t.team_id,
-                "team_name": t.team_name,
-                "active": t.active,
-            }
-            for t in teams_sorted
-        ],
+        "teams_total": len(teams),
+        "teams_active": len(active),
+        "poll_week": poll_week,
+        "teams": out_sorted
     }
 
 
@@ -106,9 +160,10 @@ def search_teams(q: str, limit: int = 25):
 
 
 @app.get("/teams/{team_id}")
-def get_team(team_id: str):
+def get_team(team_id: str, week: int | None = None):
     """
-    Team card (from TeamsIndex) + useful links.
+    Team card (from TeamsIndex) + useful links + poll badges (LSL primary, LCAA secondary).
+    If week not provided, uses latest poll week present in Polls sheet.
     """
     tid = team_id.strip().upper()
     teams = load_teams_index()
@@ -117,10 +172,48 @@ def get_team(team_id: str):
     if not match:
         raise HTTPException(status_code=404, detail=f"Unknown team_id: {tid}")
 
+    name_map = _team_name_map(active_only=False)
+
+    # ---- poll badge lookup ----
+    polls_block = {
+        "week": None,
+        "LSL": {"rank": None, "next5_order": None},
+        "LCAA": {"rank": None, "next5_order": None},
+    }
+
+    try:
+        rows = load_polls()
+        if rows:
+            weeks = sorted({r["week"] for r in rows})
+            w = week if week is not None else weeks[-1]
+            polls_block["week"] = w
+
+            def find_badge(poll_name: str):
+                subset = [r for r in rows if r["week"] == w and r["poll"] == poll_name]
+                for r in subset:
+                    if r["team_id"] != tid:
+                        continue
+                    if r["bucket"] == "TOP25":
+                        return {"rank": int(r["bucket_order"]), "next5_order": None}
+                    if r["bucket"] == "NEXT5":
+                        return {"rank": None, "next5_order": int(r["bucket_order"])}
+                return {"rank": None, "next5_order": None}
+
+            polls_block["LSL"] = find_badge("LSL")
+            polls_block["LCAA"] = find_badge("LCAA")
+
+    except Exception:
+        # Polls optional; keep nulls if anything goes wrong
+        pass
+
     return {
         "team_id": tid,
         "team_name": match.team_name,
         "active": match.active,
+
+        # ESPN-style poll badges (LSL primary, LCAA secondary)
+        "polls": polls_block,
+
         "links": {
             "schedule": f"/teams/{tid}/schedule",
             "summary": f"/teams/{tid}/summary",
@@ -460,6 +553,298 @@ def poll_single(poll: str, week: int | None = None):
 
     name_map = _team_name_map(active_only=False)
     return _poll_payload(rows, w, poll_u, name_map)
+
+
+@app.get("/rankings/polls")
+def rankings_polls(week: int | None = None):
+    """
+    ESPN-style poll rankings view:
+    - LSL Poll first (AP equivalent)
+    - LCAA Poll second (Coaches equivalent)
+    Returns Top 25 + Next 5 Out for each.
+    """
+    rows = load_polls()
+    if not rows:
+        raise HTTPException(status_code=404, detail="No poll data found. Fill Polls tab first.")
+
+    # Choose week: requested or latest available
+    weeks = sorted({r["week"] for r in rows})
+    w = week if week is not None else (weeks[-1] if weeks else None)
+    if w is None:
+        raise HTTPException(status_code=404, detail="No poll weeks found in Polls tab.")
+
+    name_map = _team_name_map(active_only=False)
+
+    # Reuse the same formatting as /polls does (Top25 has official rank; Next5 has order only)
+    lsl = _poll_payload(rows, w, "LSL", name_map)
+    lcaa = _poll_payload(rows, w, "LCAA", name_map)
+
+    return {
+        "meta": {
+            "title_primary": "LSL Poll",
+            "title_secondary": "LCAA Poll",
+            "primary_is_main": True,
+            "secondary_is_main": False,
+            "note_next5": "Next 5 Out is not an official rank; order is display-only."
+        },
+        "week": w,
+        "primary": lsl,     # LSL Poll (AP equivalent)
+        "secondary": lcaa,  # LCAA Poll (Coaches equivalent)
+    }
+
+
+def _latest_records_week(rows: list[dict]) -> int | None:
+    weeks = sorted({r["week"] for r in rows})
+    return weeks[-1] if weeks else None
+
+
+def _build_lsl_poll_maps_for_week(week: int | None = None):
+    """
+    Returns: (poll_week, top25_rank_map, next5_order_map)
+      - top25_rank_map: team_id -> 1..25
+      - next5_order_map: team_id -> 1..5 (display-only)
+    Uses latest poll week if week is None.
+    """
+    rows = load_polls()
+    if not rows:
+        return (None, {}, {})
+
+    available_weeks = sorted({r["week"] for r in rows})
+    poll_week = week if week is not None else available_weeks[-1]
+    if poll_week not in available_weeks:
+        # if requested week doesn't exist, return empty maps (or you could raise)
+        return (poll_week, {}, {})
+
+    lsl_rows = [r for r in rows if r["week"] == poll_week and r["poll"] == "LSL"]
+
+    top25 = {}
+    next5 = {}
+    for r in lsl_rows:
+        tid = str(r["team_id"]).strip().upper()
+        if r["bucket"] == "TOP25":
+            top25[tid] = int(r["bucket_order"])
+        elif r["bucket"] == "NEXT5":
+            next5[tid] = int(r["bucket_order"])
+
+    return (poll_week, top25, next5)
+
+
+@app.get("/conferences")
+def conferences(week: int | None = None):
+    """
+    List conferences with team counts + LSL Poll counts (Top 25 + Next 5 Out).
+    Week is for RecordsSnapshot context only (optional).
+    """
+    membership = load_conference_membership()
+    conf_names = load_conferences_map()
+    records = load_records_snapshot()
+
+    w = week if week is not None else _latest_records_week(records)
+
+    # LSL poll maps (latest poll week by default)
+    poll_week, lsl_top25_rank, lsl_next5_order = _build_lsl_poll_maps_for_week()
+
+    # group team_ids by conference
+    conf_to_teams: dict[str, list[str]] = {}
+    for team_id, conf_id in membership.items():
+        conf_to_teams.setdefault(conf_id, []).append(team_id)
+
+    out = []
+    for conf_id, team_ids in conf_to_teams.items():
+        top25_ct = sum(1 for tid in team_ids if tid in lsl_top25_rank)
+        next5_ct = sum(1 for tid in team_ids if tid in lsl_next5_order)
+
+        out.append({
+            "conference_id": conf_id,
+            "conference_name": conf_names.get(conf_id, conf_id),
+            "teams_count": len(team_ids),
+            "week": w,
+            "polls": {
+                "LSL": {
+                    "week": poll_week,
+                    "top25_count": top25_ct,
+                    "next5_count": next5_ct,
+                }
+            }
+        })
+
+    out_sorted = sorted(out, key=lambda x: (x["conference_name"], x["conference_id"]))
+    return {"conferences_count": len(out_sorted), "conferences": out_sorted}
+
+
+@app.get("/conferences/{conf_id}")
+def conference_detail(conf_id: str, week: int | None = None, debug: bool = False):
+    """
+    Full conference membership + standings from RecordsSnapshot.
+    Includes teams without sheets.
+    """
+    cid = conf_id.strip().upper()
+
+    membership = load_conference_membership()
+    conf_names = load_conferences_map()
+    records = load_records_snapshot()
+
+    if not records:
+        raise HTTPException(status_code=404, detail="No RecordsSnapshot data found. Fill RecordsSnapshot first.")
+
+    w = week if week is not None else _latest_records_week(records)
+    if w is None:
+        raise HTTPException(status_code=404, detail="No record weeks found in RecordsSnapshot.")
+
+    # build team list for this conference
+    members = [tid for tid, c in membership.items() if c == cid]
+    if not members:
+        raise HTTPException(status_code=404, detail=f"No teams found for conference: {cid}")
+
+    # build records map for the week
+    rec_map = {r["team_id"]: r for r in records if r["week"] == w}
+
+    name_map = _team_name_map(active_only=False)
+
+    # Identify tracked teams (has sheet) for UX
+    tracked = {t.team_id.strip().upper() for t in load_teams_index() if t.active}
+
+    standings = []
+    missing = []
+    for tid in sorted(members):
+        r = rec_map.get(tid)
+        if not r:
+            missing.append(tid)
+            continue
+
+        wins = r["wins"]; losses = r["losses"]
+        cw = r["conf_wins"]; cl = r["conf_losses"]
+
+        standings.append({
+            "team_id": tid,
+            "team_name": name_map.get(tid, tid),
+            "is_tracked": tid in tracked,
+            "overall": {"wins": wins, "losses": losses},
+            "conference": {"wins": cw, "losses": cl},
+            "win_pct": round(wins / (wins + losses), 4) if (wins + losses) > 0 else 0.0,
+            "conf_win_pct": round(cw / (cw + cl), 4) if (cw + cl) > 0 else 0.0,
+            "last_updated": r.get("last_updated", ""),
+            "links": {
+                "team": f"/teams/{tid}",
+                "schedule": f"/teams/{tid}/schedule",
+                "summary": f"/teams/{tid}/summary",
+            } if tid in tracked else {},
+        })
+
+        # ---- Head-to-head tie-breakers (universal) ----
+    # Only applied within tie groups that share the same (conf_wins, conf_losses).
+    conf_games_all = load_conf_games_snapshot()
+    conf_games = [
+        g for g in conf_games_all
+        if g["conference_id"] == cid and g["week"] <= w
+    ]
+
+    def _deterministic_key(x):
+        return (
+            -x["conf_win_pct"],
+            -x["conference"]["wins"],
+            x["conference"]["losses"],
+            -x["win_pct"],
+            -x["overall"]["wins"],
+            x["overall"]["losses"],
+            x["team_name"],
+        )
+
+    # Group by exact conference record (wins/losses) to form tie groups
+    tie_groups = {}
+    for row in standings:
+        key = (row["conference"]["wins"], row["conference"]["losses"])
+        tie_groups.setdefault(key, []).append(row)
+
+    resolved = []
+
+    for (cw, cl), group in tie_groups.items():
+        if len(group) == 1:
+            resolved.extend(group)
+            continue
+
+        tied_ids = {t["team_id"] for t in group}
+        h2h_w = {tid: 0 for tid in tied_ids}
+        h2h_l = {tid: 0 for tid in tied_ids}
+
+        # Compute H2H only among tied teams
+        for g in conf_games:
+            h = g["home_id"]
+            a = g["away_id"]
+            if h not in tied_ids or a not in tied_ids:
+                continue
+
+            hs = g["home_score"]
+            as_ = g["away_score"]
+
+            if hs > as_:
+                h2h_w[h] += 1
+                h2h_l[a] += 1
+            elif as_ > hs:
+                h2h_w[a] += 1
+                h2h_l[h] += 1
+            else:
+                # ties are extremely unlikely; ignore
+                pass
+
+        def h2h_pct(tid):
+            gp = h2h_w[tid] + h2h_l[tid]
+            return (h2h_w[tid] / gp) if gp > 0 else 0.0
+
+        # Sort group by H2H first, then fall back to deterministic key
+        group_sorted = sorted(
+            group,
+            key=lambda x: (
+                -h2h_pct(x["team_id"]),
+                -h2h_w[x["team_id"]],
+                _deterministic_key(x),
+            )
+        )
+
+        # Attach tiebreak details ONLY when debug=true
+        if debug:
+            for x in group_sorted:
+                tid2 = x["team_id"]
+                x["tiebreak"] = {
+                    "h2h_wins": h2h_w.get(tid2, 0),
+                    "h2h_losses": h2h_l.get(tid2, 0),
+                    "h2h_win_pct": round(h2h_pct(tid2), 4),
+                }
+
+        resolved.extend(group_sorted)
+
+    # Final sort: primary by conference record groups already preserved by grouping,
+    # but we must order the groups themselves by conf record + deterministic
+    resolved_sorted = sorted(
+        resolved,
+        key=lambda x: (
+            -x["conference"]["wins"],
+            x["conference"]["losses"],
+            _deterministic_key(x),
+        )
+    )
+
+    # Sort standings: conference wins desc, conf losses asc, then overall win_pct desc, then name
+    standings_sorted = sorted(
+        standings,
+        key=lambda x: (
+            -x["conference"]["wins"],
+            x["conference"]["losses"],
+            -x["win_pct"],
+            x["team_name"],
+        )
+    )
+
+    return {
+        "conference_id": cid,
+        "conference_name": conf_names.get(cid, cid),
+        "week": w,
+        "teams_count": len(members),
+        "standings_count": len(resolved_sorted),
+        "missing_records_count": len(missing),
+        "missing_team_ids": missing[:50],
+        "standings": resolved_sorted,
+    }
 
 
 @app.get("/home")

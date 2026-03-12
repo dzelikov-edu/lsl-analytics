@@ -136,6 +136,181 @@ def load_polls() -> list[dict]:
     return out
 
 
+def load_conference_membership() -> dict[str, str]:
+    """
+    Reads ConferenceMembership tab from MASTER sheet.
+    Expected columns: team_id | conference_id
+    Returns: team_id -> conference_id
+    """
+    service = get_sheets_service(settings.GOOGLE_SERVICE_ACCOUNT_JSON)
+    values = read_range(service, settings.MASTER_SHEET_ID, "ConferenceMembership!A1:B5000")
+    if not values or len(values) < 2:
+        return {}
+
+    header = [str(x).strip().lower() for x in values[0]]
+    idx = {h: i for i, h in enumerate(header)}
+    if "team_id" not in idx or "conference_id" not in idx:
+        raise RuntimeError("ConferenceMembership must have headers: team_id, conference_id")
+
+    out: dict[str, str] = {}
+    for row in values[1:]:
+        if not row:
+            continue
+        team_id = str(row[idx["team_id"]]).strip().upper() if idx["team_id"] < len(row) else ""
+        conf_id = str(row[idx["conference_id"]]).strip().upper() if idx["conference_id"] < len(row) else ""
+        if team_id and conf_id:
+            out[team_id] = conf_id
+
+    return out
+
+
+def load_conferences_map() -> dict[str, str]:
+    """
+    Reads Conferences tab from MASTER sheet.
+    Expected columns: conference_id | conference_name
+    Returns: conference_id -> conference_name
+    """
+    service = get_sheets_service(settings.GOOGLE_SERVICE_ACCOUNT_JSON)
+    values = read_range(service, settings.MASTER_SHEET_ID, "Conferences!A1:B200")
+    if not values or len(values) < 2:
+        return {}
+
+    header = [str(x).strip().lower() for x in values[0]]
+    idx = {h: i for i, h in enumerate(header)}
+    if "conference_id" not in idx or "conference_name" not in idx:
+        raise RuntimeError("Conferences must have headers: conference_id, conference_name")
+
+    out: dict[str, str] = {}
+    for row in values[1:]:
+        cid = str(row[idx["conference_id"]]).strip().upper() if idx["conference_id"] < len(row) else ""
+        cname = str(row[idx["conference_name"]]).strip() if idx["conference_name"] < len(row) else ""
+        if cid and cname:
+            out[cid] = cname
+
+    return out
+
+
+def load_records_snapshot() -> list[dict]:
+    """
+    Reads RecordsSnapshot tab from MASTER sheet.
+    Expected columns:
+      week | team_id | wins | losses | conf_wins | conf_losses | last_updated (optional)
+    Returns list of rows as dicts.
+    """
+    service = get_sheets_service(settings.GOOGLE_SERVICE_ACCOUNT_JSON)
+    values = read_range(service, settings.MASTER_SHEET_ID, "RecordsSnapshot!A1:G10000")
+    if not values or len(values) < 2:
+        return []
+
+    header = [str(x).strip().lower() for x in values[0]]
+    idx = {h: i for i, h in enumerate(header)}
+
+    required = ["week", "team_id", "wins", "losses", "conf_wins", "conf_losses"]
+    for r in required:
+        if r not in idx:
+            raise RuntimeError(f"RecordsSnapshot missing required column: {r}")
+
+    def cell(row, name, default=""):
+        i = idx.get(name)
+        if i is None or i >= len(row):
+            return default
+        return row[i]
+
+    out = []
+    for row in values[1:]:
+        if not row:
+            continue
+
+        week_raw = cell(row, "week", "")
+        team_id = str(cell(row, "team_id", "")).strip().upper()
+
+        if week_raw == "" or not team_id:
+            continue
+
+        try:
+            week = int(float(str(week_raw)))
+            wins = int(float(str(cell(row, "wins", "0"))))
+            losses = int(float(str(cell(row, "losses", "0"))))
+            conf_wins = int(float(str(cell(row, "conf_wins", "0"))))
+            conf_losses = int(float(str(cell(row, "conf_losses", "0"))))
+        except Exception:
+            continue
+
+        last_updated = ""
+        if "last_updated" in idx:
+            last_updated = str(cell(row, "last_updated", "")).strip()
+
+        out.append({
+            "week": week,
+            "team_id": team_id,
+            "wins": wins,
+            "losses": losses,
+            "conf_wins": conf_wins,
+            "conf_losses": conf_losses,
+            "last_updated": last_updated,
+        })
+
+    return out
+
+
+def load_conf_games_snapshot() -> list[dict]:
+    """
+    Reads ConfGamesSnapshot tab from MASTER sheet.
+    Expected columns:
+      week | conference_id | home_id | away_id | home_score | away_score
+    Returns list of rows as dicts.
+    """
+    service = get_sheets_service(settings.GOOGLE_SERVICE_ACCOUNT_JSON)
+    values = read_range(service, settings.MASTER_SHEET_ID, "ConfGamesSnapshot!A1:F20000")
+    if not values or len(values) < 2:
+        return []
+
+    header = [str(x).strip().lower() for x in values[0]]
+    idx = {h: i for i, h in enumerate(header)}
+
+    required = ["week", "conference_id", "home_id", "away_id", "home_score", "away_score"]
+    for r in required:
+        if r not in idx:
+            raise RuntimeError(f"ConfGamesSnapshot missing required column: {r}")
+
+    def cell(row, name, default=""):
+        i = idx.get(name)
+        if i is None or i >= len(row):
+            return default
+        return row[i]
+
+    out = []
+    for row in values[1:]:
+        if not row:
+            continue
+
+        week_raw = cell(row, "week", "")
+        conf_id = str(cell(row, "conference_id", "")).strip().upper()
+        home_id = str(cell(row, "home_id", "")).strip().upper()
+        away_id = str(cell(row, "away_id", "")).strip().upper()
+
+        if week_raw == "" or not conf_id or not home_id or not away_id:
+            continue
+
+        try:
+            week = int(float(str(week_raw)))
+            home_score = int(float(str(cell(row, "home_score", "0"))))
+            away_score = int(float(str(cell(row, "away_score", "0"))))
+        except Exception:
+            continue
+
+        out.append({
+            "week": week,
+            "conference_id": conf_id,
+            "home_id": home_id,
+            "away_id": away_id,
+            "home_score": home_score,
+            "away_score": away_score,
+        })
+
+    return out
+
+
 def read_schedule_export(team_sheet_id: str, export_tab: str) -> List[dict]:
     """
     Reads ScheduleExport by HEADER NAMES (order doesn't matter; extra columns allowed).
