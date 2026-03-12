@@ -378,6 +378,308 @@ def status():
     }
 
 
+@app.get("/home")
+def home(
+    team_id: Optional[str] = None,
+    days: int = 3,
+    top_n: int = 25,
+    phase: Optional[str] = None,
+):
+    """
+    Mobile-friendly home payload:
+      - status (last refresh)
+      - next upcoming day(s) of games (calendar preview)
+      - top rankings preview (SOS-lite)
+    Optional filters:
+      - team_id: scope calendar preview to a team
+      - phase: scope calendar preview to a phase (e.g., REG_SEASON)
+    """
+    _ensure_data_dir()
+
+    # ---- status/meta ----
+    meta = None
+    if os.path.exists(REFRESH_META_PATH):
+        with open(REFRESH_META_PATH, "r", encoding="utf-8") as f:
+            meta = json.load(f)
+
+    games = _load_games_or_404()
+    name_map = _team_name_map(active_only=False)
+
+    # normalize inputs
+    tid = team_id.strip().upper() if team_id else None
+    ph = phase.strip().upper() if phase else None
+
+    try:
+        days = int(days)
+        top_n = int(top_n)
+    except Exception:
+        raise HTTPException(status_code=400, detail="days and top_n must be integers")
+
+    days = max(1, min(days, 14))
+    top_n = max(5, min(top_n, 100))
+
+    def _phase_rank(p: str) -> int:
+        return {"REG_SEASON": 1, "CONF_TOURNEY": 2, "NAT_TOURNEY": 3}.get(p, 9)
+
+    def _season_rank_from_date_key(dk: str) -> int:
+        if not dk or len(dk) != 4 or not dk.isdigit():
+            return 999999
+        mm = int(dk[:2])
+        dd = int(dk[2:])
+        mm_rank = mm + 12 if mm <= 10 else mm
+        return mm_rank * 100 + dd
+
+    def _display_date(dk: str) -> str:
+        if dk and len(dk) == 4 and dk.isdigit():
+            return f"{dk[:2]}/{dk[2:]}"
+        return ""
+
+    # ---- build a "next days" calendar preview ----
+    # pick upcoming games only (unplayed) to represent "what's next"
+    buckets = {}
+    for g in games:
+        ta = str(g.get("team_a", "")).strip().upper()
+        tb = str(g.get("team_b", "")).strip().upper()
+        g_phase = str(g.get("phase", "")).strip().upper()
+        dk = str(g.get("date_key", "")).strip()
+
+        a = g.get("a_score")
+        b = g.get("b_score")
+        played_flag = (a is not None) and (b is not None)
+
+        if played_flag:
+            continue
+        if not dk:
+            continue
+        if tid and tid not in (ta, tb):
+            continue
+        if ph and g_phase != ph:
+            continue
+
+        buckets.setdefault(dk, []).append(g)
+
+    date_keys_sorted = sorted(buckets.keys(), key=_season_rank_from_date_key)
+    next_dates = date_keys_sorted[:days]
+
+    calendar_preview = []
+    for dk in next_dates:
+        games_for_day = buckets.get(dk, [])
+
+        def _game_sort_key(g):
+            gp = str(g.get("phase", "")).strip().upper()
+            gw = _to_int_or_none(g.get("week"))
+            gw = gw if gw is not None else 9999
+            home_id = str(g.get("home_id", "")).strip().upper()
+            away_id = str(g.get("away_id", "")).strip().upper()
+            return (_phase_rank(gp), gw, home_id, away_id)
+
+        games_sorted = sorted(games_for_day, key=_game_sort_key)
+
+        out_games = []
+        for g in games_sorted:
+            home_id = str(g.get("home_id", "")).strip().upper()
+            away_id = str(g.get("away_id", "")).strip().upper()
+            ta = str(g.get("team_a", "")).strip().upper()
+            tb = str(g.get("team_b", "")).strip().upper()
+
+            out_games.append({
+                "game_key": g.get("game_key"),
+                "phase": str(g.get("phase", "")).strip().upper(),
+                "week": _to_int_or_none(g.get("week")),
+                "venue": g.get("venue"),
+                "home_id": home_id,
+                "home_name": name_map.get(home_id, home_id),
+                "away_id": away_id,
+                "away_name": name_map.get(away_id, away_id),
+                "team_a": ta,
+                "team_a_name": name_map.get(ta, ta),
+                "team_b": tb,
+                "team_b_name": name_map.get(tb, tb),
+            })
+
+        calendar_preview.append({
+            "date_key": dk,
+            "display_date": _display_date(dk),
+            "season_rank": _season_rank_from_date_key(dk),
+            "games_count": len(out_games),
+            "games": out_games,
+        })
+
+    # ---- rankings preview (SOS-lite) ----
+    # compute quickly from games list (played games only)
+    rec = {}
+    def ensure(tid2: str):
+        tid2 = tid2.strip().upper()
+        if tid2 not in rec:
+            rec[tid2] = {"team_id": tid2, "team_name": name_map.get(tid2, tid2), "wins": 0, "losses": 0, "played": 0}
+
+    for g in games:
+        ta = str(g.get("team_a", "")).strip().upper()
+        tb = str(g.get("team_b", "")).strip().upper()
+        a = g.get("a_score")
+        b = g.get("b_score")
+        if not ta or not tb:
+            continue
+        ensure(ta); ensure(tb)
+        if a is None or b is None:
+            continue
+        rec[ta]["played"] += 1
+        rec[tb]["played"] += 1
+        if a > b:
+            rec[ta]["wins"] += 1
+            rec[tb]["losses"] += 1
+        elif b > a:
+            rec[tb]["wins"] += 1
+            rec[ta]["losses"] += 1
+
+    for tid2, r in rec.items():
+        r["win_pct"] = round((r["wins"] / r["played"]), 4) if r["played"] > 0 else 0.0
+
+    opp_lists = {tid2: [] for tid2 in rec.keys()}
+    for g in games:
+        ta = str(g.get("team_a", "")).strip().upper()
+        tb = str(g.get("team_b", "")).strip().upper()
+        a = g.get("a_score")
+        b = g.get("b_score")
+        if a is None or b is None:
+            continue
+        if ta in opp_lists and tb in opp_lists:
+            opp_lists[ta].append(tb)
+            opp_lists[tb].append(ta)
+
+    for tid2, opps in opp_lists.items():
+        if not opps:
+            rec[tid2]["sos_lite"] = 0.0
+            continue
+        s = 0.0
+        for o in opps:
+            s += rec.get(o, {"win_pct": 0.0})["win_pct"]
+        rec[tid2]["sos_lite"] = round(s / len(opps), 4)
+
+    ranked = sorted(rec.values(), key=lambda x: (-x["win_pct"], -x["sos_lite"], -x["wins"], x["team_id"]))
+    rankings_preview = ranked[:top_n]
+
+        # ---- team summary preview (only when team_id is provided) ----
+    team_summary_preview = None
+    if tid:
+        team_games = []
+        wins = losses = played_ct = 0
+
+        for g in games:
+            ta = str(g.get("team_a", "")).strip().upper()
+            tb = str(g.get("team_b", "")).strip().upper()
+            if tid not in (ta, tb):
+                continue
+
+            week_v = _to_int_or_none(g.get("week"))
+            phase_v = str(g.get("phase", "")).strip().upper()
+            dk = str(g.get("date_key", "")).strip()
+
+            a_score = g.get("a_score")
+            b_score = g.get("b_score")
+            played_flag = (a_score is not None) and (b_score is not None)
+
+            # perspective scores/opponent
+            if tid == ta:
+                opponent_id = tb
+                team_score = a_score
+                opp_score = b_score
+            else:
+                opponent_id = ta
+                team_score = b_score
+                opp_score = a_score
+
+            if played_flag:
+                played_ct += 1
+                if team_score > opp_score:
+                    wins += 1
+                elif team_score < opp_score:
+                    losses += 1
+
+            team_games.append({
+                "game_key": g.get("game_key"),
+                "phase": phase_v,
+                "week": week_v,
+                "date_key": dk,
+                "opponent_team_id": opponent_id,
+                "opponent_name": name_map.get(opponent_id, opponent_id),
+                "played": played_flag,
+                "team_score": team_score,
+                "opp_score": opp_score,
+                "home_id": str(g.get("home_id", "")).strip().upper(),
+                "away_id": str(g.get("away_id", "")).strip().upper(),
+            })
+
+        def _phase_rank(p: str) -> int:
+            return {"REG_SEASON": 1, "CONF_TOURNEY": 2, "NAT_TOURNEY": 3}.get(p, 9)
+
+        def _season_rank_from_date_key(dk: str) -> int:
+            if not dk or len(dk) != 4 or not dk.isdigit():
+                return 999999
+            mm = int(dk[:2])
+            dd = int(dk[2:])
+            mm_rank = mm + 12 if mm <= 10 else mm
+            return mm_rank * 100 + dd
+
+        # last played game (latest by season-date, then phase/week)
+        played_games = sorted(
+            [x for x in team_games if x["played"]],
+            key=lambda x: (_season_rank_from_date_key(x["date_key"]), _phase_rank(x["phase"]), x["week"] if x["week"] is not None else 9999)
+        )
+        last_game = played_games[-1] if played_games else None
+
+        # next upcoming game (earliest by season-date, then phase/week)
+        upcoming_games = sorted(
+            [x for x in team_games if not x["played"]],
+            key=lambda x: (_season_rank_from_date_key(x["date_key"]), _phase_rank(x["phase"]), x["week"] if x["week"] is not None else 9999)
+        )
+        next_game = upcoming_games[0] if upcoming_games else None
+
+        win_pct = round(wins / played_ct, 4) if played_ct > 0 else 0.0
+
+        team_summary_preview = {
+            "team_id": tid,
+            "team_name": name_map.get(tid, tid),
+            "record": {"wins": wins, "losses": losses, "played": played_ct, "win_pct": win_pct},
+            "games_total_in_file": len(team_games),
+            "last_game": last_game,
+            "next_game": next_game,
+            "upcoming_count": len(upcoming_games),
+        }
+
+    # ---- response ----
+    status_block = {
+        "ok": True,
+        "refreshed_at": meta.get("refreshed_at") if meta else None,
+        "games_count": meta.get("games_count") if meta else len(games),
+        "summary": meta.get("summary") if meta else None,
+    }
+
+    return {
+        "status": status_block,
+        "filters": {"team_id": tid, "phase": ph},
+        "team_summary_preview": team_summary_preview,
+        "calendar_preview": {
+            "days_requested": days,
+            "days_returned": len(calendar_preview),
+            "days": calendar_preview,
+        },
+        "rankings_preview": {
+            "type": "sos_lite",
+            "top_n": top_n,
+            "teams_returned": len(rankings_preview),
+            "rankings": rankings_preview,
+        },
+        "links": {
+            "status": "/status",
+            "calendar": "/calendar",
+            "rankings": "/rankings/sos-lite",
+            "teams": "/teams",
+            "refresh": "/refresh",
+        },
+    }
+
+
 @app.get("/games")
 def get_games(
     limit: int = 100,
@@ -643,6 +945,179 @@ def matchup(team1: str, team2: str):
         "team2_name": name_map.get(t2, t2),
         "games_returned": len(out_sorted),
         "games": out_sorted
+    }
+
+
+@app.get("/calendar")
+def calendar(
+    team_id: Optional[str] = None,
+    phase: Optional[str] = None,
+    week: Optional[int] = None,
+    played: Optional[bool] = None,
+    limit_days: int = 30,
+    offset_days: int = 0,
+):
+    """
+    Calendar feed grouped by date_key (MMDD), optimized for mobile.
+    Default: league-wide, all phases, includes played+unplayed.
+    Filters: team_id, phase, week, played
+    Pagination: limit_days, offset_days
+    """
+    games = _load_games_or_404()
+    name_map = _team_name_map(active_only=False)
+
+    # normalize filters
+    tid = team_id.strip().upper() if team_id else None
+    ph = phase.strip().upper() if phase else None
+    wk = int(week) if week is not None else None
+
+    # clamp day pagination
+    try:
+        limit_days = int(limit_days)
+        offset_days = int(offset_days)
+    except Exception:
+        raise HTTPException(status_code=400, detail="limit_days and offset_days must be integers")
+
+    limit_days = max(1, min(limit_days, 120))
+    offset_days = max(0, offset_days)
+
+    def _season_rank_from_date_key(dk: str) -> int:
+        """
+        Season-order rank for MMDD where season starts in November:
+        Nov/Dec first, then Jan..Oct.
+        Returns an integer that sorts correctly.
+        """
+        if not dk or len(dk) != 4 or not dk.isdigit():
+            return 999999
+        mm = int(dk[:2])
+        dd = int(dk[2:])
+        mm_rank = mm + 12 if mm <= 10 else mm  # Jan-Oct pushed after Nov-Dec
+        return mm_rank * 100 + dd
+
+    def _display_date(dk: str) -> str:
+        if dk and len(dk) == 4 and dk.isdigit():
+            return f"{dk[:2]}/{dk[2:]}"
+        return ""
+
+    # filter games first
+    filtered = []
+    for g in games:
+        ta = str(g.get("team_a", "")).strip().upper()
+        tb = str(g.get("team_b", "")).strip().upper()
+        g_phase = str(g.get("phase", "")).strip().upper()
+        g_week = _to_int_or_none(g.get("week"))
+
+        a = g.get("a_score")
+        b = g.get("b_score")
+        g_played = (a is not None) and (b is not None)
+
+        dk = str(g.get("date_key", "")).strip()
+
+        if tid and tid not in (ta, tb):
+            continue
+        if ph and g_phase != ph:
+            continue
+        if wk is not None and g_week != wk:
+            continue
+        if played is not None and g_played != bool(played):
+            continue
+
+        # If date_key is missing, we skip it for calendar view (calendar is date-based)
+        if not dk:
+            continue
+
+        filtered.append(g)
+
+    # group by date_key
+    buckets = {}
+    for g in filtered:
+        dk = str(g.get("date_key", "")).strip()
+        buckets.setdefault(dk, []).append(g)
+
+    # sort date buckets in season order
+    date_keys_sorted = sorted(buckets.keys(), key=_season_rank_from_date_key)
+
+    # day pagination
+    date_keys_page = date_keys_sorted[offset_days: offset_days + limit_days]
+
+    # build day cards
+    days = []
+    for dk in date_keys_page:
+        games_for_day = buckets.get(dk, [])
+
+        # sort games within a day: phase rank -> week -> home/away
+        def _phase_rank(p: str) -> int:
+            return {"REG_SEASON": 1, "CONF_TOURNEY": 2, "NAT_TOURNEY": 3}.get(p, 9)
+
+        def _game_sort_key(g):
+            gp = str(g.get("phase", "")).strip().upper()
+            gw = _to_int_or_none(g.get("week"))
+            gw = gw if gw is not None else 9999
+            home_id = str(g.get("home_id", "")).strip().upper()
+            away_id = str(g.get("away_id", "")).strip().upper()
+            return (_phase_rank(gp), gw, home_id, away_id)
+
+        games_sorted = sorted(games_for_day, key=_game_sort_key)
+
+        out_games = []
+        for g in games_sorted:
+            ta = str(g.get("team_a", "")).strip().upper()
+            tb = str(g.get("team_b", "")).strip().upper()
+            home_id = str(g.get("home_id", "")).strip().upper()
+            away_id = str(g.get("away_id", "")).strip().upper()
+
+            a = g.get("a_score")
+            b = g.get("b_score")
+            g_played = (a is not None) and (b is not None)
+
+            out_games.append({
+                "game_key": g.get("game_key"),
+                "phase": str(g.get("phase", "")).strip().upper(),
+                "week": _to_int_or_none(g.get("week")),
+                "venue": g.get("venue"),
+                "home_id": home_id,
+                "home_name": name_map.get(home_id, home_id),
+                "away_id": away_id,
+                "away_name": name_map.get(away_id, away_id),
+                "team_a": ta,
+                "team_a_name": name_map.get(ta, ta),
+                "team_b": tb,
+                "team_b_name": name_map.get(tb, tb),
+                "a_score": a,
+                "b_score": b,
+                "played": g_played,
+            })
+
+        days.append({
+            "date_key": dk,
+            "display_date": _display_date(dk),
+            "season_rank": _season_rank_from_date_key(dk),
+            "games_count": len(out_games),
+            "games": out_games,
+        })
+
+    next_offset_days = offset_days + limit_days
+    if next_offset_days >= len(date_keys_sorted):
+        next_offset_days = None
+
+    prev_offset_days = offset_days - limit_days
+    if prev_offset_days < 0:
+        prev_offset_days = None
+
+    return {
+        "count_days": len(days),
+        "total_days": len(date_keys_sorted),
+        "limit_days": limit_days,
+        "offset_days": offset_days,
+        "next_offset_days": next_offset_days,
+        "prev_offset_days": prev_offset_days,
+        "filters": {
+            "team_id": tid,
+            "phase": ph,
+            "week": wk,
+            "played": played,
+        },
+        "days": days,
     }
     
 
