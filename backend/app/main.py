@@ -1,5 +1,5 @@
 from fastapi import FastAPI, HTTPException
-from app.ingest import load_teams_index, ingest_preview_for_one_team, ingest_league
+from app.ingest import load_teams_index, ingest_preview_for_one_team, ingest_league, load_polls
 
 import json
 import os
@@ -378,6 +378,90 @@ def status():
     }
 
 
+def _latest_poll_week(rows: list[dict]) -> int | None:
+    weeks = sorted({r["week"] for r in rows})
+    return weeks[-1] if weeks else None
+
+
+def _poll_payload(rows: list[dict], week: int, poll: str, name_map: dict) -> dict:
+    poll = poll.upper()
+
+    subset = [r for r in rows if r["week"] == week and r["poll"] == poll]
+
+    top25 = sorted([r for r in subset if r["bucket"] == "TOP25"], key=lambda x: x["bucket_order"])
+    next5 = sorted([r for r in subset if r["bucket"] == "NEXT5"], key=lambda x: x["bucket_order"])
+
+    # TOP25 has official rank; NEXT5 does not.
+    top25_out = [{
+        "rank": r["bucket_order"],
+        "team_id": r["team_id"],
+        "team_name": name_map.get(r["team_id"], r["team_id"]),
+        "notes": r.get("notes", ""),
+    } for r in top25]
+
+    next5_out = [{
+        "order": r["bucket_order"],  # internal ordering only
+        "team_id": r["team_id"],
+        "team_name": name_map.get(r["team_id"], r["team_id"]),
+        "notes": r.get("notes", ""),
+    } for r in next5]
+
+    return {
+        "poll": poll,
+        "week": week,
+        "top25": top25_out,
+        "next5": next5_out,
+        "counts": {"top25": len(top25_out), "next5": len(next5_out)},
+    }
+
+
+@app.get("/polls")
+def polls(week: int | None = None):
+    """
+    Returns both polls (LSL + LCAA) for a week.
+    If week not provided, returns latest week present in Polls sheet.
+    """
+    rows = load_polls()
+    if not rows:
+        raise HTTPException(status_code=404, detail="No poll data found. Fill Polls tab first.")
+
+    w = week if week is not None else _latest_poll_week(rows)
+    if w is None:
+        raise HTTPException(status_code=404, detail="No poll weeks found in Polls tab.")
+
+    name_map = _team_name_map(active_only=False)
+
+    return {
+        "week": w,
+        "polls": {
+            "LSL": _poll_payload(rows, w, "LSL", name_map),
+            "LCAA": _poll_payload(rows, w, "LCAA", name_map),
+        }
+    }
+
+
+@app.get("/polls/{poll}")
+def poll_single(poll: str, week: int | None = None):
+    """
+    Returns one poll (LSL or LCAA) for a week.
+    If week not provided, returns latest week present in Polls sheet.
+    """
+    poll_u = poll.strip().upper()
+    if poll_u not in ("LSL", "LCAA"):
+        raise HTTPException(status_code=400, detail="poll must be LSL or LCAA")
+
+    rows = load_polls()
+    if not rows:
+        raise HTTPException(status_code=404, detail="No poll data found. Fill Polls tab first.")
+
+    w = week if week is not None else _latest_poll_week(rows)
+    if w is None:
+        raise HTTPException(status_code=404, detail="No poll weeks found in Polls tab.")
+
+    name_map = _team_name_map(active_only=False)
+    return _poll_payload(rows, w, poll_u, name_map)
+
+
 @app.get("/home")
 def home(
     team_id: Optional[str] = None,
@@ -647,6 +731,323 @@ def home(
             "upcoming_count": len(upcoming_games),
         }
 
+        # ---- my_team_next_3 (only when team_id is provided) ----
+    my_team_next_3 = None
+    if tid:
+        upcoming = []
+
+        for g in games:
+            ta = str(g.get("team_a", "")).strip().upper()
+            tb = str(g.get("team_b", "")).strip().upper()
+            if tid not in (ta, tb):
+                continue
+
+            a = g.get("a_score")
+            b = g.get("b_score")
+            played_flag = (a is not None) and (b is not None)
+            if played_flag:
+                continue
+
+            dk = str(g.get("date_key", "")).strip()
+            if not dk:
+                continue
+
+            phase_v = str(g.get("phase", "")).strip().upper()
+            week_v = _to_int_or_none(g.get("week"))
+
+            home_id = str(g.get("home_id", "")).strip().upper()
+            away_id = str(g.get("away_id", "")).strip().upper()
+            venue = str(g.get("venue", "")).strip().upper()
+
+            opponent_id = away_id if home_id == tid else home_id
+            opponent_name = name_map.get(opponent_id, opponent_id)
+
+            # site from perspective of tid
+            if venue == "N":
+                site = "NEUTRAL"
+            else:
+                site = "HOME" if home_id == tid else "AWAY"
+
+            upcoming.append({
+                "game_key": g.get("game_key"),
+                "date_key": dk,
+                "display_date": _display_date(dk),
+                "phase": phase_v,
+                "week": week_v,
+                "site": site,
+                "opponent_team_id": opponent_id,
+                "opponent_name": opponent_name,
+                "home_id": home_id,
+                "home_name": name_map.get(home_id, home_id),
+                "away_id": away_id,
+                "away_name": name_map.get(away_id, away_id),
+            })
+
+        # sort by season date order, then phase, then week
+        upcoming_sorted = sorted(
+            upcoming,
+            key=lambda x: (_season_rank_from_date_key(x["date_key"]), _phase_rank(x["phase"]), x["week"] if x["week"] is not None else 9999)
+        )
+
+        my_team_next_3 = {
+            "team_id": tid,
+            "team_name": name_map.get(tid, tid),
+            "games_returned": min(3, len(upcoming_sorted)),
+            "games": upcoming_sorted[:3],
+        }
+
+        # ---- my_team_recent_3 (only when team_id is provided) ----
+    my_team_recent_3 = None
+    if tid:
+        recent = []
+
+        for g in games:
+            ta = str(g.get("team_a", "")).strip().upper()
+            tb = str(g.get("team_b", "")).strip().upper()
+            if tid not in (ta, tb):
+                continue
+
+            a = g.get("a_score")
+            b = g.get("b_score")
+            played_flag = (a is not None) and (b is not None)
+            if not played_flag:
+                continue
+
+            dk = str(g.get("date_key", "")).strip()
+            phase_v = str(g.get("phase", "")).strip().upper()
+            week_v = _to_int_or_none(g.get("week"))
+
+            home_id = str(g.get("home_id", "")).strip().upper()
+            away_id = str(g.get("away_id", "")).strip().upper()
+            venue = str(g.get("venue", "")).strip().upper()
+
+            opponent_id = away_id if home_id == tid else home_id
+            opponent_name = name_map.get(opponent_id, opponent_id)
+
+            # site from tid perspective
+            if venue == "N":
+                site = "NEUTRAL"
+            else:
+                site = "HOME" if home_id == tid else "AWAY"
+
+            # team/opp scores from tid perspective
+            if tid == ta:
+                team_score = a
+                opp_score = b
+            else:
+                team_score = b
+                opp_score = a
+
+            result = "W" if team_score > opp_score else ("L" if team_score < opp_score else "T")
+
+            prefix = "@ " if site == "AWAY" else "vs "
+            neutral_tag = " (N)" if site == "NEUTRAL" else ""
+            display_result_short = f"{result} {team_score}\u2013{opp_score} {prefix}{opponent_name}{neutral_tag}"
+
+            recent.append({
+                "game_key": g.get("game_key"),
+                "date_key": dk,
+                "display_date": _display_date(dk) if dk else "",
+                "phase": phase_v,
+                "week": week_v,
+                "site": site,
+                "opponent_team_id": opponent_id,
+                "opponent_name": opponent_name,
+                "team_score": team_score,
+                "opp_score": opp_score,
+                "result": result,
+                "display_result_short": display_result_short,
+                "home_id": home_id,
+                "home_name": name_map.get(home_id, home_id),
+                "away_id": away_id,
+                "away_name": name_map.get(away_id, away_id),
+            })
+
+        # Most recent first: season date order, then phase, then week
+        recent_sorted = sorted(
+            recent,
+            key=lambda x: (
+                _season_rank_from_date_key(x["date_key"]) if x["date_key"] else 999999,
+                _phase_rank(x["phase"]),
+                x["week"] if x["week"] is not None else 9999
+            ),
+            reverse=True
+        )
+
+        my_team_recent_3 = {
+            "team_id": tid,
+            "team_name": name_map.get(tid, tid),
+            "games_returned": min(3, len(recent_sorted)),
+            "games": recent_sorted[:3],
+        }
+
+            # ---- featured_games ----
+    # League mode: prioritize LSL Poll (TOP25 > NEXT5), then tie-break by quality + soonest date.
+    # Team mode: show that team's next 5 upcoming games (still useful as "featured" for my team).
+    featured_games = {
+        "mode": "team" if tid else "league",
+        "team_id": tid,
+        "team_name": name_map.get(tid, tid) if tid else None,
+        "games_returned": 0,
+        "games": []
+    }
+
+    # Build LSL poll maps (latest week in Polls sheet)
+    lsl_top25_rank = {}   # team_id -> 1..25
+    lsl_next5_order = {}  # team_id -> 1..5 (not official rank)
+    lsl_poll_week = None
+
+    try:
+        poll_rows = load_polls()
+        if poll_rows:
+            lsl_poll_week = max(r["week"] for r in poll_rows)
+            lsl_rows = [r for r in poll_rows if r["week"] == lsl_poll_week and r["poll"] == "LSL"]
+            for r in lsl_rows:
+                t = str(r["team_id"]).strip().upper()
+                if r["bucket"] == "TOP25":
+                    lsl_top25_rank[t] = int(r["bucket_order"])
+                elif r["bucket"] == "NEXT5":
+                    lsl_next5_order[t] = int(r["bucket_order"])
+    except Exception:
+        # Polls optional: fall back to non-poll logic if something goes wrong
+        lsl_top25_rank, lsl_next5_order, lsl_poll_week = {}, {}, None
+
+    def _poll_points(team_id: str) -> int:
+        """
+        Internal scoring only:
+        - TOP25: rank 1 gets 25, rank 25 gets 1
+        - NEXT5: order 1 gets 5, order 5 gets 1 (not an official rank)
+        - unranked: 0
+        """
+        if team_id in lsl_top25_rank:
+            return 26 - lsl_top25_rank[team_id]
+        if team_id in lsl_next5_order:
+            return 6 - lsl_next5_order[team_id]
+        return 0
+
+    # Win% map for tie-break quality scoring (played games only)
+    wl = {}
+    def _ensure_wl(t):
+        if t not in wl:
+            wl[t] = {"wins": 0, "losses": 0, "played": 0}
+
+    for g in games:
+        ta = str(g.get("team_a", "")).strip().upper()
+        tb = str(g.get("team_b", "")).strip().upper()
+        a = g.get("a_score")
+        b = g.get("b_score")
+        if not ta or not tb:
+            continue
+        _ensure_wl(ta); _ensure_wl(tb)
+        if a is None or b is None:
+            continue
+        wl[ta]["played"] += 1
+        wl[tb]["played"] += 1
+        if a > b:
+            wl[ta]["wins"] += 1
+            wl[tb]["losses"] += 1
+        elif b > a:
+            wl[tb]["wins"] += 1
+            wl[ta]["losses"] += 1
+
+    winpct = {t: (r["wins"] / r["played"]) if r["played"] > 0 else 0.0 for t, r in wl.items()}
+
+    def _quality(home_id: str, away_id: str) -> float:
+        return round((winpct.get(home_id, 0.0) + winpct.get(away_id, 0.0)) / 2.0, 4)
+
+    # Collect upcoming games pool (unplayed only)
+    upcoming_pool = []
+    for g in games:
+        a = g.get("a_score")
+        b = g.get("b_score")
+        if (a is not None) and (b is not None):
+            continue
+
+        dk = str(g.get("date_key", "")).strip()
+        if not dk:
+            continue
+
+        phase_v = str(g.get("phase", "")).strip().upper()
+        if ph and phase_v != ph:
+            continue
+
+        home_id = str(g.get("home_id", "")).strip().upper()
+        away_id = str(g.get("away_id", "")).strip().upper()
+        venue = str(g.get("venue", "")).strip().upper()
+        week_v = _to_int_or_none(g.get("week"))
+
+        # team scope
+        if tid:
+            ta = str(g.get("team_a", "")).strip().upper()
+            tb = str(g.get("team_b", "")).strip().upper()
+            if tid not in (ta, tb):
+                continue
+
+            if venue == "N":
+                site = "NEUTRAL"
+            else:
+                site = "HOME" if home_id == tid else "AWAY"
+        else:
+            site = "NEUTRAL" if venue == "N" else "HOME"
+
+        upcoming_pool.append({
+            "game_key": g.get("game_key"),
+            "date_key": dk,
+            "display_date": _display_date(dk),
+            "phase": phase_v,
+            "week": week_v,
+            "venue": venue,
+            "home_id": home_id,
+            "home_name": name_map.get(home_id, home_id),
+            "away_id": away_id,
+            "away_name": name_map.get(away_id, away_id),
+            "site": site,
+            "quality": _quality(home_id, away_id),
+
+            # LSL poll context (LSL only)
+            "lsl_rank_home": lsl_top25_rank.get(home_id),
+            "lsl_rank_away": lsl_top25_rank.get(away_id),
+            "lsl_next5_home": lsl_next5_order.get(home_id),
+            "lsl_next5_away": lsl_next5_order.get(away_id),
+        })
+
+    if tid:
+        # Team mode: next 5 upcoming games by season date, then phase, then week
+        upcoming_sorted = sorted(
+            upcoming_pool,
+            key=lambda x: (_season_rank_from_date_key(x["date_key"]), _phase_rank(x["phase"]), x["week"] if x["week"] is not None else 9999)
+        )
+        featured = upcoming_sorted[:5]
+    else:
+        # League mode: keep it "what's next" by focusing on earliest upcoming date(s),
+        # but rank those games by LSL poll strength first.
+        if upcoming_pool:
+            day_ranks = sorted(set(_season_rank_from_date_key(x["date_key"]) for x in upcoming_pool))
+            expanded = []
+            i = 0
+            while len(expanded) < 25 and i < len(day_ranks):  # expand a few days forward
+                expanded.extend([x for x in upcoming_pool if _season_rank_from_date_key(x["date_key"]) == day_ranks[i]])
+                i += 1
+
+            featured = sorted(
+                expanded,
+                key=lambda x: (
+                    -(_poll_points(x["home_id"]) + _poll_points(x["away_id"])),  # LSL poll first
+                    -x["quality"],  # tie-break
+                    _season_rank_from_date_key(x["date_key"]),
+                    x["week"] if x["week"] is not None else 9999,
+                    x["home_id"],
+                    x["away_id"],
+                )
+            )[:5]
+        else:
+            featured = []
+
+    featured_games["poll"] = "LSL"
+    featured_games["poll_week"] = lsl_poll_week
+    featured_games["games"] = featured
+    featured_games["games_returned"] = len(featured)
+
     # ---- response ----
     status_block = {
         "ok": True,
@@ -659,6 +1060,9 @@ def home(
         "status": status_block,
         "filters": {"team_id": tid, "phase": ph},
         "team_summary_preview": team_summary_preview,
+        "my_team_next_3": my_team_next_3,
+        "my_team_recent_3": my_team_recent_3,
+        "featured_games": featured_games,
         "calendar_preview": {
             "days_requested": days,
             "days_returned": len(calendar_preview),

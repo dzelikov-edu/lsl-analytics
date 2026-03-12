@@ -81,6 +81,61 @@ def load_team_map_names() -> dict:
     return out
 
 
+def load_polls() -> list[dict]:
+    """
+    Reads Polls tab from MASTER sheet and returns a list of rows.
+    Expected columns in Polls tab:
+      week | poll | bucket | bucket_order | team_id | notes
+    """
+    service = get_sheets_service(settings.GOOGLE_SERVICE_ACCOUNT_JSON)
+    values = read_range(service, settings.MASTER_SHEET_ID, "Polls!A1:F2000")
+    if not values or len(values) < 2:
+        return []
+
+    header = [str(x).strip().lower() for x in values[0]]
+    idx = {h: i for i, h in enumerate(header)}
+
+    required = ["week", "poll", "bucket", "bucket_order", "team_id"]
+    for r in required:
+        if r not in idx:
+            raise RuntimeError(f"Polls sheet missing required column: {r}")
+
+    out = []
+    for row in values[1:]:
+        def cell(name, default=""):
+            i = idx.get(name)
+            if i is None or i >= len(row):
+                return default
+            return str(row[i]).strip()
+
+        week_s = cell("week")
+        poll = cell("poll").upper()
+        bucket = cell("bucket").upper()
+        bucket_order_s = cell("bucket_order")
+        team_id = cell("team_id").upper()
+        notes = cell("notes", "")
+
+        if not week_s or not poll or not bucket or not bucket_order_s or not team_id:
+            continue
+
+        try:
+            week = int(float(week_s))
+            bucket_order = int(float(bucket_order_s))
+        except Exception:
+            continue
+
+        out.append({
+            "week": week,
+            "poll": poll,
+            "bucket": bucket,               # TOP25 or NEXT5
+            "bucket_order": bucket_order,   # 1..25 or 1..5
+            "team_id": team_id,
+            "notes": notes,
+        })
+
+    return out
+
+
 def read_schedule_export(team_sheet_id: str, export_tab: str) -> List[dict]:
     """
     Reads ScheduleExport by HEADER NAMES (order doesn't matter; extra columns allowed).
