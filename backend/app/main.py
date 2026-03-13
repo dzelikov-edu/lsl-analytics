@@ -598,13 +598,17 @@ def _latest_records_week(rows: list[dict]) -> int | None:
     return weeks[-1] if weeks else None
 
 
-def _build_lsl_poll_maps_for_week(week: int | None = None):
+def _build_poll_maps_for_week(poll: str, week: int | None = None):
     """
     Returns: (poll_week, top25_rank_map, next5_order_map)
       - top25_rank_map: team_id -> 1..25
       - next5_order_map: team_id -> 1..5 (display-only)
     Uses latest poll week if week is None.
     """
+    poll_u = str(poll).strip().upper()
+    if poll_u not in ("LSL", "LCAA"):
+        return (week, {}, {})
+
     rows = load_polls()
     if not rows:
         return (None, {}, {})
@@ -612,14 +616,13 @@ def _build_lsl_poll_maps_for_week(week: int | None = None):
     available_weeks = sorted({r["week"] for r in rows})
     poll_week = week if week is not None else available_weeks[-1]
     if poll_week not in available_weeks:
-        # if requested week doesn't exist, return empty maps (or you could raise)
         return (poll_week, {}, {})
 
-    lsl_rows = [r for r in rows if r["week"] == poll_week and r["poll"] == "LSL"]
+    poll_rows = [r for r in rows if r["week"] == poll_week and r["poll"] == poll_u]
 
     top25 = {}
     next5 = {}
-    for r in lsl_rows:
+    for r in poll_rows:
         tid = str(r["team_id"]).strip().upper()
         if r["bucket"] == "TOP25":
             top25[tid] = int(r["bucket_order"])
@@ -642,7 +645,7 @@ def conferences(week: int | None = None):
     w = week if week is not None else _latest_records_week(records)
 
     # LSL poll maps (latest poll week by default)
-    poll_week, lsl_top25_rank, lsl_next5_order = _build_lsl_poll_maps_for_week()
+    poll_week, lsl_top25_rank, lsl_next5_order = _build_poll_maps_for_week("LSL")
 
     # group team_ids by conference
     conf_to_teams: dict[str, list[str]] = {}
@@ -704,6 +707,16 @@ def conference_detail(conf_id: str, week: int | None = None, debug: bool = False
     # Identify tracked teams (has sheet) for UX
     tracked = {t.team_id.strip().upper() for t in load_teams_index() if t.active}
 
+    lsl_poll_week, lsl_top25_rank, lsl_next5_order = _build_poll_maps_for_week("LSL", w)
+    lcaa_poll_week, lcaa_top25_rank, lcaa_next5_order = _build_poll_maps_for_week("LCAA", w)
+
+    conf_team_ids = set(members)
+
+    lsl_top25_count = sum(1 for tid in conf_team_ids if tid in lsl_top25_rank)
+    lsl_next5_count = sum(1 for tid in conf_team_ids if tid in lsl_next5_order)
+    lcaa_top25_count = sum(1 for tid in conf_team_ids if tid in lcaa_top25_rank)
+    lcaa_next5_count = sum(1 for tid in conf_team_ids if tid in lcaa_next5_order)
+
     standings = []
     missing = []
     for tid in sorted(members):
@@ -724,6 +737,27 @@ def conference_detail(conf_id: str, week: int | None = None, debug: bool = False
             "win_pct": round(wins / (wins + losses), 4) if (wins + losses) > 0 else 0.0,
             "conf_win_pct": round(cw / (cw + cl), 4) if (cw + cl) > 0 else 0.0,
             "last_updated": r.get("last_updated", ""),
+            "polls": {
+                "LSL": {
+                    "week": lsl_poll_week,
+                    "rank": lsl_top25_rank.get(tid),
+                    "next5_order": lsl_next5_order.get(tid),
+                    "is_ranked": tid in lsl_top25_rank,
+                    "is_next5": tid in lsl_next5_order,
+                },
+                "LCAA": {
+                    "week": lcaa_poll_week,
+                    "rank": lcaa_top25_rank.get(tid),
+                    "next5_order": lcaa_next5_order.get(tid),
+                    "is_ranked": tid in lcaa_top25_rank,
+                    "is_next5": tid in lcaa_next5_order,
+                },
+                "primary_display": (
+                    f"#{lsl_top25_rank[tid]}"
+                    if tid in lsl_top25_rank
+                    else ("Next 5" if tid in lsl_next5_order else None)
+                ),
+            },
             "links": {
                 "team": f"/teams/{tid}",
                 "schedule": f"/teams/{tid}/schedule",
@@ -731,7 +765,7 @@ def conference_detail(conf_id: str, week: int | None = None, debug: bool = False
             } if tid in tracked else {},
         })
 
-        # ---- Head-to-head tie-breakers (universal) ----
+    # ---- Head-to-head tie-breakers (universal) ----
     # Only applied within tie groups that share the same (conf_wins, conf_losses).
     conf_games_all = load_conf_games_snapshot()
     conf_games = [
@@ -756,23 +790,34 @@ def conference_detail(conf_id: str, week: int | None = None, debug: bool = False
         key = (row["conference"]["wins"], row["conference"]["losses"])
         tie_groups.setdefault(key, []).append(row)
 
-    resolved = []
+        # Preserve within-group head-to-head ordering.
+    # Order the conference-record groups themselves, but do not re-sort inside each group.
+    ordered_group_keys = sorted(
+        tie_groups.keys(),
+        key=lambda k: (-k[0], k[1])  # conf wins desc, conf losses asc
+    )
 
-    for (cw, cl), group in tie_groups.items():
+    resolved_sorted = []
+    for group_key in ordered_group_keys:
+        group = tie_groups[group_key]
+
         if len(group) == 1:
-            resolved.extend(group)
+            resolved_sorted.extend(group)
             continue
 
         tied_ids = {t["team_id"] for t in group}
         h2h_w = {tid: 0 for tid in tied_ids}
         h2h_l = {tid: 0 for tid in tied_ids}
 
-        # Compute H2H only among tied teams
+        h2h_games_found = False
+
         for g in conf_games:
             h = g["home_id"]
             a = g["away_id"]
             if h not in tied_ids or a not in tied_ids:
                 continue
+            
+            h2h_games_found = True
 
             hs = g["home_score"]
             as_ = g["away_score"]
@@ -783,15 +828,11 @@ def conference_detail(conf_id: str, week: int | None = None, debug: bool = False
             elif as_ > hs:
                 h2h_w[a] += 1
                 h2h_l[h] += 1
-            else:
-                # ties are extremely unlikely; ignore
-                pass
 
         def h2h_pct(tid):
             gp = h2h_w[tid] + h2h_l[tid]
             return (h2h_w[tid] / gp) if gp > 0 else 0.0
 
-        # Sort group by H2H first, then fall back to deterministic key
         group_sorted = sorted(
             group,
             key=lambda x: (
@@ -801,8 +842,7 @@ def conference_detail(conf_id: str, week: int | None = None, debug: bool = False
             )
         )
 
-        # Attach tiebreak details ONLY when debug=true
-        if debug:
+        if debug and h2h_games_found:
             for x in group_sorted:
                 tid2 = x["team_id"]
                 x["tiebreak"] = {
@@ -811,29 +851,7 @@ def conference_detail(conf_id: str, week: int | None = None, debug: bool = False
                     "h2h_win_pct": round(h2h_pct(tid2), 4),
                 }
 
-        resolved.extend(group_sorted)
-
-    # Final sort: primary by conference record groups already preserved by grouping,
-    # but we must order the groups themselves by conf record + deterministic
-    resolved_sorted = sorted(
-        resolved,
-        key=lambda x: (
-            -x["conference"]["wins"],
-            x["conference"]["losses"],
-            _deterministic_key(x),
-        )
-    )
-
-    # Sort standings: conference wins desc, conf losses asc, then overall win_pct desc, then name
-    standings_sorted = sorted(
-        standings,
-        key=lambda x: (
-            -x["conference"]["wins"],
-            x["conference"]["losses"],
-            -x["win_pct"],
-            x["team_name"],
-        )
-    )
+        resolved_sorted.extend(group_sorted)
 
     return {
         "conference_id": cid,
@@ -843,6 +861,18 @@ def conference_detail(conf_id: str, week: int | None = None, debug: bool = False
         "standings_count": len(resolved_sorted),
         "missing_records_count": len(missing),
         "missing_team_ids": missing[:50],
+        "poll_summary": {
+            "LSL": {
+                "week": lsl_poll_week,
+                "top25_count": lsl_top25_count,
+                "next5_count": lsl_next5_count,
+            },
+            "LCAA": {
+                "week": lcaa_poll_week,
+                "top25_count": lcaa_top25_count,
+                "next5_count": lcaa_next5_count,
+            },
+        },
         "standings": resolved_sorted,
     }
 
