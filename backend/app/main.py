@@ -2025,6 +2025,40 @@ def analytics_sos(week: int | None = None):
     }
 
 
+def _home_analytics_preview(week: int | None = None) -> dict:
+    power = analytics_power(week)
+    resume = analytics_resume(week)
+    form = analytics_form(week)
+    sos = analytics_sos(week)
+
+    def leader_from(resp: dict) -> dict | None:
+        items = resp.get("items", [])
+        if not items:
+            return None
+        top = items[0]
+        return {
+            "rank": top.get("rank"),
+            "team_id": top.get("team_id"),
+            "team_name": top.get("team_name"),
+            "value": top.get("value"),
+            "tier": top.get("tier"),
+            "links": {
+                "team": top.get("links", {}).get("team"),
+                "analytics": f"/analytics/{resp.get('metric')}",
+            },
+        }
+
+    return {
+        "week": week,
+        "leaders": {
+            "power": leader_from(power),
+            "resume": leader_from(resume),
+            "form": leader_from(form),
+            "sos": leader_from(sos),
+        },
+    }
+
+
 @app.get("/home")
 def home(
     team_id: Optional[str] = None,
@@ -2064,6 +2098,8 @@ def home(
 
     days = max(1, min(days, 14))
     top_n = max(5, min(top_n, 100))
+
+    analytics_preview = _home_analytics_preview()
 
     def _phase_rank(p: str) -> int:
         return {"REG_SEASON": 1, "CONF_TOURNEY": 2, "NAT_TOURNEY": 3}.get(p, 9)
@@ -2152,59 +2188,121 @@ def home(
             "games": out_games,
         })
 
-    # ---- rankings preview (SOS-lite) ----
-    # compute quickly from games list (played games only)
-    rec = {}
-    def ensure(tid2: str):
-        tid2 = tid2.strip().upper()
-        if tid2 not in rec:
-            rec[tid2] = {"team_id": tid2, "team_name": name_map.get(tid2, tid2), "wins": 0, "losses": 0, "played": 0}
+    # ---- rankings preview (prefer LSL Poll, fallback to SOS-lite) ----
+    rankings_preview_type = None
+    rankings_preview_week = None
+    rankings_preview = []
 
-    for g in games:
-        ta = str(g.get("team_a", "")).strip().upper()
-        tb = str(g.get("team_b", "")).strip().upper()
-        a = g.get("a_score")
-        b = g.get("b_score")
-        if not ta or not tb:
-            continue
-        ensure(ta); ensure(tb)
-        if a is None or b is None:
-            continue
-        rec[ta]["played"] += 1
-        rec[tb]["played"] += 1
-        if a > b:
-            rec[ta]["wins"] += 1
-            rec[tb]["losses"] += 1
-        elif b > a:
-            rec[tb]["wins"] += 1
-            rec[ta]["losses"] += 1
+    # First try: latest/requested LSL poll
+    try:
+        poll_rows = load_polls()
+        if poll_rows:
+            available_weeks = sorted({r["week"] for r in poll_rows})
+            rankings_preview_week = available_weeks[-1]
 
-    for tid2, r in rec.items():
-        r["win_pct"] = round((r["wins"] / r["played"]), 4) if r["played"] > 0 else 0.0
+            lsl_rows = [
+                r for r in poll_rows
+                if r["week"] == rankings_preview_week and r["poll"] == "LSL"
+            ]
 
-    opp_lists = {tid2: [] for tid2 in rec.keys()}
-    for g in games:
-        ta = str(g.get("team_a", "")).strip().upper()
-        tb = str(g.get("team_b", "")).strip().upper()
-        a = g.get("a_score")
-        b = g.get("b_score")
-        if a is None or b is None:
-            continue
-        if ta in opp_lists and tb in opp_lists:
-            opp_lists[ta].append(tb)
-            opp_lists[tb].append(ta)
+            poll_items = []
+            for r in lsl_rows:
+                tid2 = str(r["team_id"]).strip().upper()
+                bucket = str(r["bucket"]).strip().upper()
+                bucket_order = int(r["bucket_order"])
 
-    for tid2, opps in opp_lists.items():
-        if not opps:
-            rec[tid2]["sos_lite"] = 0.0
-            continue
-        s = 0.0
-        for o in opps:
-            s += rec.get(o, {"win_pct": 0.0})["win_pct"]
-        rec[tid2]["sos_lite"] = round(s / len(opps), 4)
+                item = {
+                    "team_id": tid2,
+                    "team_name": name_map.get(tid2, tid2),
+                    "bucket": bucket,
+                    "bucket_order": bucket_order,
+                    "rank": bucket_order if bucket == "TOP25" else None,
+                    "next5_order": bucket_order if bucket == "NEXT5" else None,
+                }
+                poll_items.append(item)
 
-    ranked = sorted(rec.values(), key=lambda x: (-x["win_pct"], -x["sos_lite"], -x["wins"], x["team_id"]))
-    rankings_preview = ranked[:top_n]
+            def _poll_sort_key(x):
+                if x["bucket"] == "TOP25":
+                    return (0, x["bucket_order"], x["team_name"])
+                if x["bucket"] == "NEXT5":
+                    return (1, x["bucket_order"], x["team_name"])
+                return (2, 999, x["team_name"])
+
+            poll_items_sorted = sorted(poll_items, key=_poll_sort_key)
+            rankings_preview = poll_items_sorted[:top_n]
+            rankings_preview_type = "lsl_poll"
+    except Exception:
+        rankings_preview_type = None
+        rankings_preview_week = None
+        rankings_preview = []
+
+    # Fallback: current SOS-lite logic if poll data unavailable
+    if rankings_preview_type is None:
+        rec = {}
+
+        def ensure(tid2: str):
+            tid2 = tid2.strip().upper()
+            if tid2 not in rec:
+                rec[tid2] = {
+                    "team_id": tid2,
+                    "team_name": name_map.get(tid2, tid2),
+                    "wins": 0,
+                    "losses": 0,
+                    "played": 0
+                }
+
+        for g in games:
+            ta = str(g.get("team_a", "")).strip().upper()
+            tb = str(g.get("team_b", "")).strip().upper()
+            a = g.get("a_score")
+            b = g.get("b_score")
+            if not ta or not tb:
+                continue
+            ensure(ta)
+            ensure(tb)
+            if a is None or b is None:
+                continue
+            rec[ta]["played"] += 1
+            rec[tb]["played"] += 1
+            if a > b:
+                rec[ta]["wins"] += 1
+                rec[tb]["losses"] += 1
+            elif b > a:
+                rec[tb]["wins"] += 1
+                rec[ta]["losses"] += 1
+
+        for tid2, r in rec.items():
+            r["win_pct"] = round((r["wins"] / r["played"]), 4) if r["played"] > 0 else 0.0
+
+        opp_lists = {tid2: [] for tid2 in rec.keys()}
+        for g in games:
+            ta = str(g.get("team_a", "")).strip().upper()
+            tb = str(g.get("team_b", "")).strip().upper()
+            a = g.get("a_score")
+            b = g.get("b_score")
+            if a is None or b is None:
+                continue
+            if ta in opp_lists and tb in opp_lists:
+                opp_lists[ta].append(tb)
+                opp_lists[tb].append(ta)
+
+        for tid2, opps in opp_lists.items():
+            if not opps:
+                rec[tid2]["sos_lite"] = 0.0
+                continue
+            s = 0.0
+            for o in opps:
+                s += rec.get(o, {"win_pct": 0.0})["win_pct"]
+            rec[tid2]["sos_lite"] = round(s / len(opps), 4)
+
+        ranked = sorted(
+            rec.values(),
+            key=lambda x: (-x["win_pct"], -x["sos_lite"], -x["wins"], x["team_id"])
+        )
+
+        rankings_preview = ranked[:top_n]
+        rankings_preview_type = "sos_lite"
+        rankings_preview_week = None
 
         # ---- team summary preview (only when team_id is provided) ----
     team_summary_preview = None
@@ -2626,13 +2724,15 @@ def home(
         "my_team_next_3": my_team_next_3,
         "my_team_recent_3": my_team_recent_3,
         "featured_games": featured_games,
+        "analytics_preview": analytics_preview,
         "calendar_preview": {
             "days_requested": days,
             "days_returned": len(calendar_preview),
             "days": calendar_preview,
         },
         "rankings_preview": {
-            "type": "sos_lite",
+            "type": rankings_preview_type,
+            "week": rankings_preview_week,
             "top_n": top_n,
             "teams_returned": len(rankings_preview),
             "rankings": rankings_preview,
