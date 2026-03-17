@@ -136,6 +136,71 @@ def load_polls() -> list[dict]:
     return out
 
 
+def load_preseason_power() -> list[dict]:
+    """
+    Reads PreseasonPower tab from MASTER sheet.
+    Expected columns:
+      week | team_id | power_value | notes (optional)
+
+    Returns list of rows as dicts:
+      {
+        "week": int,
+        "team_id": str,
+        "power_value": float,
+        "notes": str,
+      }
+    """
+    service = get_sheets_service(settings.GOOGLE_SERVICE_ACCOUNT_JSON)
+    values = read_range(service, settings.MASTER_SHEET_ID, "PreseasonPower!A1:D2000")
+    if not values or len(values) < 2:
+        return []
+
+    header = [str(x).strip().lower() for x in values[0]]
+    idx = {h: i for i, h in enumerate(header)}
+
+    required = ["week", "team_id", "power_value"]
+    for r in required:
+        if r not in idx:
+            raise RuntimeError(f"PreseasonPower missing required column: {r}")
+
+    def cell(row, name, default=""):
+        i = idx.get(name)
+        if i is None or i >= len(row):
+            return default
+        return row[i]
+
+    out = []
+    for row in values[1:]:
+        if not row:
+            continue
+
+        week_raw = cell(row, "week", "")
+        team_id = str(cell(row, "team_id", "")).strip().upper()
+        power_raw = cell(row, "power_value", "")
+
+        if week_raw == "" or not team_id or power_raw == "":
+            continue
+
+        try:
+            week = int(float(str(week_raw)))
+            power_value = float(str(power_raw))
+        except Exception:
+            continue
+
+        notes = ""
+        if "notes" in idx:
+            notes = str(cell(row, "notes", "")).strip()
+
+        out.append({
+            "week": week,
+            "team_id": team_id,
+            "power_value": power_value,
+            "notes": notes,
+        })
+
+    return out
+
+
 def load_conference_membership() -> dict[str, str]:
     """
     Reads ConferenceMembership tab from MASTER sheet.

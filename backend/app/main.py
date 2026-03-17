@@ -4,6 +4,7 @@ from app.ingest import (
     ingest_preview_for_one_team,
     ingest_league,
     load_polls,
+    load_preseason_power,
     load_conference_membership,
     load_conferences_map,
     load_records_snapshot,
@@ -874,6 +875,670 @@ def conference_detail(conf_id: str, week: int | None = None, debug: bool = False
             },
         },
         "standings": resolved_sorted,
+    }
+
+
+def _analytics_record_map(week: int | None = None) -> dict[str, dict]:
+    records = load_records_snapshot()
+    if not records:
+        return {}
+
+    rec_week = week if week is not None else _latest_records_week(records)
+    if rec_week is None:
+        return {}
+
+    out = {}
+    for r in records:
+        if r["week"] != rec_week:
+            continue
+        tid = str(r["team_id"]).strip().upper()
+        out[tid] = {
+            "wins": int(r["wins"]),
+            "losses": int(r["losses"]),
+        }
+    return out
+
+
+def _analytics_polls_map(week: int | None = None) -> dict[str, dict]:
+    lsl_week, lsl_top25, lsl_next5 = _build_poll_maps_for_week("LSL", week)
+    lcaa_week, lcaa_top25, lcaa_next5 = _build_poll_maps_for_week("LCAA", week)
+
+    team_ids = set(lsl_top25) | set(lsl_next5) | set(lcaa_top25) | set(lcaa_next5)
+    out = {}
+
+    for tid in team_ids:
+        out[tid] = {
+            "LSL": {
+                "week": lsl_week,
+                "rank": lsl_top25.get(tid),
+                "is_ranked": tid in lsl_top25,
+                "is_next5": tid in lsl_next5,
+            },
+            "LCAA": {
+                "week": lcaa_week,
+                "rank": lcaa_top25.get(tid),
+                "is_ranked": tid in lcaa_top25,
+                "is_next5": tid in lcaa_next5,
+            },
+        }
+
+    return out
+
+
+def _analytics_team_links(team_id: str) -> dict:
+    tid = str(team_id).strip().upper()
+    return {
+        "team": f"/teams/{tid}",
+    }
+
+
+def _analytics_record_block(team_id: str, week: int | None = None) -> dict:
+    tid = str(team_id).strip().upper()
+    records = load_records_snapshot()
+    if not records:
+        return {"wins": 0, "losses": 0}
+
+    rec_week = week if week is not None else _latest_records_week(records)
+    if rec_week is None:
+        return {"wins": 0, "losses": 0}
+
+    for r in records:
+        if r["week"] == rec_week and r["team_id"] == tid:
+            return {
+                "wins": int(r["wins"]),
+                "losses": int(r["losses"]),
+            }
+
+    return {"wins": 0, "losses": 0}
+
+
+def _analytics_polls_block(team_id: str, week: int | None = None) -> dict:
+    tid = str(team_id).strip().upper()
+
+    lsl_week, lsl_top25, lsl_next5 = _build_poll_maps_for_week("LSL", week)
+    lcaa_week, lcaa_top25, lcaa_next5 = _build_poll_maps_for_week("LCAA", week)
+
+    return {
+        "LSL": {
+            "week": lsl_week,
+            "rank": lsl_top25.get(tid),
+            "is_ranked": tid in lsl_top25,
+            "is_next5": tid in lsl_next5,
+        },
+        "LCAA": {
+            "week": lcaa_week,
+            "rank": lcaa_top25.get(tid),
+            "is_ranked": tid in lcaa_top25,
+            "is_next5": tid in lcaa_next5,
+        },
+    }
+
+
+def _analytics_base_row(
+    team_id: str,
+    team_name: str,
+    value: float,
+    rank: int,
+    week: int | None = None,
+    tier: str | None = None,
+    trend: str = "flat",
+    record_map: dict | None = None,
+    polls_map: dict | None = None,
+) -> dict:
+    tid = str(team_id).strip().upper()
+
+    if record_map is None:
+        record = _analytics_record_block(tid, week)
+    else:
+        record = record_map.get(tid, {"wins": 0, "losses": 0})
+
+    if polls_map is None:
+        polls = _analytics_polls_block(tid, week)
+    else:
+        polls = polls_map.get(
+            tid,
+            {
+                "LSL": {
+                    "week": week,
+                    "rank": None,
+                    "is_ranked": False,
+                    "is_next5": False,
+                },
+                "LCAA": {
+                    "week": week,
+                    "rank": None,
+                    "is_ranked": False,
+                    "is_next5": False,
+                },
+            },
+        )
+
+    row = {
+        "rank": rank,
+        "team_id": tid,
+        "team_name": team_name,
+        "value": round(float(value), 4),
+        "trend": trend,
+        "record": record,
+        "polls": polls,
+        "links": _analytics_team_links(tid),
+    }
+
+    if tier is not None:
+        row["tier"] = tier
+
+    return row
+
+
+@app.get("/analytics")
+def analytics_overview(week: int | None = None):
+    return {
+        "week": week,
+        "meta": {
+            "title": "Analytics",
+            "subtitle": "League-wide advanced team metrics",
+            "metrics_available": ["power", "resume", "form", "sos"],
+        },
+        "leaders": {
+            "power": None,
+            "resume": None,
+            "form": None,
+            "sos": None,
+        },
+        "featured_insights": [],
+        "top_tables": {
+            "power": [],
+            "resume": [],
+            "form": [],
+            "sos": [],
+        },
+    }
+
+
+def _power_tier_from_rank(rank: int) -> str:
+    if rank <= 10:
+        return "elite"
+    if rank <= 25:
+        return "strong"
+    if rank <= 40:
+        return "solid"
+    return "tracked"
+
+
+@app.get("/analytics/power")
+def analytics_power(week: int | None = None):
+    w = 0 if week is None else week
+
+    rows = load_preseason_power()
+    if not rows:
+        return {
+            "week": w,
+            "metric": "power",
+            "meta": {
+                "title": "LSL Power",
+                "subtitle": "Who would be favored on a neutral floor today",
+                "source": "PreseasonPower",
+                "source_detail": "week_0_preseason_only",
+                "status": "no_data",
+            },
+            "count": 0,
+            "items": [],
+        }
+
+    subset = [r for r in rows if r["week"] == w]
+
+    # For now, only preseason week-0 is implemented with real data.
+    # Later, in-season Power can replace or extend this.
+    if not subset:
+        return {
+            "week": w,
+            "metric": "power",
+            "meta": {
+                "title": "LSL Power",
+                "subtitle": "Who would be favored on a neutral floor today",
+                "source": "PreseasonPower",
+                "source_detail": "week_0_preseason_only",
+                "status": "week_not_available",
+            },
+            "count": 0,
+            "items": [],
+        }
+
+    name_map = _team_name_map(active_only=False)
+    record_map = _analytics_record_map(w)
+    polls_map = _analytics_polls_map(w)
+
+    ranked = sorted(
+        subset,
+        key=lambda x: (x["power_value"], name_map.get(x["team_id"], x["team_id"]))
+    )
+
+    items = []
+    for idx, row in enumerate(ranked, start=1):
+        tid = row["team_id"]
+        base = _analytics_base_row(
+            team_id=tid,
+            team_name=name_map.get(tid, tid),
+            value=row["power_value"],
+            rank=idx,
+            week=w,
+            tier=_power_tier_from_rank(idx),
+            trend="flat",
+            record_map=record_map,
+            polls_map=polls_map,
+        )
+
+        base["power"] = {
+            "source": "preseason",
+            "notes": row.get("notes", ""),
+        }
+
+        items.append(base)
+
+    return {
+        "week": w,
+        "metric": "power",
+        "meta": {
+            "title": "LSL Power",
+            "subtitle": "Who would be favored on a neutral floor today",
+            "source": "PreseasonPower",
+            "source_detail": "week_0_preseason_only",
+            "status": "ok",
+        },
+        "count": len(items),
+        "items": items,
+    }
+
+
+@app.get("/analytics/resume")
+def analytics_resume(week: int | None = None):
+    return {
+        "week": week,
+        "metric": "resume",
+        "meta": {
+            "title": "LSL Resume",
+            "subtitle": "Season accomplishment strength",
+        },
+        "count": 0,
+        "items": [],
+    }
+
+
+def _form_tier_from_rank(rank: int) -> str:
+    if rank <= 10:
+        return "hot"
+    if rank <= 25:
+        return "strong"
+    if rank <= 40:
+        return "solid"
+    return "cool"
+
+
+@app.get("/analytics/form")
+def analytics_form(week: int | None = None):
+    _ensure_data_dir()
+
+    if not os.path.exists(GAMES_JSON_PATH):
+        return {
+            "week": week,
+            "metric": "form",
+            "meta": {
+                "title": "LSL Form",
+                "subtitle": "Recent performance over the last 8 games",
+                "source": "games.json",
+                "source_detail": "last_8_played_games_v1",
+                "status": "no_games_json",
+            },
+            "count": 0,
+            "items": [],
+        }
+
+    games = _load_games_or_404()
+    name_map = _team_name_map(active_only=True)
+
+    # Build played game logs by team
+    team_games = {}
+
+    def ensure_team(tid: str):
+        tid = tid.strip().upper()
+        if tid not in team_games:
+            team_games[tid] = []
+
+    for g in games:
+        a_score = g.get("a_score")
+        b_score = g.get("b_score")
+        if a_score is None or b_score is None:
+            continue
+
+        gw = _to_int_or_none(g.get("week"))
+        if week is not None and gw is not None and gw > week:
+            continue
+
+        ta = str(g.get("team_a", "")).strip().upper()
+        tb = str(g.get("team_b", "")).strip().upper()
+        if not ta or not tb:
+            continue
+
+        ensure_team(ta)
+        ensure_team(tb)
+
+        # team A perspective
+        team_games[ta].append({
+            "week": gw if gw is not None else 9999,
+            "team_id": ta,
+            "opp_id": tb,
+            "team_score": a_score,
+            "opp_score": b_score,
+            "margin": a_score - b_score,
+        })
+
+        # team B perspective
+        team_games[tb].append({
+            "week": gw if gw is not None else 9999,
+            "team_id": tb,
+            "opp_id": ta,
+            "team_score": b_score,
+            "opp_score": a_score,
+            "margin": b_score - a_score,
+        })
+
+    if not team_games:
+        return {
+            "week": week,
+            "metric": "form",
+            "meta": {
+                "title": "LSL Form",
+                "subtitle": "Recent performance over the last 8 games",
+                "source": "games.json",
+                "source_detail": "last_8_played_games_v1",
+                "status": "no_played_games",
+            },
+            "count": 0,
+            "items": [],
+        }
+
+    def softened_margin(m: int | float) -> float:
+        """
+        Diminishing returns on margin:
+        - full credit up to 10
+        - half credit from 11 to 20
+        - quarter credit beyond 20
+        Symmetric for losses.
+        """
+        sign = 1.0 if m >= 0 else -1.0
+        x = abs(float(m))
+
+        if x <= 10:
+            val = x
+        elif x <= 20:
+            val = 10 + (x - 10) * 0.5
+        else:
+            val = 10 + 10 * 0.5 + (x - 20) * 0.25
+
+        return sign * val
+
+    rows = []
+    for tid, logs in team_games.items():
+        # Sort by week descending; later date support can refine this
+        logs_sorted = sorted(logs, key=lambda x: x["week"], reverse=True)
+        recent = logs_sorted[:8]
+
+        if not recent:
+            continue
+
+        recent_wins = sum(1 for g in recent if g["team_score"] > g["opp_score"])
+        recent_losses = sum(1 for g in recent if g["team_score"] < g["opp_score"])
+        recent_count = len(recent)
+
+        avg_soft_margin = round(
+            sum(softened_margin(g["margin"]) for g in recent) / recent_count,
+            4
+        ) if recent_count > 0 else 0.0
+
+        # Simple v1 form score:
+        # recent win pct (scaled to 0-100) + softened avg margin
+        win_pct = (recent_wins / recent_count) if recent_count > 0 else 0.0
+        form_value = round((win_pct * 100.0) + avg_soft_margin, 4)
+
+        rows.append({
+            "team_id": tid,
+            "team_name": name_map.get(tid, tid),
+            "form_value": form_value,
+            "recent_wins": recent_wins,
+            "recent_losses": recent_losses,
+            "recent_count": recent_count,
+        })
+
+    ranked = sorted(
+        rows,
+        key=lambda x: (-x["form_value"], x["team_name"])
+    )
+
+    record_map = _analytics_record_map(week)
+    polls_map = _analytics_polls_map(week)
+
+    items = []
+    for idx, row in enumerate(ranked, start=1):
+        tid = row["team_id"]
+
+        base = _analytics_base_row(
+            team_id=tid,
+            team_name=row["team_name"],
+            value=row["form_value"],
+            rank=idx,
+            week=week,
+            tier=_form_tier_from_rank(idx),
+            trend="flat",
+            record_map=record_map,
+            polls_map=polls_map,
+        )
+
+        base["form"] = {
+            "source": "played_games",
+            "window": 8,
+            "last_n_record": {
+                "wins": row["recent_wins"],
+                "losses": row["recent_losses"],
+            },
+            "games_in_window": row["recent_count"],
+        }
+
+        items.append(base)
+
+    return {
+        "week": week,
+        "metric": "form",
+        "meta": {
+            "title": "LSL Form",
+            "subtitle": "Recent performance over the last 8 games",
+            "source": "games.json",
+            "source_detail": "last_8_played_games_v1",
+            "status": "ok",
+        },
+        "count": len(items),
+        "items": items,
+    }
+
+
+def _sos_tier_from_rank(rank: int) -> str:
+    if rank <= 10:
+        return "brutal"
+    if rank <= 25:
+        return "strong"
+    if rank <= 40:
+        return "solid"
+    return "lighter"
+
+
+@app.get("/analytics/sos")
+def analytics_sos(week: int | None = None):
+    _ensure_data_dir()
+
+    if not os.path.exists(GAMES_JSON_PATH):
+        return {
+            "week": week,
+            "metric": "sos",
+            "meta": {
+                "title": "Strength of Schedule",
+                "subtitle": "Schedule difficulty to date",
+                "source": "games.json",
+                "source_detail": "played_games_only",
+                "status": "no_games_json",
+            },
+            "count": 0,
+            "items": [],
+        }
+
+    games = _load_games_or_404()
+    name_map = _team_name_map(active_only=True)
+
+    # Filter to played games only, optionally through requested week
+    played_games = []
+    for g in games:
+        a = g.get("a_score")
+        b = g.get("b_score")
+        if a is None or b is None:
+            continue
+
+        gw = _to_int_or_none(g.get("week"))
+        if week is not None and gw is not None and gw > week:
+            continue
+
+        played_games.append(g)
+
+    if not played_games:
+        return {
+            "week": week,
+            "metric": "sos",
+            "meta": {
+                "title": "Strength of Schedule",
+                "subtitle": "Schedule difficulty to date",
+                "source": "games.json",
+                "source_detail": "played_games_only",
+                "status": "no_played_games",
+            },
+            "count": 0,
+            "items": [],
+        }
+
+    # 1) Build played-game records
+    rec = {}  # team_id -> {wins, losses, played, win_pct}
+    def ensure(tid: str):
+        tid = tid.strip().upper()
+        if tid not in rec:
+            rec[tid] = {
+                "team_id": tid,
+                "team_name": name_map.get(tid, tid),
+                "wins": 0,
+                "losses": 0,
+                "played": 0,
+                "win_pct": 0.0,
+            }
+
+    for g in played_games:
+        ta = str(g.get("team_a", "")).strip().upper()
+        tb = str(g.get("team_b", "")).strip().upper()
+        a = g.get("a_score")
+        b = g.get("b_score")
+
+        if not ta or not tb:
+            continue
+
+        ensure(ta)
+        ensure(tb)
+
+        rec[ta]["played"] += 1
+        rec[tb]["played"] += 1
+
+        if a > b:
+            rec[ta]["wins"] += 1
+            rec[tb]["losses"] += 1
+        elif b > a:
+            rec[tb]["wins"] += 1
+            rec[ta]["losses"] += 1
+
+    for tid, r in rec.items():
+        r["win_pct"] = round((r["wins"] / r["played"]), 4) if r["played"] > 0 else 0.0
+
+    # 2) Compute SOS-lite style opponent difficulty:
+    # average opponent win_pct, weighted by each played game
+    opp_lists = {tid: [] for tid in rec.keys()}
+
+    for g in played_games:
+        ta = str(g.get("team_a", "")).strip().upper()
+        tb = str(g.get("team_b", "")).strip().upper()
+
+        if ta not in rec or tb not in rec:
+            continue
+
+        opp_lists[ta].append(tb)
+        opp_lists[tb].append(ta)
+
+    rows = []
+    for tid, opps in opp_lists.items():
+        if len(opps) == 0:
+            sos_value = 0.0
+            counted = 0
+        else:
+            s = 0.0
+            counted = 0
+            for o in opps:
+                if o in rec:
+                    s += rec[o]["win_pct"]
+                    counted += 1
+            sos_value = round((s / counted), 4) if counted > 0 else 0.0
+
+        rows.append({
+            "team_id": tid,
+            "team_name": name_map.get(tid, tid),
+            "sos_value": sos_value,
+            "opp_games_counted": counted,
+        })
+
+    # Higher SOS means harder schedule
+    ranked = sorted(
+        rows,
+        key=lambda x: (-x["sos_value"], x["team_name"])
+    )
+
+    record_map = _analytics_record_map(week)
+    polls_map = _analytics_polls_map(week)
+
+    items = []
+    for idx, row in enumerate(ranked, start=1):
+        tid = row["team_id"]
+
+        base = _analytics_base_row(
+            team_id=tid,
+            team_name=row["team_name"],
+            value=row["sos_value"],
+            rank=idx,
+            week=week,
+            tier=_sos_tier_from_rank(idx),
+            trend="flat",
+            record_map=record_map,
+            polls_map=polls_map,
+        )
+
+        base["sos"] = {
+            "source": "played_games",
+            "opp_games_counted": row["opp_games_counted"],
+        }
+
+        items.append(base)
+
+    return {
+        "week": week,
+        "metric": "sos",
+        "meta": {
+            "title": "Strength of Schedule",
+            "subtitle": "Schedule difficulty to date",
+            "source": "games.json",
+            "source_detail": "played_games_only",
+            "status": "ok",
+        },
+        "count": len(items),
+        "items": items,
     }
 
 
