@@ -78,6 +78,8 @@ def teams(week: int | None = None):
         # polls are optional; if anything fails, we just return null badges
         lsl_top25_rank, lsl_next5_order, poll_week = {}, {}, None
 
+    analytics_map = _team_list_analytics_map(week)
+
     # Build response
     out = []
     for t in active:
@@ -93,7 +95,13 @@ def teams(week: int | None = None):
                     "rank": lsl_top25_rank.get(tid),             # 1..25 or None
                     "next5_order": lsl_next5_order.get(tid),     # 1..5 or None
                 }
-            }
+            },
+            "analytics": analytics_map.get(tid, {
+                "power": None,
+                "resume": None,
+                "form": None,
+                "sos": None,
+            }),
         })
 
     # Sort list so ranked teams appear first, then alphabetical
@@ -115,7 +123,6 @@ def teams(week: int | None = None):
         "poll_week": poll_week,
         "teams": out_sorted
     }
-
 
 @app.get("/teams/search")
 def search_teams(q: str, limit: int = 25):
@@ -158,6 +165,153 @@ def search_teams(q: str, limit: int = 25):
         "limit": limit,
         "results": results_sorted[:limit],
     }
+
+
+def _team_analytics_summary(team_id: str, week: int | None = None) -> dict:
+    tid = str(team_id).strip().upper()
+    w = 0 if week is None else week
+
+    summary = {
+        "power": None,
+        "resume": None,
+        "form": None,
+        "sos": None,
+    }
+
+    # Power: real preseason week-0 data exists now
+    try:
+        power_resp = analytics_power(w)
+        for item in power_resp.get("items", []):
+            if item.get("team_id") == tid:
+                summary["power"] = {
+                    "rank": item.get("rank"),
+                    "value": item.get("value"),
+                    "tier": item.get("tier"),
+                }
+                break
+    except Exception:
+        pass
+
+    # Resume / Form / SOS: keep additive and honest
+    # Only populate if the route has real items and this team is present
+    try:
+        resume_resp = analytics_resume(w)
+        for item in resume_resp.get("items", []):
+            if item.get("team_id") == tid:
+                summary["resume"] = {
+                    "rank": item.get("rank"),
+                    "value": item.get("value"),
+                    "tier": item.get("tier"),
+                }
+                break
+    except Exception:
+        pass
+
+    try:
+        form_resp = analytics_form(w)
+        for item in form_resp.get("items", []):
+            if item.get("team_id") == tid:
+                summary["form"] = {
+                    "rank": item.get("rank"),
+                    "value": item.get("value"),
+                    "tier": item.get("tier"),
+                }
+                break
+    except Exception:
+        pass
+
+    try:
+        sos_resp = analytics_sos(w)
+        for item in sos_resp.get("items", []):
+            if item.get("team_id") == tid:
+                summary["sos"] = {
+                    "rank": item.get("rank"),
+                    "value": item.get("value"),
+                    "tier": item.get("tier"),
+                }
+                break
+    except Exception:
+        pass
+
+    return summary
+
+
+def _team_list_analytics_map(week: int | None = None) -> dict[str, dict]:
+    w = 0 if week is None else week
+
+    out: dict[str, dict] = {}
+
+    def ensure_team(tid: str):
+        tid = str(tid).strip().upper()
+        if tid not in out:
+            out[tid] = {
+                "power": None,
+                "resume": None,
+                "form": None,
+                "sos": None,
+            }
+
+    try:
+        power_resp = analytics_power(w)
+        for item in power_resp.get("items", []):
+            tid = str(item.get("team_id", "")).strip().upper()
+            if not tid:
+                continue
+            ensure_team(tid)
+            out[tid]["power"] = {
+                "rank": item.get("rank"),
+                "value": item.get("value"),
+                "tier": item.get("tier"),
+            }
+    except Exception:
+        pass
+
+    try:
+        resume_resp = analytics_resume(w)
+        for item in resume_resp.get("items", []):
+            tid = str(item.get("team_id", "")).strip().upper()
+            if not tid:
+                continue
+            ensure_team(tid)
+            out[tid]["resume"] = {
+                "rank": item.get("rank"),
+                "value": item.get("value"),
+                "tier": item.get("tier"),
+            }
+    except Exception:
+        pass
+
+    try:
+        form_resp = analytics_form(w)
+        for item in form_resp.get("items", []):
+            tid = str(item.get("team_id", "")).strip().upper()
+            if not tid:
+                continue
+            ensure_team(tid)
+            out[tid]["form"] = {
+                "rank": item.get("rank"),
+                "value": item.get("value"),
+                "tier": item.get("tier"),
+            }
+    except Exception:
+        pass
+
+    try:
+        sos_resp = analytics_sos(w)
+        for item in sos_resp.get("items", []):
+            tid = str(item.get("team_id", "")).strip().upper()
+            if not tid:
+                continue
+            ensure_team(tid)
+            out[tid]["sos"] = {
+                "rank": item.get("rank"),
+                "value": item.get("value"),
+                "tier": item.get("tier"),
+            }
+    except Exception:
+        pass
+
+    return out
 
 
 @app.get("/teams/{team_id}")
@@ -214,6 +368,8 @@ def get_team(team_id: str, week: int | None = None):
 
         # ESPN-style poll badges (LSL primary, LCAA secondary)
         "polls": polls_block,
+
+        "analytics": _team_analytics_summary(tid, week),
 
         "links": {
             "schedule": f"/teams/{tid}/schedule",
@@ -1032,6 +1188,27 @@ def _analytics_base_row(
 
 @app.get("/analytics")
 def analytics_overview(week: int | None = None):
+    power = analytics_power(week)
+    resume = analytics_resume(week)
+    form = analytics_form(week)
+    sos = analytics_sos(week)
+
+    def leader_from(resp: dict) -> dict | None:
+        items = resp.get("items", [])
+        if not items:
+            return None
+        top = items[0]
+        return {
+            "rank": top.get("rank"),
+            "team_id": top.get("team_id"),
+            "team_name": top.get("team_name"),
+            "value": top.get("value"),
+            "links": {
+                "team": top.get("links", {}).get("team"),
+                "analytics": f"/analytics/{resp.get('metric')}",
+            },
+        }
+
     return {
         "week": week,
         "meta": {
@@ -1040,17 +1217,17 @@ def analytics_overview(week: int | None = None):
             "metrics_available": ["power", "resume", "form", "sos"],
         },
         "leaders": {
-            "power": None,
-            "resume": None,
-            "form": None,
-            "sos": None,
+            "power": leader_from(power),
+            "resume": leader_from(resume),
+            "form": leader_from(form),
+            "sos": leader_from(sos),
         },
         "featured_insights": [],
         "top_tables": {
-            "power": [],
-            "resume": [],
-            "form": [],
-            "sos": [],
+            "power": power.get("items", [])[:5],
+            "resume": resume.get("items", [])[:5],
+            "form": form.get("items", [])[:5],
+            "sos": sos.get("items", [])[:5],
         },
     }
 
@@ -1110,7 +1287,7 @@ def analytics_power(week: int | None = None):
 
     ranked = sorted(
         subset,
-        key=lambda x: (x["power_value"], name_map.get(x["team_id"], x["team_id"]))
+        key=lambda x: (-x["power_value"], name_map.get(x["team_id"], x["team_id"]))
     )
 
     items = []
