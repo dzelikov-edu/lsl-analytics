@@ -1150,17 +1150,323 @@ def analytics_power(week: int | None = None):
     }
 
 
+def _resume_tier_from_rank(rank: int) -> str:
+    if rank <= 10:
+        return "elite"
+    if rank <= 25:
+        return "strong"
+    if rank <= 40:
+        return "solid"
+    return "tracked"
+
+
+def _resume_quad_for_opponent(opp_id: str, site: str, power_rank_map: dict[str, int]) -> str:
+    """
+    Working quad model:
+
+    Q1
+    - Home: 1-25
+    - Neutral: 1-32
+    - Away: 1-40
+
+    Q2
+    - Home: 26-46
+    - Neutral: 33-52
+    - Away: 41-58
+
+    Q3
+    - Home: 47-69
+    - Neutral: 53-69
+    - Away: 59-69
+
+    Q4
+    - opponent outside tracked 69
+    """
+    oid = str(opp_id).strip().upper()
+    s = str(site or "").strip().upper()
+
+    rank = power_rank_map.get(oid)
+    if rank is None:
+        return "Q4"
+
+    if s == "HOME":
+        if rank <= 25:
+            return "Q1"
+        if rank <= 46:
+            return "Q2"
+        return "Q3"
+
+    if s == "NEUTRAL":
+        if rank <= 32:
+            return "Q1"
+        if rank <= 52:
+            return "Q2"
+        return "Q3"
+
+    # Treat anything else as AWAY
+    if rank <= 40:
+        return "Q1"
+    if rank <= 58:
+        return "Q2"
+    return "Q3"
+
+
+def _resume_score_from_counts(
+    q1_wins: int,
+    q2_wins: int,
+    q3_wins: int,
+    q4_wins: int,
+    q1_losses: int,
+    q2_losses: int,
+    q3_losses: int,
+    q4_losses: int,
+) -> float:
+    """
+    Phase-1 Resume scoring:
+    - Q1 wins rewarded most
+    - Q2 wins rewarded meaningfully
+    - Q3 wins rewarded lightly
+    - Q4 wins rewarded minimally
+
+    - Q1 losses penalized lightly
+    - Q2 losses penalized moderately
+    - Q3 losses penalized more
+    - Q4 losses penalized most
+
+    Q4 losses are also counted as bad losses.
+    """
+    return round(
+        (q1_wins * 12.0)
+        + (q2_wins * 7.0)
+        + (q3_wins * 3.0)
+        + (q4_wins * 0.5)
+        - (q1_losses * 1.5)
+        - (q2_losses * 4.0)
+        - (q3_losses * 7.0)
+        - (q4_losses * 12.0),
+        4,
+    )
+
+
+def _preseason_power_rank_map(week: int | None = None) -> dict[str, int]:
+    """
+    Builds team_id -> rank map from PreseasonPower for the requested week.
+    For now, this is the evaluation-week opponent-quality snapshot used by Resume.
+    """
+    w = 0 if week is None else week
+    rows = load_preseason_power()
+    subset = [r for r in rows if r["week"] == w]
+    if not subset:
+        return {}
+
+    name_map = _team_name_map(active_only=False)
+
+    ranked = sorted(
+        subset,
+        key=lambda x: (x["power_value"], name_map.get(x["team_id"], x["team_id"]))
+    )
+
+    out = {}
+    for idx, row in enumerate(ranked, start=1):
+        out[str(row["team_id"]).strip().upper()] = idx
+    return out
+
+
 @app.get("/analytics/resume")
 def analytics_resume(week: int | None = None):
+    _ensure_data_dir()
+
+    if not os.path.exists(GAMES_JSON_PATH):
+        return {
+            "week": week,
+            "metric": "resume",
+            "meta": {
+                "title": "LSL Resume",
+                "subtitle": "Season accomplishment strength",
+                "source": "games.json",
+                "source_detail": "phase_1_quads_no_sos_weighting",
+                "status": "no_games_json",
+            },
+            "count": 0,
+            "items": [],
+        }
+
+    games = _load_games_or_404()
+    name_map = _team_name_map(active_only=True)
+
+    # Played games only, optionally filtered through requested week
+    played_games = []
+    for g in games:
+        a = g.get("a_score")
+        b = g.get("b_score")
+        if a is None or b is None:
+            continue
+
+        gw = _to_int_or_none(g.get("week"))
+        if week is not None and gw is not None and gw > week:
+            continue
+
+        played_games.append(g)
+
+    if not played_games:
+        return {
+            "week": week,
+            "metric": "resume",
+            "meta": {
+                "title": "LSL Resume",
+                "subtitle": "Season accomplishment strength",
+                "source": "games.json",
+                "source_detail": "phase_1_quads_no_sos_weighting",
+                "status": "no_played_games",
+            },
+            "count": 0,
+            "items": [],
+        }
+
+    power_rank_map = _preseason_power_rank_map(week)
+    if not power_rank_map:
+        return {
+            "week": week,
+            "metric": "resume",
+            "meta": {
+                "title": "LSL Resume",
+                "subtitle": "Season accomplishment strength",
+                "source": "games.json + PreseasonPower",
+                "source_detail": "phase_1_quads_no_sos_weighting",
+                "status": "no_power_snapshot",
+            },
+            "count": 0,
+            "items": [],
+        }
+
+    # Build per-team resume buckets
+    rows = {}
+
+    def ensure_team(tid: str):
+        tid = tid.strip().upper()
+        if tid not in rows:
+            rows[tid] = {
+                "team_id": tid,
+                "team_name": name_map.get(tid, tid),
+                "q1_wins": 0,
+                "q2_wins": 0,
+                "q3_wins": 0,
+                "q4_wins": 0,
+                "q1_losses": 0,
+                "q2_losses": 0,
+                "q3_losses": 0,
+                "q4_losses": 0,
+                "bad_losses": 0,
+            }
+
+    for g in played_games:
+        ta = str(g.get("team_a", "")).strip().upper()
+        tb = str(g.get("team_b", "")).strip().upper()
+        a = g.get("a_score")
+        b = g.get("b_score")
+
+        if not ta or not tb:
+            continue
+
+        ensure_team(ta)
+        ensure_team(tb)
+
+        site = str(g.get("site", "")).strip().upper()
+
+        # team A perspective
+        if site == "HOME":
+            site_a = "HOME"
+            site_b = "AWAY"
+        elif site == "AWAY":
+            site_a = "AWAY"
+            site_b = "HOME"
+        else:
+            site_a = "NEUTRAL"
+            site_b = "NEUTRAL"
+
+        quad_a = _resume_quad_for_opponent(tb, site_a, power_rank_map)
+        quad_b = _resume_quad_for_opponent(ta, site_b, power_rank_map)
+
+        if a > b:
+            rows[ta][f"{quad_a.lower()}_wins"] += 1
+            rows[tb][f"{quad_b.lower()}_losses"] += 1
+            if quad_b == "Q4":
+                rows[tb]["bad_losses"] += 1
+        elif b > a:
+            rows[tb][f"{quad_b.lower()}_wins"] += 1
+            rows[ta][f"{quad_a.lower()}_losses"] += 1
+            if quad_a == "Q4":
+                rows[ta]["bad_losses"] += 1
+
+    ranked_rows = []
+    for tid, r in rows.items():
+        value = _resume_score_from_counts(
+            q1_wins=r["q1_wins"],
+            q2_wins=r["q2_wins"],
+            q3_wins=r["q3_wins"],
+            q4_wins=r["q4_wins"],
+            q1_losses=r["q1_losses"],
+            q2_losses=r["q2_losses"],
+            q3_losses=r["q3_losses"],
+            q4_losses=r["q4_losses"],
+        )
+
+        ranked_rows.append({
+            "team_id": tid,
+            "team_name": r["team_name"],
+            "resume_value": value,
+            "resume": {
+                "q1_wins": r["q1_wins"],
+                "q2_wins": r["q2_wins"],
+                "q3_wins": r["q3_wins"],
+                "q4_wins": r["q4_wins"],
+                "q1_losses": r["q1_losses"],
+                "q2_losses": r["q2_losses"],
+                "q3_losses": r["q3_losses"],
+                "q4_losses": r["q4_losses"],
+                "bad_losses": r["bad_losses"],
+            },
+        })
+
+    ranked = sorted(
+        ranked_rows,
+        key=lambda x: (-x["resume_value"], x["team_name"])
+    )
+
+    record_map = _analytics_record_map(week)
+    polls_map = _analytics_polls_map(week)
+
+    items = []
+    for idx, row in enumerate(ranked, start=1):
+        tid = row["team_id"]
+
+        base = _analytics_base_row(
+            team_id=tid,
+            team_name=row["team_name"],
+            value=row["resume_value"],
+            rank=idx,
+            week=week,
+            tier=_resume_tier_from_rank(idx),
+            trend="flat",
+            record_map=record_map,
+            polls_map=polls_map,
+        )
+
+        base["resume"] = row["resume"]
+        items.append(base)
+
     return {
         "week": week,
         "metric": "resume",
         "meta": {
             "title": "LSL Resume",
             "subtitle": "Season accomplishment strength",
+            "source": "games.json + PreseasonPower",
+            "source_detail": "phase_1_quads_no_sos_weighting",
+            "status": "ok",
         },
-        "count": 0,
-        "items": [],
+        "count": len(items),
+        "items": items,
     }
 
 
