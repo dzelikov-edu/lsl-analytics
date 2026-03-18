@@ -1186,6 +1186,81 @@ def _analytics_base_row(
     return row
 
 
+def _analytics_featured_insights(week: int | None = None) -> list[dict]:
+    power = analytics_power(week)
+    resume = analytics_resume(week)
+    form = analytics_form(week)
+    sos = analytics_sos(week)
+
+    def first_item(resp: dict) -> dict | None:
+        items = resp.get("items", [])
+        return items[0] if items else None
+
+    insights = []
+
+    top_power = first_item(power)
+    if top_power:
+        insights.append({
+            "type": "power_leader",
+            "title": "Power Leader",
+            "team_id": top_power.get("team_id"),
+            "team_name": top_power.get("team_name"),
+            "summary": f"#{top_power.get('rank')} in LSL Power",
+            "value": top_power.get("value"),
+            "links": {
+                "team": top_power.get("links", {}).get("team"),
+                "analytics": "/analytics/power",
+            },
+        })
+
+    top_resume = first_item(resume)
+    if top_resume:
+        insights.append({
+            "type": "resume_leader",
+            "title": "Resume Leader",
+            "team_id": top_resume.get("team_id"),
+            "team_name": top_resume.get("team_name"),
+            "summary": f"#{top_resume.get('rank')} in LSL Resume",
+            "value": top_resume.get("value"),
+            "links": {
+                "team": top_resume.get("links", {}).get("team"),
+                "analytics": "/analytics/resume",
+            },
+        })
+
+    top_form = first_item(form)
+    if top_form:
+        insights.append({
+            "type": "form_leader",
+            "title": "Hottest Team",
+            "team_id": top_form.get("team_id"),
+            "team_name": top_form.get("team_name"),
+            "summary": f"#{top_form.get('rank')} in LSL Form",
+            "value": top_form.get("value"),
+            "links": {
+                "team": top_form.get("links", {}).get("team"),
+                "analytics": "/analytics/form",
+            },
+        })
+
+    top_sos = first_item(sos)
+    if top_sos:
+        insights.append({
+            "type": "sos_leader",
+            "title": "Toughest Schedule",
+            "team_id": top_sos.get("team_id"),
+            "team_name": top_sos.get("team_name"),
+            "summary": f"#{top_sos.get('rank')} in SOS",
+            "value": top_sos.get("value"),
+            "links": {
+                "team": top_sos.get("links", {}).get("team"),
+                "analytics": "/analytics/sos",
+            },
+        })
+
+    return insights
+
+
 @app.get("/analytics")
 def analytics_overview(week: int | None = None):
     power = analytics_power(week)
@@ -1222,7 +1297,7 @@ def analytics_overview(week: int | None = None):
             "form": leader_from(form),
             "sos": leader_from(sos),
         },
-        "featured_insights": [],
+        "featured_insights": _analytics_featured_insights(week),
         "top_tables": {
             "power": power.get("items", [])[:5],
             "resume": resume.get("items", [])[:5],
@@ -2086,6 +2161,12 @@ def home(
     games = _load_games_or_404()
     name_map = _team_name_map(active_only=False)
 
+    tracked_team_ids = {
+        str(t.team_id).strip().upper()
+        for t in load_teams_index()
+        if getattr(t, "active", False)
+    }
+
     # normalize inputs
     tid = team_id.strip().upper() if team_id else None
     ph = phase.strip().upper() if phase else None
@@ -2586,6 +2667,52 @@ def home(
             return 6 - lsl_next5_order[team_id]
         return 0
 
+    def _is_lsl_top25(team_id: str) -> bool:
+        return team_id in lsl_top25_rank
+
+    def _is_lsl_next5(team_id: str) -> bool:
+        return team_id in lsl_next5_order
+    
+    def _is_tracked_team(team_id: str) -> bool:
+        return str(team_id).strip().upper() in tracked_team_ids
+
+    def _featured_matchup_bucket(home_id: str, away_id: str) -> int:
+        """
+        Lower bucket number = more desirable featured matchup.
+
+        0 = Top25 vs Top25
+        1 = Top25 vs Next5
+        2 = Poll ecosystem vs poll ecosystem (both sides are Top25/Next5)
+        3 = Both teams are tracked 69 teams
+        4 = one Top25 team involved
+        5 = one Next5 team involved
+        6 = everything else
+        """
+        h_top25 = _is_lsl_top25(home_id)
+        a_top25 = _is_lsl_top25(away_id)
+        h_next5 = _is_lsl_next5(home_id)
+        a_next5 = _is_lsl_next5(away_id)
+
+        h_poll = h_top25 or h_next5
+        a_poll = a_top25 or a_next5
+
+        h_tracked = _is_tracked_team(home_id)
+        a_tracked = _is_tracked_team(away_id)
+
+        if h_top25 and a_top25:
+            return 0
+        if (h_top25 and a_next5) or (a_top25 and h_next5):
+            return 1
+        if h_poll and a_poll:
+            return 2
+        if h_tracked and a_tracked:
+            return 3
+        if h_top25 or a_top25:
+            return 4
+        if h_next5 or a_next5:
+            return 5
+        return 6
+
     # Win% map for tie-break quality scoring (played games only)
     wl = {}
     def _ensure_wl(t):
@@ -2693,9 +2820,10 @@ def home(
             featured = sorted(
                 expanded,
                 key=lambda x: (
-                    -(_poll_points(x["home_id"]) + _poll_points(x["away_id"])),  # LSL poll first
-                    -x["quality"],  # tie-break
-                    _season_rank_from_date_key(x["date_key"]),
+                    _featured_matchup_bucket(x["home_id"], x["away_id"]),  # matchup quality first
+                    -(_poll_points(x["home_id"]) + _poll_points(x["away_id"])),  # then combined LSL poll strength
+                    -x["quality"],  # then quality
+                    _season_rank_from_date_key(x["date_key"]),  # then soonest date
                     x["week"] if x["week"] is not None else 9999,
                     x["home_id"],
                     x["away_id"],
