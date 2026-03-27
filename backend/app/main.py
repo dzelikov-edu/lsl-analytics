@@ -237,6 +237,15 @@ def _team_analytics_summary(team_id: str, week: int | None = None) -> dict:
     return summary
 
 
+def _team_roster_count(team_id: str) -> int:
+    tid = str(team_id).strip().upper()
+    try:
+        rows = load_players_snapshot()
+        return sum(1 for r in rows if str(r.get("team_id", "")).strip().upper() == tid)
+    except Exception:
+        return 0
+
+
 def _team_list_analytics_map(week: int | None = None) -> dict[str, dict]:
     w = 0 if week is None else week
 
@@ -372,11 +381,16 @@ def get_team(team_id: str, week: int | None = None):
 
         "analytics": _team_analytics_summary(tid, week),
 
+        "roster_summary": {
+            "players_count": _team_roster_count(tid),
+        },
+
         "links": {
             "schedule": f"/teams/{tid}/schedule",
             "summary": f"/teams/{tid}/summary",
             "results": f"/teams/{tid}/results",
             "upcoming": f"/teams/{tid}/upcoming",
+            "roster": f"/teams/{tid}/roster",
         }
     }
 
