@@ -201,6 +201,115 @@ def load_preseason_power() -> list[dict]:
     return out
 
 
+def load_players_snapshot() -> list[dict]:
+    """
+    Reads PlayersSnapshot tab from MASTER sheet.
+
+    Expected columns:
+      team_id | player_id | player_name | jersey_number | primary_position |
+      secondary_position | height | weight | class | home_city |
+      home_state_region | home_country | prev_team_id | prev_team_name |
+      games_played | ppg | rpg | apg | spg | bpg | fg_pct | three_pct |
+      ft_pct | prev_games_played | prev_ppg | prev_rpg | prev_apg |
+      prev_spg | prev_bpg | prev_fg_pct | prev_three_pct | prev_ft_pct | notes
+    """
+    service = get_sheets_service(settings.GOOGLE_SERVICE_ACCOUNT_JSON)
+    values = read_range(service, settings.MASTER_SHEET_ID, "PlayersSnapshot!A1:AG5000")
+    if not values or len(values) < 2:
+        return []
+
+    header = [str(x).strip().lower() for x in values[0]]
+    idx = {h: i for i, h in enumerate(header)}
+
+    required = [
+        "team_id",
+        "player_id",
+        "player_name",
+        "jersey_number",
+        "primary_position",
+        "height",
+        "weight",
+        "class",
+        "home_city",
+        "home_state_region",
+        "home_country",
+    ]
+    for r in required:
+        if r not in idx:
+            raise RuntimeError(f"PlayersSnapshot missing required column: {r}")
+
+    def cell(row, name, default=""):
+        i = idx.get(name)
+        if i is None or i >= len(row):
+            return default
+        return row[i]
+
+    def as_str(row, name, default=""):
+        return str(cell(row, name, default)).strip()
+
+    def as_float(row, name):
+        raw = str(cell(row, name, "")).strip()
+        if raw == "":
+            return None
+
+        try:
+            if raw.endswith("%"):
+                return float(raw[:-1].strip())
+            return float(raw)
+        except Exception:
+            return None
+
+    out = []
+    for row in values[1:]:
+        if not row:
+            continue
+
+        team_id = as_str(row, "team_id").upper()
+        player_id = as_str(row, "player_id").upper()
+        player_name = as_str(row, "player_name")
+
+        if not team_id or not player_id or not player_name:
+            continue
+
+        out.append({
+            "team_id": team_id,
+            "player_id": player_id,
+            "player_name": player_name,
+            "jersey_number": as_str(row, "jersey_number"),
+            "primary_position": as_str(row, "primary_position"),
+            "secondary_position": as_str(row, "secondary_position"),
+            "height": as_str(row, "height"),
+            "weight": as_str(row, "weight"),
+            "class": as_str(row, "class"),
+            "home_city": as_str(row, "home_city"),
+            "home_state_region": as_str(row, "home_state_region"),
+            "home_country": as_str(row, "home_country"),
+            "prev_team_id": as_str(row, "prev_team_id").upper(),
+            "prev_team_name": as_str(row, "prev_team_name"),
+            "games_played": as_float(row, "games_played"),
+            "ppg": as_float(row, "ppg"),
+            "rpg": as_float(row, "rpg"),
+            "apg": as_float(row, "apg"),
+            "spg": as_float(row, "spg"),
+            "bpg": as_float(row, "bpg"),
+            "fg_pct": as_float(row, "fg_pct"),
+            "three_pct": as_float(row, "three_pct"),
+            "ft_pct": as_float(row, "ft_pct"),
+            "prev_games_played": as_float(row, "prev_games_played"),
+            "prev_ppg": as_float(row, "prev_ppg"),
+            "prev_rpg": as_float(row, "prev_rpg"),
+            "prev_apg": as_float(row, "prev_apg"),
+            "prev_spg": as_float(row, "prev_spg"),
+            "prev_bpg": as_float(row, "prev_bpg"),
+            "prev_fg_pct": as_float(row, "prev_fg_pct"),
+            "prev_three_pct": as_float(row, "prev_three_pct"),
+            "prev_ft_pct": as_float(row, "prev_ft_pct"),
+            "notes": as_str(row, "notes"),
+        })
+
+    return out
+
+
 def load_conference_membership() -> dict[str, str]:
     """
     Reads ConferenceMembership tab from MASTER sheet.

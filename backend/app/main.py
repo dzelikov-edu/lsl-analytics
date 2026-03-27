@@ -5,6 +5,7 @@ from app.ingest import (
     ingest_league,
     load_polls,
     load_preseason_power,
+    load_players_snapshot,
     load_conference_membership,
     load_conferences_map,
     load_records_snapshot,
@@ -3407,6 +3408,33 @@ def team_results(team_id: str, phase: Optional[str] = None):
     Played games only (wrapper around /schedule).
     """
     return team_schedule(team_id=team_id, include_unplayed=False, phase=phase, week=None)
+
+
+@app.get("/teams/{team_id}/roster")
+def team_roster(team_id: str):
+    tid = team_id.strip().upper()
+
+    teams = load_teams_index()
+    match = next((t for t in teams if t.team_id.strip().upper() == tid and t.active), None)
+    if not match:
+        raise HTTPException(status_code=404, detail=f"Team '{tid}' not found")
+
+    rows = load_players_snapshot()
+    roster = [r for r in rows if r["team_id"] == tid]
+
+    roster_sorted = roster
+
+    return {
+        "team_id": tid,
+        "team_name": match.team_name,
+        "players_count": len(roster_sorted),
+        "players": roster_sorted,
+        "links": {
+            "team": f"/teams/{tid}",
+            "schedule": f"/teams/{tid}/schedule",
+            "results": f"/teams/{tid}/results",
+        },
+    }
 
 
 @app.get("/teams/{team_id}/upcoming")
