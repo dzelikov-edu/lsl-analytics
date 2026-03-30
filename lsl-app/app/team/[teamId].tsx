@@ -1,6 +1,6 @@
-import { useLocalSearchParams } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { API_BASE_URL } from '@/lib/api';
 
@@ -42,22 +42,10 @@ export default function TeamDetailScreen() {
     const lcaaNext5 = team?.polls?.LCAA?.next5_order;
 
     const analyticsCards = [
-        {
-            label: 'Power',
-            item: team?.analytics?.power,
-        },
-        {
-            label: 'Resume',
-            item: team?.analytics?.resume,
-        },
-        {
-            label: 'Form',
-            item: team?.analytics?.form,
-        },
-        {
-            label: 'SOS',
-            item: team?.analytics?.sos,
-        },
+        { label: 'Power', item: team?.analytics?.power },
+        { label: 'Resume', item: team?.analytics?.resume },
+        { label: 'Form', item: team?.analytics?.form },
+        { label: 'SOS', item: team?.analytics?.sos },
     ];
 
     const formatPollValue = (rank?: number | null, next5?: number | null) => {
@@ -124,7 +112,12 @@ export default function TeamDetailScreen() {
                             <Text style={styles.listRow}>Schedule</Text>
                             <Text style={styles.listRow}>Results</Text>
                             <Text style={styles.listRow}>Analytics</Text>
-                            <Text style={styles.listRow}>Roster</Text>
+
+                            <Pressable
+                                onPress={() => router.push(`/team/${teamId}/roster`)}
+                                style={({ pressed }) => [pressed && styles.rowPressed]}>
+                                <Text style={[styles.listRow, styles.linkRow]}>Roster</Text>
+                            </Pressable>
                         </View>
                     </View>
                 </>
@@ -199,6 +192,12 @@ const styles = StyleSheet.create({
     listRow: {
         fontSize: 16,
         marginBottom: 8,
+    },
+    linkRow: {
+        textDecorationLine: 'underline',
+    },
+    rowPressed: {
+        opacity: 0.7,
     },
     body: {
         fontSize: 13,
