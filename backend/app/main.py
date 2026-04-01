@@ -10,6 +10,7 @@ from app.ingest import (
     load_conferences_map,
     load_records_snapshot,
     load_conf_games_snapshot,
+    load_week_phase_map,
 )
 
 import json
@@ -244,6 +245,34 @@ def _team_roster_count(team_id: str) -> int:
         return sum(1 for r in rows if str(r.get("team_id", "")).strip().upper() == tid)
     except Exception:
         return 0
+    
+
+def _phase_display_name(
+    phase: str | None,
+    week: int | None = None,
+    phase_map: dict[int, dict] | None = None,
+) -> str | None:
+    if not phase:
+        return None
+
+    phase_norm = str(phase).strip().upper()
+    pm = phase_map or {}
+
+    if week is not None:
+        row = pm.get(week)
+        if row and str(row.get("phase", "")).strip().upper() == phase_norm:
+            return row.get("phase_display_name") or phase_norm
+
+    for row in pm.values():
+        if str(row.get("phase", "")).strip().upper() == phase_norm:
+            return row.get("phase_display_name") or phase_norm
+
+    fallback = {
+        "REG_SEASON": "Regular Season",
+        "CONF_TOURNEY": "Conference Tournament",
+        "NAT_TOURNEY": "National Tournament",
+    }
+    return fallback.get(phase_norm, phase_norm.replace("_", " ").title())
 
 
 def _team_list_analytics_map(week: int | None = None) -> dict[str, dict]:
@@ -2175,6 +2204,7 @@ def home(
 
     games = _load_games_or_404()
     name_map = _team_name_map(active_only=False)
+    phase_map = load_week_phase_map()
 
     tracked_team_ids = {
         str(t.team_id).strip().upper()
@@ -2261,10 +2291,14 @@ def home(
             ta = str(g.get("team_a", "")).strip().upper()
             tb = str(g.get("team_b", "")).strip().upper()
 
+            phase_v = str(g.get("phase", "")).strip().upper()
+            week_v = _to_int_or_none(g.get("week"))
+
             out_games.append({
                 "game_key": g.get("game_key"),
-                "phase": str(g.get("phase", "")).strip().upper(),
-                "week": _to_int_or_none(g.get("week")),
+                "phase": phase_v,
+                "phase_display": _phase_display_name(phase_v, week_v, phase_map),
+                "week": week_v,
                 "venue": g.get("venue"),
                 "home_id": home_id,
                 "home_name": name_map.get(home_id, home_id),
@@ -2798,6 +2832,7 @@ def home(
             "date_key": dk,
             "display_date": _display_date(dk),
             "phase": phase_v,
+            "phase_display": _phase_display_name(phase_v, week_v, phase_map),
             "week": week_v,
             "venue": venue,
             "home_id": home_id,
@@ -3090,6 +3125,7 @@ def _to_int_or_none(v):
 def get_game_by_key(game_key: str):
     games = _load_games_or_404()
     name_map = _team_name_map(active_only=False)
+    phase_map = load_week_phase_map()
     key = game_key.strip()
 
     for g in games:
@@ -3099,8 +3135,13 @@ def get_game_by_key(game_key: str):
             home_id = str(g.get("home_id", "")).strip().upper()
             away_id = str(g.get("away_id", "")).strip().upper()
 
+            phase_v = str(g.get("phase", "")).strip().upper()
+            week_v = _to_int_or_none(g.get("week"))
+
             return {
                 **g,
+                "phase": phase_v,
+                "phase_display": _phase_display_name(phase_v, week_v, phase_map),
                 "team_a_name": name_map.get(ta, ta),
                 "team_b_name": name_map.get(tb, tb),
                 "home_name": name_map.get(home_id, home_id),
@@ -3114,6 +3155,7 @@ def get_game_by_key(game_key: str):
 def matchup(team1: str, team2: str):
     games = _load_games_or_404()
     name_map = _team_name_map(active_only=False)
+    phase_map = load_week_phase_map()
     t1 = team1.strip().upper()
     t2 = team2.strip().upper()
 
@@ -3129,10 +3171,14 @@ def matchup(team1: str, team2: str):
         b_score = g.get("b_score")
         played = (a_score is not None) and (b_score is not None)
 
+        phase_v = str(g.get("phase", "")).strip().upper()
+        week_v = _to_int_or_none(g.get("week"))
+
         out.append({
             "game_key": g.get("game_key"),
-            "phase": str(g.get("phase", "")).strip().upper(),
-            "week": _to_int_or_none(g.get("week")),
+            "phase": phase_v,
+            "phase_display": _phase_display_name(phase_v, week_v, phase_map),
+            "week": week_v,
             "venue": g.get("venue"),
             "home_id": g.get("home_id"),
             "home_name": name_map.get(str(g.get("home_id", "")).strip().upper(), str(g.get("home_id", "")).strip().upper()),
@@ -3175,6 +3221,7 @@ def calendar(
     """
     games = _load_games_or_404()
     name_map = _team_name_map(active_only=False)
+    phase_map = load_week_phase_map()
 
     # normalize filters
     tid = team_id.strip().upper() if team_id else None
@@ -3280,10 +3327,14 @@ def calendar(
             b = g.get("b_score")
             g_played = (a is not None) and (b is not None)
 
+            phase_v = str(g.get("phase", "")).strip().upper()
+            week_v = _to_int_or_none(g.get("week"))
+
             out_games.append({
                 "game_key": g.get("game_key"),
-                "phase": str(g.get("phase", "")).strip().upper(),
-                "week": _to_int_or_none(g.get("week")),
+                "phase": phase_v,
+                "phase_display": _phase_display_name(phase_v, week_v, phase_map),
+                "week": week_v,
                 "venue": g.get("venue"),
                 "home_id": home_id,
                 "home_name": name_map.get(home_id, home_id),
@@ -3347,6 +3398,7 @@ def team_schedule(
     """
     games = _load_games_or_404()
     tid = team_id.strip().upper()
+    phase_map = load_week_phase_map()
 
     out = []
     for g in games:
@@ -3384,10 +3436,14 @@ def team_schedule(
             opponent_id = ta
             site = "HOME" if g.get("home_id") == tb and g.get("venue") == "H" else ("AWAY" if g.get("home_id") == ta and g.get("venue") == "H" else "NEUTRAL")
 
+        phase_v = str(g.get("phase", "")).strip().upper()
+        week_v = _to_int_or_none(g.get("week"))
+        
         out.append({
             "game_key": g.get("game_key"),
-            "phase": g.get("phase"),
-            "week": _to_int_or_none(g.get("week")),
+            "phase": phase_v,
+            "phase_display": _phase_display_name(phase_v, week_v, phase_map),
+            "week": week_v,
             "site": site,
             "team_id": tid,
             "opponent_team_id": opponent_id,
@@ -3458,6 +3514,7 @@ def team_upcoming(team_id: str, phase: Optional[str] = None):
     """
     games = _load_games_or_404()
     tid = team_id.strip().upper()
+    phase_map = load_week_phase_map()
 
     out = []
     for g in games:
@@ -3477,10 +3534,15 @@ def team_upcoming(team_id: str, phase: Optional[str] = None):
             continue
 
         opponent = tb if tid == ta else ta
+
+        phase_v = str(g.get("phase", "")).strip().upper()
+        week_v = _to_int_or_none(g.get("week"))
+
         out.append({
             "game_key": g.get("game_key"),
-            "phase": str(g.get("phase", "")).strip().upper(),
-            "week": _to_int_or_none(g.get("week")),
+            "phase": phase_v,
+            "phase_display": _phase_display_name(phase_v, week_v, phase_map),
+            "week": week_v,
             "team_id": tid,
             "opponent_team_id": opponent,
             "venue": g.get("venue"),

@@ -485,6 +485,64 @@ def load_conf_games_snapshot() -> list[dict]:
     return out
 
 
+def load_week_phase_map() -> dict[int, dict]:
+    """
+    Reads WeekPhaseMap tab from MASTER sheet.
+
+    Expected columns:
+      week | phase | phase_display_name
+    """
+    service = get_sheets_service(settings.GOOGLE_SERVICE_ACCOUNT_JSON)
+    values = read_range(service, settings.MASTER_SHEET_ID, "WeekPhaseMap!A1:C500")
+    if not values or len(values) < 2:
+        return {}
+
+    header = [str(x).strip().lower() for x in values[0]]
+    idx = {h: i for i, h in enumerate(header)}
+
+    required = ["week", "phase", "phase_display_name"]
+    for r in required:
+        if r not in idx:
+            raise RuntimeError(f"WeekPhaseMap missing required column: {r}")
+
+    def cell(row, name, default=""):
+        i = idx.get(name)
+        if i is None or i >= len(row):
+            return default
+        return row[i]
+
+    def as_str(row, name, default=""):
+        return str(cell(row, name, default)).strip()
+
+    def as_int(row, name):
+        raw = str(cell(row, name, "")).strip()
+        if raw == "":
+            return None
+        try:
+            return int(float(raw))
+        except Exception:
+            return None
+
+    out = {}
+    for row in values[1:]:
+        if not row:
+            continue
+
+        week = as_int(row, "week")
+        phase = as_str(row, "phase").upper()
+        phase_display_name = as_str(row, "phase_display_name")
+
+        if week is None or not phase:
+            continue
+
+        out[week] = {
+            "phase": phase,
+            "phase_display_name": phase_display_name or phase,
+        }
+
+    return out
+
+
 def read_schedule_export(team_sheet_id: str, export_tab: str) -> List[dict]:
     """
     Reads ScheduleExport by HEADER NAMES (order doesn't matter; extra columns allowed).

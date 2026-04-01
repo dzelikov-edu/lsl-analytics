@@ -90,7 +90,7 @@ export default function HomeScreen() {
               featuredGames.map((game: any) => (
                 <View key={game.game_key} style={styles.card}>
                   <Text style={styles.cardMeta}>
-                    {game.display_date || game.date_key || 'TBD'} • {game.phase || '—'} • Week {game.week ?? '—'}
+                    {game.display_date || game.date_key || 'TBD'} • {game.phase_display || game.phase || '—'} • Week {game.week ?? '—'}
                   </Text>
 
                   <Text style={styles.teamRow}>

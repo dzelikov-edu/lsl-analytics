@@ -109,8 +109,18 @@ export default function TeamDetailScreen() {
                         <Text style={styles.sectionTitle}>Available Sections</Text>
                         <View style={styles.card}>
                             <Text style={styles.listRow}>Overview</Text>
-                            <Text style={styles.listRow}>Schedule</Text>
-                            <Text style={styles.listRow}>Results</Text>
+
+                            <Pressable
+                                onPress={() => router.push(`/team/${teamId}/schedule`)}
+                                style={({ pressed }) => [pressed && styles.rowPressed]}>
+                                <Text style={[styles.listRow, styles.linkRow]}>Schedule</Text>
+                            </Pressable>
+
+                            <Pressable
+                                onPress={() => router.push(`/team/${teamId}/results`)}
+                                style={({ pressed }) => [pressed && styles.rowPressed]}>
+                                <Text style={[styles.listRow, styles.linkRow]}>Results</Text>
+                            </Pressable>
                             <Text style={styles.listRow}>Analytics</Text>
 
                             <Pressable
