@@ -1,30 +1,20 @@
-import { useEffect, useState } from 'react';
-import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
-
+import { AppColors } from '@/constants/app-colors';
+import { useColorScheme } from '@/hooks/use-color-scheme';
 import { API_BASE_URL } from '@/lib/api';
+import { useEffect, useMemo, useState } from 'react';
+import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 type LeaderItem = {
     rank?: number | null;
-    team_id?: string;
     team_name?: string;
     value?: number | null;
-    links?: {
-        team?: string;
-        analytics?: string;
-    };
 } | null;
 
 type InsightItem = {
-    type?: string;
     title?: string;
-    team_id?: string;
     team_name?: string;
     summary?: string;
     value?: number | null;
-    links?: {
-        team?: string;
-        analytics?: string;
-    };
 };
 
 type TableRow = {
@@ -32,10 +22,122 @@ type TableRow = {
     team_id?: string;
     team_name?: string;
     value?: number | null;
-    tier?: string | null;
 };
 
 export default function AnalyticsScreen() {
+    const colorScheme = useColorScheme() ?? 'light';
+    const theme = AppColors[colorScheme];
+
+    const styles = useMemo(
+        () =>
+            StyleSheet.create({
+                content: {
+                    padding: 20,
+                    paddingBottom: 40,
+                    backgroundColor: theme.background,
+                },
+                screenTitle: {
+                    fontSize: 32,
+                    fontWeight: '800',
+                    marginBottom: 20,
+                    color: theme.text,
+                },
+                section: {
+                    marginBottom: 24,
+                },
+                centerBlock: {
+                    paddingVertical: 40,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                },
+                helper: {
+                    fontSize: 15,
+                    color: theme.mutedText,
+                    marginTop: 12,
+                },
+                sectionTitle: {
+                    fontSize: 22,
+                    fontWeight: '700',
+                    marginBottom: 12,
+                    color: theme.text,
+                },
+                card: {
+                    borderWidth: 1,
+                    borderColor: theme.border,
+                    borderRadius: 14,
+                    padding: 14,
+                    marginBottom: 10,
+                    backgroundColor: theme.card,
+                },
+                cardLabel: {
+                    fontSize: 14,
+                    color: theme.mutedText,
+                    marginBottom: 6,
+                },
+                cardTeam: {
+                    fontSize: 22,
+                    fontWeight: '700',
+                    marginBottom: 4,
+                    color: theme.text,
+                },
+                cardValue: {
+                    fontSize: 15,
+                    color: theme.mutedText,
+                },
+                listCard: {
+                    borderWidth: 1,
+                    borderColor: theme.border,
+                    borderRadius: 14,
+                    padding: 14,
+                    backgroundColor: theme.card,
+                },
+                listRow: {
+                    fontSize: 16,
+                    marginBottom: 8,
+                    color: theme.text,
+                },
+                insightBlock: {
+                    marginBottom: 12,
+                },
+                insightTitle: {
+                    fontSize: 16,
+                    fontWeight: '700',
+                    marginBottom: 4,
+                    color: theme.text,
+                },
+                insightTeam: {
+                    fontSize: 16,
+                    marginBottom: 2,
+                    color: theme.text,
+                },
+                insightSummary: {
+                    fontSize: 14,
+                    color: theme.mutedText,
+                    marginBottom: 2,
+                },
+                insightValue: {
+                    fontSize: 14,
+                    fontWeight: '600',
+                    color: theme.text,
+                },
+                errorTitle: {
+                    fontSize: 18,
+                    fontWeight: '700',
+                    marginBottom: 8,
+                    color: theme.text,
+                },
+                errorText: {
+                    fontSize: 14,
+                    color: theme.mutedText,
+                },
+                emptyText: {
+                    fontSize: 15,
+                    color: theme.mutedText,
+                },
+            }),
+        [theme]
+    );
+
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [payload, setPayload] = useState<any>(null);
@@ -131,7 +233,7 @@ export default function AnalyticsScreen() {
                                 <Text style={styles.emptyText}>No featured insights available.</Text>
                             ) : (
                                 featuredInsights.map((insight, index) => (
-                                    <View key={`${insight.type ?? 'insight'}-${index}`} style={styles.insightBlock}>
+                                    <View key={`${insight.title ?? 'insight'}-${index}`} style={styles.insightBlock}>
                                         <Text style={styles.insightTitle}>{insight.title ?? 'Insight'}</Text>
                                         <Text style={styles.insightTeam}>{insight.team_name ?? '—'}</Text>
                                         <Text style={styles.insightSummary}>{insight.summary ?? '—'}</Text>
@@ -153,101 +255,3 @@ export default function AnalyticsScreen() {
         </ScrollView>
     );
 }
-
-const styles = StyleSheet.create({
-    content: {
-        padding: 20,
-        paddingBottom: 40,
-        backgroundColor: '#fff',
-    },
-    screenTitle: {
-        fontSize: 32,
-        fontWeight: '800',
-        marginBottom: 20,
-    },
-    section: {
-        marginBottom: 24,
-    },
-    centerBlock: {
-        paddingVertical: 40,
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    helper: {
-        fontSize: 15,
-        opacity: 0.7,
-        marginTop: 12,
-    },
-    sectionTitle: {
-        fontSize: 22,
-        fontWeight: '700',
-        marginBottom: 12,
-    },
-    card: {
-        borderWidth: 1,
-        borderColor: '#ddd',
-        borderRadius: 14,
-        padding: 14,
-        marginBottom: 10,
-        backgroundColor: '#fafafa',
-    },
-    cardLabel: {
-        fontSize: 14,
-        opacity: 0.65,
-        marginBottom: 6,
-    },
-    cardTeam: {
-        fontSize: 22,
-        fontWeight: '700',
-        marginBottom: 4,
-    },
-    cardValue: {
-        fontSize: 15,
-        opacity: 0.75,
-    },
-    listCard: {
-        borderWidth: 1,
-        borderColor: '#ddd',
-        borderRadius: 14,
-        padding: 14,
-        backgroundColor: '#fafafa',
-    },
-    listRow: {
-        fontSize: 16,
-        marginBottom: 8,
-    },
-    insightBlock: {
-        marginBottom: 12,
-    },
-    insightTitle: {
-        fontSize: 16,
-        fontWeight: '700',
-        marginBottom: 4,
-    },
-    insightTeam: {
-        fontSize: 16,
-        marginBottom: 2,
-    },
-    insightSummary: {
-        fontSize: 14,
-        opacity: 0.75,
-        marginBottom: 2,
-    },
-    insightValue: {
-        fontSize: 14,
-        fontWeight: '600',
-    },
-    errorTitle: {
-        fontSize: 18,
-        fontWeight: '700',
-        marginBottom: 8,
-    },
-    errorText: {
-        fontSize: 14,
-        opacity: 0.75,
-    },
-    emptyText: {
-        fontSize: 15,
-        opacity: 0.7,
-    },
-});

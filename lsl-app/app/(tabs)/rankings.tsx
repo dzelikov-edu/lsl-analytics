@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-
+import { AppColors } from '@/constants/app-colors';
+import { useColorScheme } from '@/hooks/use-color-scheme';
 import { API_BASE_URL } from '@/lib/api';
+import { useEffect, useMemo, useState } from 'react';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 type Top25Row = {
     rank: number;
@@ -20,6 +21,97 @@ type Next5Row = {
 type PollKey = 'LSL' | 'LCAA';
 
 export default function RankingsScreen() {
+    const colorScheme = useColorScheme() ?? 'light';
+    const theme = AppColors[colorScheme];
+
+    const styles = useMemo(
+        () =>
+            StyleSheet.create({
+                content: {
+                    padding: 20,
+                    paddingBottom: 40,
+                    backgroundColor: theme.background,
+                },
+                screenTitle: {
+                    fontSize: 32,
+                    fontWeight: '800',
+                    marginBottom: 20,
+                    color: theme.text,
+                },
+                switcherRow: {
+                    flexDirection: 'row',
+                    marginBottom: 18,
+                    gap: 10,
+                },
+                switchPill: {
+                    borderWidth: 1,
+                    borderColor: theme.border,
+                    borderRadius: 999,
+                    paddingVertical: 10,
+                    paddingHorizontal: 16,
+                    backgroundColor: theme.card,
+                },
+                switchPillActive: {
+                    backgroundColor: theme.text,
+                    borderColor: theme.text,
+                },
+                switchText: {
+                    fontSize: 14,
+                    fontWeight: '600',
+                    color: theme.text,
+                },
+                switchTextActive: {
+                    color: theme.background,
+                },
+                section: {
+                    marginBottom: 18,
+                },
+                sectionTitle: {
+                    fontSize: 20,
+                    fontWeight: '700',
+                    marginBottom: 10,
+                    color: theme.text,
+                },
+                centerBlock: {
+                    paddingVertical: 40,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                },
+                helper: {
+                    fontSize: 15,
+                    color: theme.mutedText,
+                    marginTop: 12,
+                },
+                listCard: {
+                    borderWidth: 1,
+                    borderColor: theme.border,
+                    borderRadius: 14,
+                    padding: 14,
+                    backgroundColor: theme.card,
+                },
+                listRow: {
+                    fontSize: 18,
+                    marginBottom: 10,
+                    color: theme.text,
+                },
+                errorTitle: {
+                    fontSize: 18,
+                    fontWeight: '700',
+                    marginBottom: 8,
+                    color: theme.text,
+                },
+                errorText: {
+                    fontSize: 14,
+                    color: theme.mutedText,
+                },
+                emptyText: {
+                    fontSize: 15,
+                    color: theme.mutedText,
+                },
+            }),
+        [theme]
+    );
+
     const [selectedPoll, setSelectedPoll] = useState<PollKey>('LSL');
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -57,30 +149,16 @@ export default function RankingsScreen() {
             <View style={styles.switcherRow}>
                 <Pressable
                     onPress={() => setSelectedPoll('LSL')}
-                    style={[
-                        styles.switchPill,
-                        selectedPoll === 'LSL' && styles.switchPillActive,
-                    ]}>
-                    <Text
-                        style={[
-                            styles.switchText,
-                            selectedPoll === 'LSL' && styles.switchTextActive,
-                        ]}>
+                    style={[styles.switchPill, selectedPoll === 'LSL' && styles.switchPillActive]}>
+                    <Text style={[styles.switchText, selectedPoll === 'LSL' && styles.switchTextActive]}>
                         LSL Poll
                     </Text>
                 </Pressable>
 
                 <Pressable
                     onPress={() => setSelectedPoll('LCAA')}
-                    style={[
-                        styles.switchPill,
-                        selectedPoll === 'LCAA' && styles.switchPillActive,
-                    ]}>
-                    <Text
-                        style={[
-                            styles.switchText,
-                            selectedPoll === 'LCAA' && styles.switchTextActive,
-                        ]}>
+                    style={[styles.switchPill, selectedPoll === 'LCAA' && styles.switchPillActive]}>
+                    <Text style={[styles.switchText, selectedPoll === 'LCAA' && styles.switchTextActive]}>
                         LCAA Poll
                     </Text>
                 </Pressable>
@@ -132,83 +210,3 @@ export default function RankingsScreen() {
         </ScrollView>
     );
 }
-
-const styles = StyleSheet.create({
-    content: {
-        padding: 20,
-        paddingBottom: 40,
-        backgroundColor: '#fff',
-    },
-    screenTitle: {
-        fontSize: 32,
-        fontWeight: '800',
-        marginBottom: 20,
-    },
-    switcherRow: {
-        flexDirection: 'row',
-        marginBottom: 18,
-        gap: 10,
-    },
-    switchPill: {
-        borderWidth: 1,
-        borderColor: '#ccc',
-        borderRadius: 999,
-        paddingVertical: 10,
-        paddingHorizontal: 16,
-        backgroundColor: '#f4f4f4',
-    },
-    switchPillActive: {
-        backgroundColor: '#111',
-        borderColor: '#111',
-    },
-    switchText: {
-        fontSize: 14,
-        fontWeight: '600',
-        color: '#333',
-    },
-    switchTextActive: {
-        color: '#fff',
-    },
-    section: {
-        marginBottom: 18,
-    },
-    sectionTitle: {
-        fontSize: 20,
-        fontWeight: '700',
-        marginBottom: 10,
-    },
-    centerBlock: {
-        paddingVertical: 40,
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    helper: {
-        fontSize: 15,
-        opacity: 0.7,
-        marginTop: 12,
-    },
-    listCard: {
-        borderWidth: 1,
-        borderColor: '#ddd',
-        borderRadius: 14,
-        padding: 14,
-        backgroundColor: '#fafafa',
-    },
-    listRow: {
-        fontSize: 18,
-        marginBottom: 10,
-    },
-    errorTitle: {
-        fontSize: 18,
-        fontWeight: '700',
-        marginBottom: 8,
-    },
-    errorText: {
-        fontSize: 14,
-        opacity: 0.75,
-    },
-    emptyText: {
-        fontSize: 15,
-        opacity: 0.7,
-    },
-});

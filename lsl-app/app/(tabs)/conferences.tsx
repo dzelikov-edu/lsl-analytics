@@ -1,8 +1,9 @@
-import { router } from 'expo-router';
-import { useEffect, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-
+import { AppColors } from '@/constants/app-colors';
+import { useColorScheme } from '@/hooks/use-color-scheme';
 import { API_BASE_URL } from '@/lib/api';
+import { router } from 'expo-router';
+import { useEffect, useMemo, useState } from 'react';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 type ConferenceRow = {
     conference_id: string;
@@ -19,6 +20,64 @@ type ConferenceRow = {
 };
 
 export default function ConferencesScreen() {
+    const colorScheme = useColorScheme() ?? 'light';
+    const theme = AppColors[colorScheme];
+
+    const styles = useMemo(
+        () =>
+            StyleSheet.create({
+                content: {
+                    padding: 20,
+                    paddingBottom: 40,
+                    backgroundColor: theme.background,
+                },
+                screenTitle: {
+                    fontSize: 32,
+                    fontWeight: '800',
+                    marginBottom: 20,
+                    color: theme.text,
+                },
+                centerBlock: {
+                    paddingVertical: 40,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                },
+                helper: {
+                    fontSize: 15,
+                    color: theme.mutedText,
+                    marginTop: 12,
+                },
+                card: {
+                    borderWidth: 1,
+                    borderColor: theme.border,
+                    borderRadius: 14,
+                    padding: 14,
+                    marginBottom: 12,
+                    backgroundColor: theme.card,
+                },
+                cardPressed: {
+                    opacity: 0.75,
+                },
+                conferenceName: {
+                    fontSize: 22,
+                    fontWeight: '700',
+                    marginBottom: 8,
+                    color: theme.text,
+                },
+                context: {
+                    fontSize: 15,
+                    color: theme.mutedText,
+                },
+                errorTitle: {
+                    fontSize: 18,
+                    fontWeight: '700',
+                    marginBottom: 8,
+                    color: theme.text,
+                },
+            }),
+        [theme]
+    );
+
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [conferences, setConferences] = useState<ConferenceRow[]>([]);
@@ -80,10 +139,7 @@ export default function ConferencesScreen() {
                     <Pressable
                         key={conf.conference_id}
                         onPress={() => router.push(`/conference/${conf.conference_id}`)}
-                        style={({ pressed }) => [
-                            styles.card,
-                            pressed && styles.cardPressed,
-                        ]}>
+                        style={({ pressed }) => [styles.card, pressed && styles.cardPressed]}>
                         <Text style={styles.conferenceName}>{conf.conference_name}</Text>
                         <Text style={styles.context}>{formatContext(conf)}</Text>
                     </Pressable>
@@ -92,51 +148,3 @@ export default function ConferencesScreen() {
         </ScrollView>
     );
 }
-
-const styles = StyleSheet.create({
-    content: {
-        padding: 20,
-        paddingBottom: 40,
-        backgroundColor: '#fff',
-    },
-    screenTitle: {
-        fontSize: 32,
-        fontWeight: '800',
-        marginBottom: 20,
-    },
-    centerBlock: {
-        paddingVertical: 40,
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    helper: {
-        fontSize: 15,
-        opacity: 0.7,
-        marginTop: 12,
-    },
-    card: {
-        borderWidth: 1,
-        borderColor: '#ddd',
-        borderRadius: 14,
-        padding: 14,
-        marginBottom: 12,
-        backgroundColor: '#fafafa',
-    },
-    cardPressed: {
-        opacity: 0.75,
-    },
-    conferenceName: {
-        fontSize: 22,
-        fontWeight: '700',
-        marginBottom: 8,
-    },
-    context: {
-        fontSize: 15,
-        opacity: 0.75,
-    },
-    errorTitle: {
-        fontSize: 18,
-        fontWeight: '700',
-        marginBottom: 8,
-    },
-});

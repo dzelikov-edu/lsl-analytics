@@ -1,8 +1,9 @@
-import { router } from 'expo-router';
-import { useEffect, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-
+import { AppColors } from '@/constants/app-colors';
+import { useColorScheme } from '@/hooks/use-color-scheme';
 import { API_BASE_URL } from '@/lib/api';
+import { router } from 'expo-router';
+import { useEffect, useMemo, useState } from 'react';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 type TeamRow = {
     team_id: string;
@@ -15,30 +16,84 @@ type TeamRow = {
         };
     };
     analytics?: {
-        power?: {
-            rank?: number | null;
-            value?: number | null;
-            tier?: string | null;
-        } | null;
-        resume?: {
-            rank?: number | null;
-            value?: number | null;
-            tier?: string | null;
-        } | null;
-        form?: {
-            rank?: number | null;
-            value?: number | null;
-            tier?: string | null;
-        } | null;
-        sos?: {
-            rank?: number | null;
-            value?: number | null;
-            tier?: string | null;
-        } | null;
+        power?: { rank?: number | null } | null;
+        resume?: { rank?: number | null } | null;
+        form?: { rank?: number | null } | null;
+        sos?: { rank?: number | null } | null;
     };
 };
 
 export default function TeamsScreen() {
+    const colorScheme = useColorScheme() ?? 'light';
+    const theme = AppColors[colorScheme];
+
+    const styles = useMemo(
+        () =>
+            StyleSheet.create({
+                content: {
+                    padding: 20,
+                    paddingBottom: 40,
+                    backgroundColor: theme.background,
+                },
+                screenTitle: {
+                    fontSize: 32,
+                    fontWeight: '800',
+                    marginBottom: 20,
+                    color: theme.text,
+                },
+                centerBlock: {
+                    paddingVertical: 40,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                },
+                helper: {
+                    fontSize: 15,
+                    color: theme.mutedText,
+                    marginTop: 12,
+                },
+                teamCard: {
+                    borderWidth: 1,
+                    borderColor: theme.border,
+                    borderRadius: 14,
+                    padding: 14,
+                    marginBottom: 12,
+                    backgroundColor: theme.card,
+                },
+                teamCardPressed: {
+                    opacity: 0.75,
+                },
+                cardHeader: {
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    marginBottom: 8,
+                },
+                teamName: {
+                    fontSize: 22,
+                    fontWeight: '700',
+                    flex: 1,
+                    paddingRight: 12,
+                    color: theme.text,
+                },
+                pollBadge: {
+                    fontSize: 18,
+                    fontWeight: '700',
+                    color: theme.text,
+                },
+                analyticsStrip: {
+                    fontSize: 14,
+                    color: theme.mutedText,
+                },
+                errorTitle: {
+                    fontSize: 18,
+                    fontWeight: '700',
+                    marginBottom: 8,
+                    color: theme.text,
+                },
+            }),
+        [theme]
+    );
+
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [teams, setTeams] = useState<TeamRow[]>([]);
@@ -112,10 +167,7 @@ export default function TeamsScreen() {
                     <Pressable
                         key={team.team_id}
                         onPress={() => router.push(`/team/${team.team_id}`)}
-                        style={({ pressed }) => [
-                            styles.teamCard,
-                            pressed && styles.teamCardPressed,
-                        ]}>
+                        style={({ pressed }) => [styles.teamCard, pressed && styles.teamCardPressed]}>
                         <View style={styles.cardHeader}>
                             <Text style={styles.teamName}>{team.team_name}</Text>
                             <Text style={styles.pollBadge}>{formatRankText(team)}</Text>
@@ -127,62 +179,3 @@ export default function TeamsScreen() {
         </ScrollView>
     );
 }
-
-const styles = StyleSheet.create({
-    content: {
-        padding: 20,
-        paddingBottom: 40,
-        backgroundColor: '#fff',
-    },
-    screenTitle: {
-        fontSize: 32,
-        fontWeight: '800',
-        marginBottom: 20,
-    },
-    centerBlock: {
-        paddingVertical: 40,
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    helper: {
-        fontSize: 15,
-        opacity: 0.7,
-        marginTop: 12,
-    },
-    teamCard: {
-        borderWidth: 1,
-        borderColor: '#ddd',
-        borderRadius: 14,
-        padding: 14,
-        marginBottom: 12,
-        backgroundColor: '#fafafa',
-    },
-    teamCardPressed: {
-        opacity: 0.75,
-    },
-    cardHeader: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        marginBottom: 8,
-    },
-    teamName: {
-        fontSize: 22,
-        fontWeight: '700',
-        flex: 1,
-        paddingRight: 12,
-    },
-    pollBadge: {
-        fontSize: 18,
-        fontWeight: '700',
-    },
-    analyticsStrip: {
-        fontSize: 14,
-        opacity: 0.75,
-    },
-    errorTitle: {
-        fontSize: 18,
-        fontWeight: '700',
-        marginBottom: 8,
-    },
-});

@@ -1,9 +1,93 @@
-import { useEffect, useState } from 'react';
+import { AppColors } from '@/constants/app-colors';
+import { useColorScheme } from '@/hooks/use-color-scheme';
+import { API_BASE_URL } from '@/lib/api';
+import { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
 
-import { API_BASE_URL } from '@/lib/api';
-
 export default function HomeScreen() {
+  const colorScheme = useColorScheme() ?? 'light';
+  const theme = AppColors[colorScheme];
+
+  const styles = useMemo(
+    () =>
+      StyleSheet.create({
+        content: {
+          padding: 20,
+          paddingBottom: 40,
+          backgroundColor: theme.background,
+        },
+        screenTitle: {
+          fontSize: 32,
+          fontWeight: '800',
+          marginBottom: 6,
+          color: theme.text,
+        },
+        metaText: {
+          fontSize: 15,
+          color: theme.mutedText,
+          marginBottom: 20,
+        },
+        section: {
+          marginBottom: 24,
+        },
+        sectionTitle: {
+          fontSize: 22,
+          fontWeight: '700',
+          marginBottom: 12,
+          color: theme.text,
+        },
+        card: {
+          borderWidth: 1,
+          borderColor: theme.border,
+          borderRadius: 14,
+          padding: 14,
+          marginBottom: 12,
+          backgroundColor: theme.card,
+        },
+        cardMeta: {
+          fontSize: 13,
+          color: theme.mutedText,
+          marginBottom: 8,
+        },
+        cardTitle: {
+          fontSize: 17,
+          fontWeight: '700',
+          marginBottom: 4,
+          color: theme.text,
+        },
+        cardTeamLine: {
+          fontSize: 17,
+          fontWeight: '700',
+          marginBottom: 4,
+          color: theme.text,
+        },
+        dayGameBlock: {
+          marginTop: 10,
+        },
+        dayGameLine: {
+          fontSize: 16,
+          fontWeight: '700',
+          marginBottom: 4,
+          color: theme.text,
+        },
+        body: {
+          fontSize: 15,
+          color: theme.text,
+        },
+        centerBlock: {
+          paddingVertical: 40,
+          alignItems: 'center',
+          justifyContent: 'center',
+        },
+        helper: {
+          fontSize: 15,
+          color: theme.mutedText,
+          marginTop: 12,
+        },
+      }),
+    [theme]
+  );
+
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [payload, setPayload] = useState<any>(null);
@@ -31,36 +115,52 @@ export default function HomeScreen() {
     loadHome();
   }, []);
 
-  const refreshedAt = payload?.status?.refreshed_at ?? null;
-  const pollWeek = payload?.rankings_preview?.week ?? null;
   const featuredGames = payload?.featured_games?.games ?? [];
   const rankings = payload?.rankings_preview?.rankings ?? [];
-  const analyticsLeaders = payload?.analytics_preview?.leaders ?? {};
+  const analytics = payload?.analytics_preview?.leaders ?? {};
   const calendarDays = payload?.calendar_preview?.days ?? [];
 
-  const formatRankedName = (
-    teamName: string,
-    rank: number | null | undefined,
-    next5: number | null | undefined
-  ) => {
-    if (rank !== null && rank !== undefined) return `#${rank} ${teamName}`;
-    if (next5 !== null && next5 !== undefined) return `${teamName} (Next 5)`;
-    return teamName;
-  };
+  const getCalendarGamePriority = (game: any) => {
+    const homeRank = game?.lsl_rank_home;
+    const awayRank = game?.lsl_rank_away;
+    const homeNext5 = game?.lsl_next5_home;
+    const awayNext5 = game?.lsl_next5_away;
 
-  const analyticsItems = [
-    { label: 'Power Leader', item: analyticsLeaders.power },
-    { label: 'Resume Leader', item: analyticsLeaders.resume },
-    { label: 'Form Leader', item: analyticsLeaders.form },
-    { label: 'Toughest Schedule', item: analyticsLeaders.sos },
-  ].filter((x) => x.item);
+    const homeTop25 = homeRank !== null && homeRank !== undefined;
+    const awayTop25 = awayRank !== null && awayRank !== undefined;
+    const homeN5 = homeNext5 !== null && homeNext5 !== undefined;
+    const awayN5 = awayNext5 !== null && awayNext5 !== undefined;
+
+    const rankedTeamsCount =
+      (homeTop25 ? 1 : 0) +
+      (awayTop25 ? 1 : 0) +
+      (homeN5 ? 1 : 0) +
+      (awayN5 ? 1 : 0);
+
+    const bestRankValue = Math.min(
+      homeTop25 ? homeRank : 999,
+      awayTop25 ? awayRank : 999,
+      homeN5 ? 25 + homeNext5 : 999,
+      awayN5 ? 25 + awayNext5 : 999
+    );
+
+    const combinedRankValue =
+      (homeTop25 ? homeRank : homeN5 ? 25 + homeNext5 : 50) +
+      (awayTop25 ? awayRank : awayN5 ? 25 + awayNext5 : 50);
+
+    return {
+      rankedTeamsCount,
+      bestRankValue,
+      combinedRankValue,
+    };
+  };
 
   return (
     <ScrollView contentContainerStyle={styles.content}>
       {loading ? (
         <View style={styles.centerBlock}>
           <ActivityIndicator size="large" />
-          <Text style={styles.helper}>Loading home payload...</Text>
+          <Text style={styles.helper}>Loading home...</Text>
         </View>
       ) : error ? (
         <View style={styles.card}>
@@ -69,211 +169,107 @@ export default function HomeScreen() {
         </View>
       ) : (
         <>
-          <View style={styles.header}>
-            <Text style={styles.appTitle}>LSL</Text>
-            <Text style={styles.context}>
-              {pollWeek !== null ? `Poll Week ${pollWeek}` : 'League Home'}
-            </Text>
-            <Text style={styles.status}>
-              {refreshedAt ? `Last refresh: ${refreshedAt}` : 'Last refresh unavailable'}
-            </Text>
-          </View>
+          <Text style={styles.screenTitle}>LSL</Text>
+          <Text style={styles.metaText}>
+            Updated {payload?.status?.refreshed_at ? 'recently' : 'just now'}
+          </Text>
 
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Featured Games</Text>
+            {featuredGames.map((game: any, index: number) => (
+              <View key={game.game_key ?? index} style={styles.card}>
+                <Text style={styles.cardMeta}>
+                  {game.display_date || game.date_key || 'TBD'} • {game.phase_display || game.phase || '—'} • Week {game.week ?? '—'}
+                </Text>
 
-            {featuredGames.length === 0 ? (
-              <View style={styles.card}>
-                <Text style={styles.emptyText}>No featured games available.</Text>
+                <Text style={styles.cardTeamLine}>
+                  {game.lsl_rank_away !== null && game.lsl_rank_away !== undefined
+                    ? `#${game.lsl_rank_away} `
+                    : ''}
+                  {game.away_name || 'Away'}
+                </Text>
+
+                <Text style={styles.cardTeamLine}>
+                  {game.lsl_rank_home !== null && game.lsl_rank_home !== undefined
+                    ? `#${game.lsl_rank_home} `
+                    : ''}
+                  {game.home_name || 'Home'}
+                </Text>
               </View>
-            ) : (
-              featuredGames.map((game: any) => (
-                <View key={game.game_key} style={styles.card}>
-                  <Text style={styles.cardMeta}>
-                    {game.display_date || game.date_key || 'TBD'} • {game.phase_display || game.phase || '—'} • Week {game.week ?? '—'}
-                  </Text>
-
-                  <Text style={styles.teamRow}>
-                    {formatRankedName(
-                      game.away_name,
-                      game.lsl_rank_away,
-                      game.lsl_next5_away
-                    )}
-                  </Text>
-
-                  <Text style={styles.teamRow}>
-                    {formatRankedName(
-                      game.home_name,
-                      game.lsl_rank_home,
-                      game.lsl_next5_home
-                    )}
-                  </Text>
-                </View>
-              ))
-            )}
+            ))}
           </View>
 
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Rankings</Text>
-
-            {rankings.length === 0 ? (
-              <View style={styles.card}>
-                <Text style={styles.emptyText}>No rankings available.</Text>
-              </View>
-            ) : (
-              <View style={styles.card}>
-                {rankings.slice(0, 10).map((team: any, index: number) => (
-                  <Text key={`${team.team_id}-${index}`} style={styles.listRow}>
-                    {team.rank ?? team.bucket_order ?? index + 1}. {team.team_name}
-                  </Text>
-                ))}
-              </View>
-            )}
+            <View style={styles.card}>
+              {rankings.slice(0, 10).map((team: any, index: number) => (
+                <Text key={team.team_id ?? index} style={styles.body}>
+                  {(team.rank ?? index + 1)}. {team.team_name}
+                </Text>
+              ))}
+            </View>
           </View>
 
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Analytics</Text>
-
-            {analyticsItems.length === 0 ? (
-              <View style={styles.card}>
-                <Text style={styles.emptyText}>No analytics leaders available.</Text>
-              </View>
-            ) : (
-              analyticsItems.map((entry, index) => (
-                <View key={`${entry.label}-${index}`} style={styles.card}>
-                  <Text style={styles.analyticsLabel}>{entry.label}</Text>
-                  <Text style={styles.analyticsTeam}>{entry.item.team_name}</Text>
-                  <Text style={styles.analyticsValue}>
-                    {entry.item.rank !== null && entry.item.rank !== undefined
-                      ? `#${entry.item.rank}`
-                      : '—'}
-                    {entry.item.value !== null && entry.item.value !== undefined
-                      ? ` • ${entry.item.value}`
-                      : ''}
-                  </Text>
-                </View>
-              ))
-            )}
+            <View style={styles.card}>
+              <Text style={styles.body}>
+                Power Leader — {analytics?.power?.team_name ?? '—'}
+              </Text>
+            </View>
           </View>
 
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Upcoming Schedule</Text>
+            {calendarDays.map((day: any, index: number) => (
+              <View key={day.date_key ?? index} style={styles.card}>
+                <Text style={styles.cardTitle}>
+                  {day.display_date || day.date_key || 'TBD'}
+                </Text>
+                <Text style={styles.cardMeta}>{day.games_count ?? 0} games</Text>
 
-            {calendarDays.length === 0 ? (
-              <View style={styles.card}>
-                <Text style={styles.emptyText}>No upcoming schedule available.</Text>
-              </View>
-            ) : (
-              calendarDays.map((day: any, index: number) => (
-                <View key={`${day.date_key}-${index}`} style={styles.card}>
-                  <Text style={styles.dayHeader}>
-                    {day.display_date || day.date_key || 'TBD'} • {day.games_count ?? 0} games
-                  </Text>
+                {[...(day.games ?? [])]
+                  .sort((a: any, b: any) => {
+                    const pa = getCalendarGamePriority(a);
+                    const pb = getCalendarGamePriority(b);
 
-                  {(day.games ?? []).slice(0, 5).map((game: any, gameIndex: number) => (
-                    <Text key={`${game.game_key}-${gameIndex}`} style={styles.listRow}>
-                      {game.away_name} at {game.home_name}
-                    </Text>
+                    if (pb.rankedTeamsCount !== pa.rankedTeamsCount) {
+                      return pb.rankedTeamsCount - pa.rankedTeamsCount;
+                    }
+
+                    if (pa.bestRankValue !== pb.bestRankValue) {
+                      return pa.bestRankValue - pb.bestRankValue;
+                    }
+
+                    if (pa.combinedRankValue !== pb.combinedRankValue) {
+                      return pa.combinedRankValue - pb.combinedRankValue;
+                    }
+
+                    return 0;
+                  })
+                  .slice(0, 3)
+                  .map((game: any, gameIndex: number) => (
+                    <View key={game.game_key ?? gameIndex} style={styles.dayGameBlock}>
+                      <Text style={styles.dayGameLine}>
+                        {game.lsl_rank_away !== null && game.lsl_rank_away !== undefined
+                          ? `#${game.lsl_rank_away} `
+                          : ''}
+                        {game.away_name || 'Away'}
+                      </Text>
+
+                      <Text style={styles.dayGameLine}>
+                        {game.lsl_rank_home !== null && game.lsl_rank_home !== undefined
+                          ? `#${game.lsl_rank_home} `
+                          : ''}
+                        {game.home_name || 'Home'}
+                      </Text>
+                    </View>
                   ))}
-                </View>
-              ))
-            )}
+              </View>
+            ))}
           </View>
         </>
       )}
     </ScrollView>
   );
 }
-
-const styles = StyleSheet.create({
-  content: {
-    padding: 20,
-    paddingBottom: 40,
-    backgroundColor: '#fff',
-  },
-  header: {
-    marginBottom: 24,
-  },
-  appTitle: {
-    fontSize: 32,
-    fontWeight: '800',
-    marginBottom: 4,
-  },
-  context: {
-    fontSize: 16,
-    fontWeight: '600',
-    marginBottom: 2,
-  },
-  status: {
-    fontSize: 14,
-    opacity: 0.65,
-  },
-  section: {
-    marginBottom: 14,
-  },
-  centerBlock: {
-    paddingVertical: 40,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  helper: {
-    fontSize: 15,
-    opacity: 0.7,
-    marginTop: 12,
-  },
-  card: {
-    borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 14,
-    padding: 14,
-    marginBottom: 14,
-    backgroundColor: '#fafafa',
-  },
-  sectionTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    marginBottom: 10,
-  },
-  cardMeta: {
-    fontSize: 12,
-    opacity: 0.65,
-    marginBottom: 8,
-  },
-  teamRow: {
-    fontSize: 17,
-    fontWeight: '600',
-    marginBottom: 4,
-  },
-  listRow: {
-    fontSize: 16,
-    marginBottom: 8,
-  },
-  analyticsLabel: {
-    fontSize: 14,
-    opacity: 0.65,
-    marginBottom: 6,
-  },
-  analyticsTeam: {
-    fontSize: 20,
-    fontWeight: '700',
-    marginBottom: 4,
-  },
-  analyticsValue: {
-    fontSize: 14,
-    opacity: 0.75,
-  },
-  dayHeader: {
-    fontSize: 16,
-    fontWeight: '700',
-    marginBottom: 10,
-  },
-  emptyText: {
-    fontSize: 15,
-    opacity: 0.7,
-  },
-  body: {
-    fontSize: 13,
-    lineHeight: 20,
-    fontFamily: 'monospace',
-  },
-});

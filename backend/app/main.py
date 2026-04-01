@@ -275,6 +275,17 @@ def _phase_display_name(
     return fallback.get(phase_norm, phase_norm.replace("_", " ").title())
 
 
+def _format_date_key_mmdd(date_key) -> str | None:
+    if date_key is None:
+        return None
+
+    s = str(date_key).strip()
+    if len(s) != 4 or not s.isdigit():
+        return s or None
+
+    return f"{s[:2]}/{s[2:]}"
+
+
 def _team_list_analytics_map(week: int | None = None) -> dict[str, dict]:
     w = 0 if week is None else week
 
@@ -2206,6 +2217,26 @@ def home(
     name_map = _team_name_map(active_only=False)
     phase_map = load_week_phase_map()
 
+    # Build LSL poll maps (latest week in Polls sheet)
+    lsl_top25_rank = {}   # team_id -> 1..25
+    lsl_next5_order = {}  # team_id -> 1..5 (not official rank)
+    lsl_poll_week = None
+
+    try:
+        poll_rows = load_polls()
+        if poll_rows:
+            lsl_poll_week = max(r["week"] for r in poll_rows)
+            lsl_rows = [r for r in poll_rows if r["week"] == lsl_poll_week and r["poll"] == "LSL"]
+            for r in lsl_rows:
+                t = str(r["team_id"]).strip().upper()
+                if r["bucket"] == "TOP25":
+                    lsl_top25_rank[t] = int(r["bucket_order"])
+                elif r["bucket"] == "NEXT5":
+                    lsl_next5_order[t] = int(r["bucket_order"])
+    except Exception:
+        # Polls optional: fall back to non-poll logic if something goes wrong
+        lsl_top25_rank, lsl_next5_order, lsl_poll_week = {}, {}, None
+
     tracked_team_ids = {
         str(t.team_id).strip().upper()
         for t in load_teams_index()
@@ -2304,6 +2335,10 @@ def home(
                 "home_name": name_map.get(home_id, home_id),
                 "away_id": away_id,
                 "away_name": name_map.get(away_id, away_id),
+                "lsl_rank_home": lsl_top25_rank.get(home_id),
+                "lsl_rank_away": lsl_top25_rank.get(away_id),
+                "lsl_next5_home": lsl_next5_order.get(home_id),
+                "lsl_next5_away": lsl_next5_order.get(away_id),
                 "team_a": ta,
                 "team_a_name": name_map.get(ta, ta),
                 "team_b": tb,
@@ -2682,26 +2717,6 @@ def home(
         "games_returned": 0,
         "games": []
     }
-
-    # Build LSL poll maps (latest week in Polls sheet)
-    lsl_top25_rank = {}   # team_id -> 1..25
-    lsl_next5_order = {}  # team_id -> 1..5 (not official rank)
-    lsl_poll_week = None
-
-    try:
-        poll_rows = load_polls()
-        if poll_rows:
-            lsl_poll_week = max(r["week"] for r in poll_rows)
-            lsl_rows = [r for r in poll_rows if r["week"] == lsl_poll_week and r["poll"] == "LSL"]
-            for r in lsl_rows:
-                t = str(r["team_id"]).strip().upper()
-                if r["bucket"] == "TOP25":
-                    lsl_top25_rank[t] = int(r["bucket_order"])
-                elif r["bucket"] == "NEXT5":
-                    lsl_next5_order[t] = int(r["bucket_order"])
-    except Exception:
-        # Polls optional: fall back to non-poll logic if something goes wrong
-        lsl_top25_rank, lsl_next5_order, lsl_poll_week = {}, {}, None
 
     def _poll_points(team_id: str) -> int:
         """
@@ -3441,6 +3456,8 @@ def team_schedule(
         
         out.append({
             "game_key": g.get("game_key"),
+            "date_key": g.get("date_key"),
+            "display_date": _format_date_key_mmdd(g.get("date_key")),
             "phase": phase_v,
             "phase_display": _phase_display_name(phase_v, week_v, phase_map),
             "week": week_v,
@@ -3458,9 +3475,12 @@ def team_schedule(
             "away_id": g.get("away_id"),
         })
 
-    # sort by phase then week then opponent for stable display
+    # sort by week first, then real date, then opponent
     def sort_key(x):
-        return (str(x.get("phase","")), x.get("week") if x.get("week") is not None else 9999, str(x.get("opponent_team_id","")))
+        week_val = x.get("week") if x.get("week") is not None else 9999
+        date_key = str(x.get("date_key") or "")
+        opp = str(x.get("opponent_team_id", ""))
+        return (week_val, date_key, opp)
 
     out_sorted = sorted(out, key=sort_key)
 

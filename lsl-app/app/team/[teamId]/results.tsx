@@ -1,8 +1,9 @@
-import { useLocalSearchParams } from 'expo-router';
-import { useEffect, useState } from 'react';
-import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
-
+import { AppColors } from '@/constants/app-colors';
+import { useColorScheme } from '@/hooks/use-color-scheme';
 import { API_BASE_URL } from '@/lib/api';
+import { useLocalSearchParams } from 'expo-router';
+import { useEffect, useMemo, useState } from 'react';
+import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 type ResultGame = {
     game_key: string;
@@ -20,6 +21,72 @@ type ResultGame = {
 
 export default function TeamResultsScreen() {
     const { teamId } = useLocalSearchParams<{ teamId: string }>();
+    const colorScheme = useColorScheme() ?? 'light';
+    const theme = AppColors[colorScheme];
+
+    const styles = useMemo(
+        () =>
+            StyleSheet.create({
+                content: {
+                    padding: 20,
+                    paddingBottom: 40,
+                    backgroundColor: theme.background,
+                },
+                header: {
+                    marginBottom: 16,
+                },
+                subTitle: {
+                    fontSize: 15,
+                    color: theme.mutedText,
+                },
+                centerBlock: {
+                    paddingVertical: 40,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                },
+                helper: {
+                    fontSize: 15,
+                    color: theme.mutedText,
+                    marginTop: 12,
+                },
+                card: {
+                    borderWidth: 1,
+                    borderColor: theme.border,
+                    borderRadius: 14,
+                    padding: 14,
+                    marginBottom: 12,
+                    backgroundColor: theme.card,
+                },
+                sectionTitle: {
+                    fontSize: 20,
+                    fontWeight: '700',
+                    marginBottom: 10,
+                    color: theme.text,
+                },
+                body: {
+                    fontSize: 14,
+                    lineHeight: 20,
+                    color: theme.text,
+                },
+                metaLine: {
+                    fontSize: 13,
+                    color: theme.mutedText,
+                    marginBottom: 8,
+                },
+                resultLine: {
+                    fontSize: 19,
+                    fontWeight: '800',
+                    marginBottom: 6,
+                    color: theme.text,
+                },
+                mainLine: {
+                    fontSize: 17,
+                    fontWeight: '600',
+                    color: theme.text,
+                },
+            }),
+        [theme]
+    );
 
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -86,9 +153,6 @@ export default function TeamResultsScreen() {
             ) : (
                 <>
                     <View style={styles.header}>
-                        <Text style={styles.screenTitle}>
-                            {(payload?.team_name || payload?.team_id || 'Results').replace(/_/g, ' ')}
-                        </Text>
                         <Text style={styles.subTitle}>Played Results</Text>
                     </View>
 
@@ -116,64 +180,3 @@ export default function TeamResultsScreen() {
         </ScrollView>
     );
 }
-
-const styles = StyleSheet.create({
-    content: {
-        padding: 20,
-        paddingBottom: 40,
-        backgroundColor: '#fff',
-    },
-    header: {
-        marginBottom: 20,
-    },
-    screenTitle: {
-        fontSize: 32,
-        fontWeight: '800',
-        marginBottom: 4,
-    },
-    subTitle: {
-        fontSize: 15,
-        opacity: 0.7,
-    },
-    centerBlock: {
-        paddingVertical: 40,
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    helper: {
-        fontSize: 15,
-        opacity: 0.7,
-        marginTop: 12,
-    },
-    card: {
-        borderWidth: 1,
-        borderColor: '#ddd',
-        borderRadius: 14,
-        padding: 14,
-        marginBottom: 12,
-        backgroundColor: '#fafafa',
-    },
-    sectionTitle: {
-        fontSize: 20,
-        fontWeight: '700',
-        marginBottom: 10,
-    },
-    body: {
-        fontSize: 14,
-        lineHeight: 20,
-    },
-    metaLine: {
-        fontSize: 13,
-        opacity: 0.7,
-        marginBottom: 8,
-    },
-    resultLine: {
-        fontSize: 19,
-        fontWeight: '800',
-        marginBottom: 6,
-    },
-    mainLine: {
-        fontSize: 17,
-        fontWeight: '600',
-    },
-});

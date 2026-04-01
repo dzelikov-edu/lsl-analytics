@@ -1,11 +1,103 @@
-import { router, useLocalSearchParams } from 'expo-router';
-import { useEffect, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-
+import { AppColors } from '@/constants/app-colors';
+import { useColorScheme } from '@/hooks/use-color-scheme';
 import { API_BASE_URL } from '@/lib/api';
+import { router, useLocalSearchParams } from 'expo-router';
+import { useEffect, useMemo, useState } from 'react';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 export default function TeamDetailScreen() {
     const { teamId } = useLocalSearchParams<{ teamId: string }>();
+    const colorScheme = useColorScheme() ?? 'light';
+    const theme = AppColors[colorScheme];
+
+    const styles = useMemo(
+        () =>
+            StyleSheet.create({
+                content: {
+                    padding: 20,
+                    paddingBottom: 40,
+                    backgroundColor: theme.background,
+                },
+                centerBlock: {
+                    paddingVertical: 40,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                },
+                helper: {
+                    fontSize: 15,
+                    color: theme.mutedText,
+                    marginTop: 12,
+                },
+                header: {
+                    marginBottom: 24,
+                },
+                teamName: {
+                    fontSize: 32,
+                    fontWeight: '800',
+                    marginBottom: 6,
+                    color: theme.text,
+                },
+                pollLine: {
+                    fontSize: 16,
+                    fontWeight: '600',
+                    marginBottom: 4,
+                    color: theme.text,
+                },
+                statusLine: {
+                    fontSize: 14,
+                    color: theme.mutedText,
+                },
+                section: {
+                    marginBottom: 14,
+                },
+                card: {
+                    borderWidth: 1,
+                    borderColor: theme.border,
+                    borderRadius: 14,
+                    padding: 14,
+                    marginBottom: 14,
+                    backgroundColor: theme.card,
+                },
+                sectionTitle: {
+                    fontSize: 20,
+                    fontWeight: '700',
+                    marginBottom: 10,
+                    color: theme.text,
+                },
+                metricLabel: {
+                    fontSize: 14,
+                    color: theme.mutedText,
+                    marginBottom: 6,
+                },
+                metricValue: {
+                    fontSize: 20,
+                    fontWeight: '700',
+                    marginBottom: 4,
+                    color: theme.text,
+                },
+                metricTier: {
+                    fontSize: 14,
+                    color: theme.mutedText,
+                },
+                listRow: {
+                    fontSize: 16,
+                    marginBottom: 8,
+                    color: theme.text,
+                },
+                linkRow: {
+                    textDecorationLine: 'underline',
+                },
+                rowPressed: {
+                    opacity: 0.7,
+                },
+                body: {
+                    fontSize: 13,
+                    lineHeight: 20,
+                    color: theme.text,
+                },
+            }),
+        [theme]
+    );
 
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -121,6 +213,7 @@ export default function TeamDetailScreen() {
                                 style={({ pressed }) => [pressed && styles.rowPressed]}>
                                 <Text style={[styles.listRow, styles.linkRow]}>Results</Text>
                             </Pressable>
+
                             <Text style={styles.listRow}>Analytics</Text>
 
                             <Pressable
@@ -135,83 +228,3 @@ export default function TeamDetailScreen() {
         </ScrollView>
     );
 }
-
-const styles = StyleSheet.create({
-    content: {
-        padding: 20,
-        paddingBottom: 40,
-        backgroundColor: '#fff',
-    },
-    centerBlock: {
-        paddingVertical: 40,
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    helper: {
-        fontSize: 15,
-        opacity: 0.7,
-        marginTop: 12,
-    },
-    header: {
-        marginBottom: 24,
-    },
-    teamName: {
-        fontSize: 32,
-        fontWeight: '800',
-        marginBottom: 6,
-    },
-    pollLine: {
-        fontSize: 16,
-        fontWeight: '600',
-        marginBottom: 4,
-    },
-    statusLine: {
-        fontSize: 14,
-        opacity: 0.7,
-    },
-    section: {
-        marginBottom: 14,
-    },
-    card: {
-        borderWidth: 1,
-        borderColor: '#ddd',
-        borderRadius: 14,
-        padding: 14,
-        marginBottom: 14,
-        backgroundColor: '#fafafa',
-    },
-    sectionTitle: {
-        fontSize: 20,
-        fontWeight: '700',
-        marginBottom: 10,
-    },
-    metricLabel: {
-        fontSize: 14,
-        opacity: 0.65,
-        marginBottom: 6,
-    },
-    metricValue: {
-        fontSize: 20,
-        fontWeight: '700',
-        marginBottom: 4,
-    },
-    metricTier: {
-        fontSize: 14,
-        opacity: 0.75,
-    },
-    listRow: {
-        fontSize: 16,
-        marginBottom: 8,
-    },
-    linkRow: {
-        textDecorationLine: 'underline',
-    },
-    rowPressed: {
-        opacity: 0.7,
-    },
-    body: {
-        fontSize: 13,
-        lineHeight: 20,
-        fontFamily: 'monospace',
-    },
-});
