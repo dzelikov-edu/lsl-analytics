@@ -12,6 +12,7 @@ class TeamIndexRow:
     sheet_id: str
     export_tab: str
     active: bool
+    conference: Optional[str] = None
 
 
 def _to_bool(v) -> bool:
@@ -25,6 +26,7 @@ def load_teams_index() -> List[TeamIndexRow]:
     """
     Reads TeamsIndex from MASTER sheet.
     Requires headers: team_id, team_name, sheet_id, export_tab, active
+    Optional header: conference
     """
     service = get_sheets_service(settings.GOOGLE_SERVICE_ACCOUNT_JSON)
 
@@ -51,8 +53,9 @@ def load_teams_index() -> List[TeamIndexRow]:
         sheet_id = str(r[idx["sheet_id"]]).strip()
         export_tab = str(r[idx["export_tab"]]).strip() or settings.DEFAULT_EXPORT_TAB
         active = _to_bool(r[idx["active"]])
+        conference = str(r[idx["conference"]]).strip().upper() if "conference" in idx else None
 
-        rows.append(TeamIndexRow(team_id, team_name, sheet_id, export_tab, active))
+        rows.append(TeamIndexRow(team_id, team_name, sheet_id, export_tab, active, conference))
 
     return rows
 
@@ -315,27 +318,43 @@ def load_conference_membership() -> dict[str, str]:
     Reads ConferenceMembership tab from MASTER sheet.
     Expected columns: team_id | conference_id
     Returns: team_id -> conference_id
+
+    If the sheet read times out, falls back to TeamsIndex conference values
+    for tracked teams so conference routes do not hard-fail.
     """
-    service = get_sheets_service(settings.GOOGLE_SERVICE_ACCOUNT_JSON)
-    values = read_range(service, settings.MASTER_SHEET_ID, "ConferenceMembership!A1:B5000")
-    if not values or len(values) < 2:
-        return {}
+    try:
+        service = get_sheets_service(settings.GOOGLE_SERVICE_ACCOUNT_JSON)
+        values = read_range(service, settings.MASTER_SHEET_ID, "ConferenceMembership!A1:B2000")
+        if not values or len(values) < 2:
+            return {}
 
-    header = [str(x).strip().lower() for x in values[0]]
-    idx = {h: i for i, h in enumerate(header)}
-    if "team_id" not in idx or "conference_id" not in idx:
-        raise RuntimeError("ConferenceMembership must have headers: team_id, conference_id")
+        header = [str(x).strip().lower() for x in values[0]]
+        idx = {h: i for i, h in enumerate(header)}
+        if "team_id" not in idx or "conference_id" not in idx:
+            raise RuntimeError("ConferenceMembership must have headers: team_id, conference_id")
 
-    out: dict[str, str] = {}
-    for row in values[1:]:
-        if not row:
-            continue
-        team_id = str(row[idx["team_id"]]).strip().upper() if idx["team_id"] < len(row) else ""
-        conf_id = str(row[idx["conference_id"]]).strip().upper() if idx["conference_id"] < len(row) else ""
-        if team_id and conf_id:
-            out[team_id] = conf_id
+        out: dict[str, str] = {}
+        for row in values[1:]:
+            if not row:
+                continue
+            team_id = str(row[idx["team_id"]]).strip().upper() if idx["team_id"] < len(row) else ""
+            conf_id = str(row[idx["conference_id"]]).strip().upper() if idx["conference_id"] < len(row) else ""
+            if team_id and conf_id:
+                out[team_id] = conf_id
 
-    return out
+        return out
+
+    except Exception:
+        fallback: dict[str, str] = {}
+        for t in load_teams_index():
+            conf = getattr(t, "conference", None)
+            if conf:
+                fallback[str(t.team_id).strip().upper()] = str(conf).strip().upper()
+
+        if fallback:
+            return fallback
+
+        raise
 
 
 def load_conferences_map() -> dict[str, str]:

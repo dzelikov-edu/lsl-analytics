@@ -7,6 +7,8 @@ import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-nat
 
 type ResultGame = {
     game_key: string;
+    date_key?: string;
+    display_date?: string;
     phase?: string;
     phase_display?: string;
     week?: number | null;
@@ -14,6 +16,8 @@ type ResultGame = {
     team_id?: string;
     opponent_team_id?: string;
     opponent_name?: string;
+    opponent_lsl_rank?: number | null;
+    opponent_lsl_next5_order?: number | null;
     team_score?: number | null;
     opp_score?: number | null;
     played?: boolean;
@@ -127,8 +131,13 @@ export default function TeamResultsScreen() {
     };
 
     const formatOpponent = (game: ResultGame) => {
-        const raw = game.opponent_name || game.opponent_team_id || '—';
-        return raw.replace(/_/g, ' ');
+        const raw = (game.opponent_name || game.opponent_team_id || '—').replace(/_/g, ' ');
+
+        if (game.opponent_lsl_rank !== null && game.opponent_lsl_rank !== undefined) {
+            return `#${game.opponent_lsl_rank} ${raw}`;
+        }
+
+        return raw;
     };
 
     const resultLetter = (game: ResultGame) => {
@@ -164,7 +173,7 @@ export default function TeamResultsScreen() {
                         games.map((game) => (
                             <View key={game.game_key} style={styles.card}>
                                 <Text style={styles.metaLine}>
-                                    {game.phase_display || game.phase || '—'} • Week {game.week ?? '—'}
+                                    {game.display_date || game.date_key || 'TBD'} • {game.phase_display || game.phase || '—'} • Week {game.week ?? '—'}
                                 </Text>
                                 <Text style={styles.resultLine}>
                                     {resultLetter(game)} {game.team_score ?? '—'}-{game.opp_score ?? '—'}

@@ -286,6 +286,92 @@ def _format_date_key_mmdd(date_key) -> str | None:
     return f"{s[:2]}/{s[2:]}"
 
 
+def _load_lsl_polls_grouped_by_week() -> dict[int, list[dict]]:
+    grouped: dict[int, list[dict]] = {}
+
+    try:
+        poll_rows = load_polls()
+        for r in poll_rows or []:
+            if str(r.get("poll", "")).strip().upper() != "LSL":
+                continue
+
+            week = r.get("week")
+            if week is None:
+                continue
+
+            try:
+                week_int = int(week)
+            except Exception:
+                continue
+
+            grouped.setdefault(week_int, []).append(r)
+    except Exception:
+        return {}
+
+    return grouped
+
+
+def _latest_poll_week_at_or_before(target_week: int | None, grouped_polls: dict[int, list[dict]]) -> int | None:
+    if target_week is None or not grouped_polls:
+        return None
+
+    eligible_weeks = [w for w in grouped_polls.keys() if w <= target_week]
+    if not eligible_weeks:
+        return None
+
+    return max(eligible_weeks)
+
+
+def _lsl_rank_context_for_team_at_week(
+    team_id: str | None,
+    target_week: int | None,
+    grouped_polls: dict[int, list[dict]],
+) -> dict:
+    tid = str(team_id or "").strip().upper()
+    if not tid:
+        return {
+            "poll_week": None,
+            "rank": None,
+            "next5_order": None,
+        }
+
+    poll_week = _latest_poll_week_at_or_before(target_week, grouped_polls)
+    if poll_week is None:
+        return {
+            "poll_week": None,
+            "rank": None,
+            "next5_order": None,
+        }
+
+    rows = grouped_polls.get(poll_week, [])
+    rank = None
+    next5_order = None
+
+    for r in rows:
+        row_tid = str(r.get("team_id", "")).strip().upper()
+        if row_tid != tid:
+            continue
+
+        bucket = str(r.get("bucket", "")).strip().upper()
+        bucket_order = r.get("bucket_order")
+
+        try:
+            bucket_order_int = int(bucket_order)
+        except Exception:
+            bucket_order_int = None
+
+        if bucket == "TOP25":
+            rank = bucket_order_int
+        elif bucket == "NEXT5":
+            next5_order = bucket_order_int
+
+    return {
+        "poll_week": poll_week,
+        "rank": rank,
+        "next5_order": next5_order,
+    }
+
+
 def _team_list_analytics_map(week: int | None = None) -> dict[str, dict]:
     w = 0 if week is None else week
 
@@ -369,6 +455,7 @@ def get_team(team_id: str, week: int | None = None):
     """
     Team card (from TeamsIndex) + useful links + poll badges (LSL primary, LCAA secondary).
     If week not provided, uses latest poll week present in Polls sheet.
+    Also includes overall and conference records from played games through the selected week.
     """
     tid = team_id.strip().upper()
     teams = load_teams_index()
@@ -379,6 +466,18 @@ def get_team(team_id: str, week: int | None = None):
 
     name_map = _team_name_map(active_only=False)
 
+    team_conf_map = load_conference_membership()
+
+    # merge in TeamsIndex conference values too, so tracked-team data is always available
+    for t in teams:
+        conf = getattr(t, "conference", None)
+        if conf:
+            team_conf_map.setdefault(str(t.team_id).strip().upper(), str(conf).strip().upper())
+
+    team_conf = team_conf_map.get(tid)
+    conf_names = load_conferences_map()
+    team_conf_name = conf_names.get(team_conf) if team_conf else None
+
     # ---- poll badge lookup ----
     polls_block = {
         "week": None,
@@ -386,11 +485,14 @@ def get_team(team_id: str, week: int | None = None):
         "LCAA": {"rank": None, "next5_order": None},
     }
 
+    selected_week = week
+
     try:
         rows = load_polls()
         if rows:
             weeks = sorted({r["week"] for r in rows})
             w = week if week is not None else weeks[-1]
+            selected_week = w
             polls_block["week"] = w
 
             def find_badge(poll_name: str):
@@ -411,13 +513,80 @@ def get_team(team_id: str, week: int | None = None):
         # Polls optional; keep nulls if anything goes wrong
         pass
 
+    # ---- record lookup from played games ----
+    overall_wins = 0
+    overall_losses = 0
+    conference_wins = 0
+    conference_losses = 0
+
+    try:
+        games = _load_games_or_404()
+
+        for g in games:
+            ta = str(g.get("team_a", "")).strip().upper()
+            tb = str(g.get("team_b", "")).strip().upper()
+
+            if tid not in (ta, tb):
+                continue
+
+            game_week = _to_int_or_none(g.get("week"))
+            if selected_week is not None and game_week is not None and game_week > selected_week:
+                continue
+
+            a_score = g.get("a_score")
+            b_score = g.get("b_score")
+            played = (a_score is not None) and (b_score is not None)
+
+            if not played:
+                continue
+
+            if tid == ta:
+                team_score = a_score
+                opp_score = b_score
+                opponent_id = tb
+            else:
+                team_score = b_score
+                opp_score = a_score
+                opponent_id = ta
+
+            if team_score > opp_score:
+                overall_wins += 1
+                game_result = "W"
+            elif team_score < opp_score:
+                overall_losses += 1
+                game_result = "L"
+            else:
+                game_result = "T"
+
+            opponent_conf = team_conf_map.get(opponent_id)
+            if team_conf and opponent_conf and team_conf == opponent_conf:
+                if game_result == "W":
+                    conference_wins += 1
+                elif game_result == "L":
+                    conference_losses += 1
+
+    except Exception:
+        # Records optional; fall back to 0-0 if something goes wrong
+        pass
+
     return {
         "team_id": tid,
         "team_name": match.team_name,
         "active": match.active,
+        "conference_id": team_conf,
+        "conference_name": team_conf_name,
 
         # ESPN-style poll badges (LSL primary, LCAA secondary)
         "polls": polls_block,
+
+        "record": {
+            "overall_wins": overall_wins,
+            "overall_losses": overall_losses,
+            "overall_record": f"{overall_wins}-{overall_losses}",
+            "conference_wins": conference_wins,
+            "conference_losses": conference_losses,
+            "conference_record": f"{conference_wins}-{conference_losses}",
+        },
 
         "analytics": _team_analytics_summary(tid, week),
 
@@ -3414,6 +3583,8 @@ def team_schedule(
     games = _load_games_or_404()
     tid = team_id.strip().upper()
     phase_map = load_week_phase_map()
+    name_map = _team_name_map(active_only=False)
+    grouped_lsl_polls = _load_lsl_polls_grouped_by_week()
 
     out = []
     for g in games:
@@ -3453,7 +3624,13 @@ def team_schedule(
 
         phase_v = str(g.get("phase", "")).strip().upper()
         week_v = _to_int_or_none(g.get("week"))
-        
+
+        opponent_poll_ctx = _lsl_rank_context_for_team_at_week(
+            opponent_id,
+            week_v,
+            grouped_lsl_polls,
+        )
+
         out.append({
             "game_key": g.get("game_key"),
             "date_key": g.get("date_key"),
@@ -3464,6 +3641,10 @@ def team_schedule(
             "site": site,
             "team_id": tid,
             "opponent_team_id": opponent_id,
+            "opponent_lsl_rank": opponent_poll_ctx.get("rank"),
+            "opponent_lsl_next5_order": opponent_poll_ctx.get("next5_order"),
+            "opponent_name": name_map.get(opponent_id, opponent_id),
+            "poll_week": opponent_poll_ctx.get("poll_week"),
             "team_score": team_score,
             "opp_score": opp_score,
             "played": played,
@@ -3475,12 +3656,29 @@ def team_schedule(
             "away_id": g.get("away_id"),
         })
 
-    # sort by week first, then real date, then opponent
+    def _season_date_sort_key(date_key):
+        s = str(date_key or "").strip()
+        if len(s) != 4 or not s.isdigit():
+            return (99, 99)
+
+        month = int(s[:2])
+        day = int(s[2:])
+
+        # Treat Oct-Dec as the front half of the season, Jan-Mar as the back half
+        if month >= 10:
+            season_month = month - 9   # Oct=1, Nov=2, Dec=3
+        else:
+            season_month = month + 3   # Jan=4, Feb=5, Mar=6
+
+        return (season_month, day)
+
+
+    # sort by week first, then season-aware date, then opponent
     def sort_key(x):
         week_val = x.get("week") if x.get("week") is not None else 9999
-        date_key = str(x.get("date_key") or "")
+        date_part = _season_date_sort_key(x.get("date_key"))
         opp = str(x.get("opponent_team_id", ""))
-        return (week_val, date_key, opp)
+        return (week_val, date_part, opp)
 
     out_sorted = sorted(out, key=sort_key)
 

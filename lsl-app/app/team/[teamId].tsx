@@ -28,41 +28,59 @@ export default function TeamDetailScreen() {
                     color: theme.mutedText,
                     marginTop: 12,
                 },
-                header: {
-                    marginBottom: 24,
+                heroCard: {
+                    borderWidth: 1,
+                    borderColor: theme.border,
+                    borderRadius: 18,
+                    padding: 16,
+                    marginBottom: 18,
+                    backgroundColor: theme.card,
                 },
                 teamName: {
-                    fontSize: 32,
+                    fontSize: 30,
                     fontWeight: '800',
-                    marginBottom: 6,
+                    marginBottom: 8,
                     color: theme.text,
                 },
-                pollLine: {
-                    fontSize: 16,
-                    fontWeight: '600',
+                primaryRecord: {
+                    fontSize: 24,
+                    fontWeight: '800',
                     marginBottom: 4,
                     color: theme.text,
                 },
-                statusLine: {
+                secondaryLine: {
+                    fontSize: 15,
+                    color: theme.mutedText,
+                    marginBottom: 4,
+                },
+                pollsLine: {
+                    fontSize: 16,
+                    fontWeight: '600',
+                    color: theme.text,
+                },
+                metaLine: {
                     fontSize: 14,
                     color: theme.mutedText,
+                    marginTop: 8,
                 },
                 section: {
-                    marginBottom: 14,
-                },
-                card: {
-                    borderWidth: 1,
-                    borderColor: theme.border,
-                    borderRadius: 14,
-                    padding: 14,
-                    marginBottom: 14,
-                    backgroundColor: theme.card,
+                    marginBottom: 18,
                 },
                 sectionTitle: {
                     fontSize: 20,
                     fontWeight: '700',
                     marginBottom: 10,
                     color: theme.text,
+                },
+                analyticsGrid: {
+                    gap: 10,
+                },
+                analyticsCard: {
+                    borderWidth: 1,
+                    borderColor: theme.border,
+                    borderRadius: 14,
+                    padding: 14,
+                    backgroundColor: theme.card,
                 },
                 metricLabel: {
                     fontSize: 14,
@@ -79,20 +97,51 @@ export default function TeamDetailScreen() {
                     fontSize: 14,
                     color: theme.mutedText,
                 },
-                listRow: {
-                    fontSize: 16,
-                    marginBottom: 8,
-                    color: theme.text,
+                navCard: {
+                    borderWidth: 1,
+                    borderColor: theme.border,
+                    borderRadius: 14,
+                    backgroundColor: theme.card,
+                    overflow: 'hidden',
                 },
-                linkRow: {
-                    textDecorationLine: 'underline',
+                navRow: {
+                    paddingVertical: 14,
+                    paddingHorizontal: 14,
+                    borderBottomWidth: 1,
+                    borderBottomColor: theme.border,
                 },
-                rowPressed: {
+                navRowLast: {
+                    borderBottomWidth: 0,
+                },
+                navRowPressed: {
                     opacity: 0.7,
                 },
-                body: {
+                navTitle: {
+                    fontSize: 17,
+                    fontWeight: '700',
+                    color: theme.text,
+                    marginBottom: 2,
+                },
+                navSub: {
                     fontSize: 13,
+                    color: theme.mutedText,
+                },
+                body: {
+                    fontSize: 14,
                     lineHeight: 20,
+                    color: theme.text,
+                },
+                errorCard: {
+                    borderWidth: 1,
+                    borderColor: theme.border,
+                    borderRadius: 14,
+                    padding: 14,
+                    backgroundColor: theme.card,
+                },
+                errorTitle: {
+                    fontSize: 20,
+                    fontWeight: '700',
+                    marginBottom: 10,
                     color: theme.text,
                 },
             }),
@@ -133,6 +182,39 @@ export default function TeamDetailScreen() {
     const lcaaRank = team?.polls?.LCAA?.rank;
     const lcaaNext5 = team?.polls?.LCAA?.next5_order;
 
+    const formatConferenceName = (name?: string | null) => {
+        if (!name) return null;
+
+        const normalized = name.trim();
+
+        const shortMap: Record<string, string> = {
+            'Atlantic Coast Conference': 'ACC',
+            'Southeastern Conference': 'SEC',
+            'Big Ten Conference': 'Big Ten',
+            'Big 12 Conference': 'Big 12',
+            'Big East Conference': 'Big East',
+            'Pacific-12 Conference': 'PAC-12',
+            'Pac-12 Conference': 'PAC-12',
+            'American Conference': 'AAC',
+            'Mountain West Conference': 'Mountain West',
+            'West Coast Conference': 'WCC',
+            'Missouri Valley Conference': 'Missouri Valley',
+            'Atlantic 10 Conference': 'A-10',
+            'Atlantic Ten Conference': 'A-10',
+            'Big West Conference': 'Big West',
+            'Missouri Valley Football Conference': 'Missouri Valley',
+        };
+
+        return shortMap[normalized] ?? normalized.replace(/\s+Conference$/, '');
+    };
+
+    const overallRecord = team?.record?.overall_record ?? '—';
+    const conferenceRecord = team?.record?.conference_record ?? '—';
+    const conferenceId = team?.conference_id ?? null;
+    const conferenceName = team?.conference_name ?? null;
+    const conferenceDisplayName = formatConferenceName(conferenceName);
+    const playersCount = team?.roster_summary?.players_count ?? 0;
+
     const analyticsCards = [
         { label: 'Power', item: team?.analytics?.power },
         { label: 'Resume', item: team?.analytics?.resume },
@@ -163,63 +245,65 @@ export default function TeamDetailScreen() {
                     <Text style={styles.helper}>Loading team...</Text>
                 </View>
             ) : error ? (
-                <View style={styles.card}>
-                    <Text style={styles.sectionTitle}>Error</Text>
+                <View style={styles.errorCard}>
+                    <Text style={styles.errorTitle}>Error</Text>
                     <Text style={styles.body}>{error}</Text>
                 </View>
             ) : !team ? (
-                <View style={styles.card}>
+                <View style={styles.errorCard}>
                     <Text style={styles.body}>No team data available.</Text>
                 </View>
             ) : (
                 <>
-                    <View style={styles.header}>
+                    <View style={styles.heroCard}>
                         <Text style={styles.teamName}>{team.team_name}</Text>
-                        <Text style={styles.pollLine}>
+                        <Text style={styles.primaryRecord}>{overallRecord}</Text>
+                        <Text style={styles.secondaryLine}>
+                            {conferenceDisplayName ? `${conferenceDisplayName} Record: ${conferenceRecord}` : `Conference Record: ${conferenceRecord}`}
+                        </Text>
+                        <Text style={styles.pollsLine}>
                             LSL: {formatPollValue(lslRank, lslNext5)} • LCAA: {formatPollValue(lcaaRank, lcaaNext5)}
                         </Text>
-                        <Text style={styles.statusLine}>
-                            Players: {team?.roster_summary?.players_count ?? 0}
-                        </Text>
+                        <Text style={styles.metaLine}>Players: {playersCount}</Text>
                     </View>
 
                     <View style={styles.section}>
                         <Text style={styles.sectionTitle}>Analytics</Text>
-
-                        {analyticsCards.map((entry) => (
-                            <View key={entry.label} style={styles.card}>
-                                <Text style={styles.metricLabel}>{entry.label}</Text>
-                                <Text style={styles.metricValue}>{formatMetricValue(entry.item)}</Text>
-                                <Text style={styles.metricTier}>
-                                    {entry.item?.tier ? `Tier: ${entry.item.tier}` : 'Tier: —'}
-                                </Text>
-                            </View>
-                        ))}
+                        <View style={styles.analyticsGrid}>
+                            {analyticsCards.map((entry) => (
+                                <View key={entry.label} style={styles.analyticsCard}>
+                                    <Text style={styles.metricLabel}>{entry.label}</Text>
+                                    <Text style={styles.metricValue}>{formatMetricValue(entry.item)}</Text>
+                                    <Text style={styles.metricTier}>
+                                        {entry.item?.tier ? `Tier: ${entry.item.tier}` : 'Tier: —'}
+                                    </Text>
+                                </View>
+                            ))}
+                        </View>
                     </View>
 
                     <View style={styles.section}>
-                        <Text style={styles.sectionTitle}>Available Sections</Text>
-                        <View style={styles.card}>
-                            <Text style={styles.listRow}>Overview</Text>
-
+                        <Text style={styles.sectionTitle}>Browse Team</Text>
+                        <View style={styles.navCard}>
                             <Pressable
                                 onPress={() => router.push(`/team/${teamId}/schedule`)}
-                                style={({ pressed }) => [pressed && styles.rowPressed]}>
-                                <Text style={[styles.listRow, styles.linkRow]}>Schedule</Text>
+                                style={({ pressed }) => [styles.navRow, pressed && styles.navRowPressed]}>
+                                <Text style={styles.navTitle}>Schedule</Text>
+                                <Text style={styles.navSub}>Upcoming and full season schedule</Text>
                             </Pressable>
 
                             <Pressable
                                 onPress={() => router.push(`/team/${teamId}/results`)}
-                                style={({ pressed }) => [pressed && styles.rowPressed]}>
-                                <Text style={[styles.listRow, styles.linkRow]}>Results</Text>
+                                style={({ pressed }) => [styles.navRow, pressed && styles.navRowPressed]}>
+                                <Text style={styles.navTitle}>Results</Text>
+                                <Text style={styles.navSub}>Played games and final scores</Text>
                             </Pressable>
-
-                            <Text style={styles.listRow}>Analytics</Text>
 
                             <Pressable
                                 onPress={() => router.push(`/team/${teamId}/roster`)}
-                                style={({ pressed }) => [pressed && styles.rowPressed]}>
-                                <Text style={[styles.listRow, styles.linkRow]}>Roster</Text>
+                                style={({ pressed }) => [styles.navRow, styles.navRowLast, pressed && styles.navRowPressed]}>
+                                <Text style={styles.navTitle}>Roster</Text>
+                                <Text style={styles.navSub}>Players, positions, and basic profile info</Text>
                             </Pressable>
                         </View>
                     </View>

@@ -15,6 +15,8 @@ type ScheduleGame = {
     site?: string;
     opponent_team_id?: string;
     opponent_name?: string;
+    opponent_lsl_rank?: number | null;
+    opponent_lsl_next5_order?: number | null;
 };
 
 export default function TeamScheduleScreen() {
@@ -119,8 +121,13 @@ export default function TeamScheduleScreen() {
     };
 
     const formatOpponent = (game: ScheduleGame) => {
-        const raw = game.opponent_name || game.opponent_team_id || '—';
-        return raw.replace(/_/g, ' ');
+        const raw = (game.opponent_name || game.opponent_team_id || '—').replace(/_/g, ' ');
+
+        if (game.opponent_lsl_rank !== null && game.opponent_lsl_rank !== undefined) {
+            return `#${game.opponent_lsl_rank} ${raw}`;
+        }
+
+        return raw;
     };
 
     return (
