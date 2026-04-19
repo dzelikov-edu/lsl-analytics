@@ -30,7 +30,7 @@ def load_teams_index() -> List[TeamIndexRow]:
     """
     service = get_sheets_service(settings.GOOGLE_SERVICE_ACCOUNT_JSON)
 
-    values = read_range(service, settings.MASTER_SHEET_ID, f"{settings.TEAMS_INDEX_TAB}!A1:Z2000")
+    values = read_range(service, settings.MASTER_SHEET_ID, f"{settings.TEAMS_INDEX_TAB}!A1:G120")
     if not values:
         raise RuntimeError("TeamsIndex returned no data. Check MASTER_SHEET_ID and tab name.")
 
@@ -68,7 +68,7 @@ def load_team_map_names() -> dict:
       B = display_name
     """
     service = get_sheets_service(settings.GOOGLE_SERVICE_ACCOUNT_JSON)
-    values = read_range(service, settings.MASTER_SHEET_ID, "TeamMap!A1:B2000")
+    values = read_range(service, settings.MASTER_SHEET_ID, "TeamMap!A1:B400")
     if not values:
         return {}
 
@@ -91,7 +91,7 @@ def load_polls() -> list[dict]:
       week | poll | bucket | bucket_order | team_id | notes
     """
     service = get_sheets_service(settings.GOOGLE_SERVICE_ACCOUNT_JSON)
-    values = read_range(service, settings.MASTER_SHEET_ID, "Polls!A1:F2000")
+    values = read_range(service, settings.MASTER_SHEET_ID, "Polls!A1:F1300")
     if not values or len(values) < 2:
         return []
 
@@ -154,7 +154,7 @@ def load_preseason_power() -> list[dict]:
       }
     """
     service = get_sheets_service(settings.GOOGLE_SERVICE_ACCOUNT_JSON)
-    values = read_range(service, settings.MASTER_SHEET_ID, "PreseasonPower!A1:D2000")
+    values = read_range(service, settings.MASTER_SHEET_ID, "PreseasonPower!A1:D400")
     if not values or len(values) < 2:
         return []
 
@@ -217,7 +217,7 @@ def load_players_snapshot() -> list[dict]:
       prev_spg | prev_bpg | prev_fg_pct | prev_three_pct | prev_ft_pct | notes
     """
     service = get_sheets_service(settings.GOOGLE_SERVICE_ACCOUNT_JSON)
-    values = read_range(service, settings.MASTER_SHEET_ID, "PlayersSnapshot!A1:AG5000")
+    values = read_range(service, settings.MASTER_SHEET_ID, "PlayersSnapshot!A1:AG2000")
     if not values or len(values) < 2:
         return []
 
@@ -324,7 +324,7 @@ def load_conference_membership() -> dict[str, str]:
     """
     try:
         service = get_sheets_service(settings.GOOGLE_SERVICE_ACCOUNT_JSON)
-        values = read_range(service, settings.MASTER_SHEET_ID, "ConferenceMembership!A1:B2000")
+        values = read_range(service, settings.MASTER_SHEET_ID, "ConferenceMembership!A1:B400")
         if not values or len(values) < 2:
             return {}
 
@@ -364,7 +364,7 @@ def load_conferences_map() -> dict[str, str]:
     Returns: conference_id -> conference_name
     """
     service = get_sheets_service(settings.GOOGLE_SERVICE_ACCOUNT_JSON)
-    values = read_range(service, settings.MASTER_SHEET_ID, "Conferences!A1:B200")
+    values = read_range(service, settings.MASTER_SHEET_ID, "Conferences!A1:B40")
     if not values or len(values) < 2:
         return {}
 
@@ -391,7 +391,7 @@ def load_records_snapshot() -> list[dict]:
     Returns list of rows as dicts.
     """
     service = get_sheets_service(settings.GOOGLE_SERVICE_ACCOUNT_JSON)
-    values = read_range(service, settings.MASTER_SHEET_ID, "RecordsSnapshot!A1:G10000")
+    values = read_range(service, settings.MASTER_SHEET_ID, "RecordsSnapshot!A1:G3000")
     if not values or len(values) < 2:
         return []
 
@@ -454,7 +454,7 @@ def load_conf_games_snapshot() -> list[dict]:
     Returns list of rows as dicts.
     """
     service = get_sheets_service(settings.GOOGLE_SERVICE_ACCOUNT_JSON)
-    values = read_range(service, settings.MASTER_SHEET_ID, "ConfGamesSnapshot!A1:F20000")
+    values = read_range(service, settings.MASTER_SHEET_ID, "ConfGamesSnapshot!A1:F7500")
     if not values or len(values) < 2:
         return []
 
@@ -512,7 +512,7 @@ def load_week_phase_map() -> dict[int, dict]:
       week | phase | phase_display_name
     """
     service = get_sheets_service(settings.GOOGLE_SERVICE_ACCOUNT_JSON)
-    values = read_range(service, settings.MASTER_SHEET_ID, "WeekPhaseMap!A1:C500")
+    values = read_range(service, settings.MASTER_SHEET_ID, "WeekPhaseMap!A1:C40")
     if not values or len(values) < 2:
         return {}
 
@@ -575,7 +575,7 @@ def read_schedule_export(team_sheet_id: str, export_tab: str) -> List[dict]:
     service = get_sheets_service(settings.GOOGLE_SERVICE_ACCOUNT_JSON)
 
     # Read wider than A:K because your sheets may have extra helper columns
-    values = read_range(service, team_sheet_id, f"{export_tab}!A1:M1000")
+    values = read_range(service, team_sheet_id, f"{export_tab}!A1:M60")
     if not values:
         return []
 

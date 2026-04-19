@@ -1,42 +1,203 @@
-import { useLocalSearchParams } from 'expo-router';
-import { useEffect, useState } from 'react';
-import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
-
-import { API_BASE_URL } from '@/lib/api';
+import ConferenceLogo from '@/components/ConferenceLogo';
+import TeamLogo from '@/components/TeamLogo';
+import { AppColors } from '@/constants/app-colors';
+import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useCachedApi } from '@/hooks/useCachedApi';
+import { getConferenceBranding } from '@/lib/conferenceBranding';
+import { router, Stack, useLocalSearchParams } from 'expo-router';
+import { useMemo } from 'react';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 export default function ConferenceDetailScreen() {
     const { confId } = useLocalSearchParams<{ confId: string }>();
+    const colorScheme = useColorScheme() ?? 'light';
+    const theme = AppColors[colorScheme];
+    const branding = getConferenceBranding(confId);
 
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState<string | null>(null);
-    const [conference, setConference] = useState<any>(null);
+    const styles = useMemo(
+        () =>
+            StyleSheet.create({
+                content: {
+                    padding: 20,
+                    paddingTop: 12,
+                    paddingBottom: 40,
+                    backgroundColor: theme.background,
+                },
+                heroCard: {
+                    borderWidth: 1,
+                    borderColor: theme.border,
+                    borderRadius: 18,
+                    padding: 16,
+                    marginBottom: 20,
+                    backgroundColor: theme.card,
+                },
+                heroTopRow: {
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                },
+                heroLogoWrap: {
+                    marginRight: 12,
+                },
+                heroTextWrap: {
+                    flex: 1,
+                },
+                conferenceName: {
+                    fontSize: 28,
+                    fontWeight: '800',
+                    marginBottom: 4,
+                    color: theme.text,
+                },
+                heroSubLine: {
+                    fontSize: 15,
+                    color: theme.mutedText,
+                },
+                heroMetaLine: {
+                    fontSize: 14,
+                    color: theme.mutedText,
+                    marginTop: 10,
+                },
+                accentBar: {
+                    height: 4,
+                    width: 64,
+                    borderRadius: 999,
+                    backgroundColor: branding.primary,
+                    marginTop: 12,
+                },
+                section: {
+                    marginBottom: 14,
+                },
+                sectionTitle: {
+                    fontSize: 20,
+                    fontWeight: '700',
+                    marginBottom: 10,
+                    color: theme.text,
+                },
+                centerBlock: {
+                    paddingVertical: 40,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                },
+                helper: {
+                    fontSize: 15,
+                    color: theme.mutedText,
+                    marginTop: 12,
+                },
+                card: {
+                    borderWidth: 1,
+                    borderColor: theme.border,
+                    borderRadius: 14,
+                    padding: 14,
+                    marginBottom: 14,
+                    backgroundColor: theme.card,
+                },
+                context: {
+                    fontSize: 15,
+                    color: theme.mutedText,
+                },
+                rowWrap: {
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    marginBottom: 12,
+                },
+                rowPressable: {
+                    borderRadius: 12,
+                },
+                rowPressed: {
+                    opacity: 0.75,
+                },
+                rankNumber: {
+                    width: 32,
+                    fontSize: 16,
+                    fontWeight: '800',
+                    color: theme.text,
+                    textAlign: 'right',
+                    marginRight: 8,
+                },
+                rowTextWrap: {
+                    marginLeft: 10,
+                    flex: 1,
+                },
+                teamName: {
+                    fontSize: 17,
+                    fontWeight: '700',
+                    color: theme.text,
+                },
+                rowMeta: {
+                    fontSize: 13,
+                    color: theme.mutedText,
+                    marginTop: 2,
+                },
+                errorTitle: {
+                    fontSize: 20,
+                    fontWeight: '700',
+                    marginBottom: 10,
+                    color: theme.text,
+                },
+            }),
+        [theme, branding]
+    );
 
-    useEffect(() => {
-        const loadConference = async () => {
-            if (!confId) return;
-
-            try {
-                setLoading(true);
-                setError(null);
-
-                const response = await fetch(`${API_BASE_URL}/conferences/${confId}`);
-                if (!response.ok) {
-                    throw new Error(`HTTP ${response.status}`);
-                }
-
-                const json = await response.json();
-                setConference(json);
-            } catch (err: any) {
-                setError(err?.message ?? 'Unknown error');
-            } finally {
-                setLoading(false);
-            }
-        };
-
-        loadConference();
-    }, [confId]);
+    const {
+        data: conference,
+        loading,
+        error,
+    } = useCachedApi({
+        cacheKey: `conference:${confId}:detail`,
+        endpoint: `/conferences/${confId}`,
+        maxAgeMs: 1000 * 60 * 30,
+        enabled: !!confId,
+    });
 
     const standings = conference?.standings ?? conference?.teams ?? [];
+
+    const formatRecord = (row: any) => {
+        const conf = row?.conference;
+        const overall = row?.overall;
+
+        const confText =
+            conf && conf.wins !== undefined && conf.losses !== undefined
+                ? `${conf.wins}-${conf.losses}`
+                : null;
+
+        const overallText =
+            overall && overall.wins !== undefined && overall.losses !== undefined
+                ? `${overall.wins}-${overall.losses}`
+                : null;
+
+        if (confText && overallText) {
+            return `Conf ${confText} • Overall ${overallText}`;
+        }
+
+        if (confText) {
+            return `Conf ${confText}`;
+        }
+
+        if (overallText) {
+            return `Overall ${overallText}`;
+        }
+
+        return null;
+    };
+
+    const conferenceName =
+        conference?.conf_name ?? conference?.conference_name ?? confId ?? 'Conference';
+
+    const headerTitle = branding.headerTitle || 'Conference';
+
+    const teamsCount =
+        conference?.teams_count ??
+        conference?.summary?.teams_count ??
+        standings.length;
+
+    const lslTop25Count =
+        conference?.polls?.LSL?.top25_count ??
+        conference?.summary?.polls?.LSL?.top25_count ??
+        0;
+
+    const lslNext5Count =
+        conference?.polls?.LSL?.next5_count ??
+        conference?.summary?.polls?.LSL?.next5_count ??
+        0;
 
     return (
         <ScrollView contentContainerStyle={styles.content}>
@@ -47,7 +208,7 @@ export default function ConferenceDetailScreen() {
                 </View>
             ) : error ? (
                 <View style={styles.card}>
-                    <Text style={styles.sectionTitle}>Error</Text>
+                    <Text style={styles.errorTitle}>Error</Text>
                     <Text style={styles.context}>{error}</Text>
                 </View>
             ) : !conference ? (
@@ -56,13 +217,32 @@ export default function ConferenceDetailScreen() {
                 </View>
             ) : (
                 <>
-                    <View style={styles.header}>
-                        <Text style={styles.conferenceName}>
-                            {conference.conf_name ?? conference.conference_name ?? confId}
+                    <Stack.Screen
+                        options={{
+                            title: headerTitle,
+                        }}
+                    />
+
+                    <View style={styles.heroCard}>
+                        <View style={styles.heroTopRow}>
+                            <View style={styles.heroLogoWrap}>
+                                <ConferenceLogo confId={confId} size={48} />
+                            </View>
+
+                            <View style={styles.heroTextWrap}>
+                                <Text style={styles.conferenceName}>{conferenceName}</Text>
+                                <Text style={styles.heroSubLine}>Conference Detail</Text>
+                            </View>
+                        </View>
+
+                        <Text style={styles.heroMetaLine}>
+                            Teams: {teamsCount}
+                            {lslTop25Count || lslNext5Count
+                                ? ` • LSL Top 25: ${lslTop25Count} • Next 5: ${lslNext5Count}`
+                                : ''}
                         </Text>
-                        <Text style={styles.context}>
-                            Conference Detail
-                        </Text>
+
+                        <View style={styles.accentBar} />
                     </View>
 
                     <View style={styles.section}>
@@ -71,11 +251,53 @@ export default function ConferenceDetailScreen() {
                             {standings.length === 0 ? (
                                 <Text style={styles.context}>No standings available.</Text>
                             ) : (
-                                standings.map((row: any, index: number) => (
-                                    <Text key={`${row.team_id ?? row.team_name}-${index}`} style={styles.listRow}>
-                                        {index + 1}. {row.team_name ?? row.team_id}
-                                    </Text>
-                                ))
+                                standings.map((row: any, index: number) =>
+                                    row.is_tracked ? (
+                                        <Pressable
+                                            key={`${row.team_id ?? row.team_name}-${index}`}
+                                            onPress={() =>
+                                                router.push({
+                                                    pathname: '/team/[teamId]',
+                                                    params: { teamId: row.team_id },
+                                                })
+                                            }
+                                            style={({ pressed }) => [
+                                                styles.rowWrap,
+                                                styles.rowPressable,
+                                                pressed && styles.rowPressed,
+                                            ]}>
+                                            <Text style={styles.rankNumber}>{index + 1}.</Text>
+                                            <TeamLogo teamId={row.team_id} size={24} />
+                                            <View style={styles.rowTextWrap}>
+                                                <Text style={styles.teamName}>
+                                                    {row?.polls?.LSL?.rank !== null && row?.polls?.LSL?.rank !== undefined
+                                                        ? `#${row.polls.LSL.rank} `
+                                                        : ''}
+                                                    {row.team_name ?? row.team_id}
+                                                </Text>
+                                                {formatRecord(row) ? (
+                                                    <Text style={styles.rowMeta}>{formatRecord(row)}</Text>
+                                                ) : null}
+                                            </View>
+                                        </Pressable>
+                                    ) : (
+                                        <View key={`${row.team_id ?? row.team_name}-${index}`} style={styles.rowWrap}>
+                                            <Text style={styles.rankNumber}>{index + 1}.</Text>
+                                            <TeamLogo teamId={row.team_id} size={24} />
+                                            <View style={styles.rowTextWrap}>
+                                                <Text style={styles.teamName}>
+                                                    {row?.polls?.LSL?.rank !== null && row?.polls?.LSL?.rank !== undefined
+                                                        ? `#${row.polls.LSL.rank} `
+                                                        : ''}
+                                                    {row.team_name ?? row.team_id}
+                                                </Text>
+                                                {formatRecord(row) ? (
+                                                    <Text style={styles.rowMeta}>{formatRecord(row)}</Text>
+                                                ) : null}
+                                            </View>
+                                        </View>
+                                    )
+                                )
                             )}
                         </View>
                     </View>
@@ -84,53 +306,3 @@ export default function ConferenceDetailScreen() {
         </ScrollView>
     );
 }
-
-const styles = StyleSheet.create({
-    content: {
-        padding: 20,
-        paddingBottom: 40,
-        backgroundColor: '#fff',
-    },
-    header: {
-        marginBottom: 24,
-    },
-    conferenceName: {
-        fontSize: 32,
-        fontWeight: '800',
-        marginBottom: 6,
-    },
-    section: {
-        marginBottom: 14,
-    },
-    sectionTitle: {
-        fontSize: 20,
-        fontWeight: '700',
-        marginBottom: 10,
-    },
-    centerBlock: {
-        paddingVertical: 40,
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    helper: {
-        fontSize: 15,
-        opacity: 0.7,
-        marginTop: 12,
-    },
-    card: {
-        borderWidth: 1,
-        borderColor: '#ddd',
-        borderRadius: 14,
-        padding: 14,
-        marginBottom: 14,
-        backgroundColor: '#fafafa',
-    },
-    context: {
-        fontSize: 15,
-        opacity: 0.75,
-    },
-    listRow: {
-        fontSize: 16,
-        marginBottom: 8,
-    },
-});

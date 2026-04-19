@@ -1,9 +1,11 @@
+import TeamLogo from '@/components/TeamLogo';
 import { AppColors } from '@/constants/app-colors';
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import { API_BASE_URL } from '@/lib/api';
+import { useCachedApi } from '@/hooks/useCachedApi';
 import { router } from 'expo-router';
-import { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useMemo } from 'react';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 type TeamRow = {
     team_id: string;
@@ -26,20 +28,30 @@ type TeamRow = {
 export default function TeamsScreen() {
     const colorScheme = useColorScheme() ?? 'light';
     const theme = AppColors[colorScheme];
+    const insets = useSafeAreaInsets();
+    const { width } = useWindowDimensions();
+    const isCompact = width < 430;
+    const topTabPadding = isCompact ? insets.top + 8 : 12;
 
     const styles = useMemo(
         () =>
             StyleSheet.create({
                 content: {
-                    padding: 20,
+                    paddingHorizontal: 20,
+                    paddingTop: topTabPadding,
                     paddingBottom: 40,
                     backgroundColor: theme.background,
                 },
                 screenTitle: {
                     fontSize: 32,
                     fontWeight: '800',
-                    marginBottom: 20,
+                    marginBottom: 6,
                     color: theme.text,
+                },
+                screenSubTitle: {
+                    fontSize: 15,
+                    color: theme.mutedText,
+                    marginBottom: 18,
                 },
                 centerBlock: {
                     paddingVertical: 40,
@@ -54,7 +66,7 @@ export default function TeamsScreen() {
                 teamCard: {
                     borderWidth: 1,
                     borderColor: theme.border,
-                    borderRadius: 14,
+                    borderRadius: 16,
                     padding: 14,
                     marginBottom: 12,
                     backgroundColor: theme.card,
@@ -62,27 +74,52 @@ export default function TeamsScreen() {
                 teamCardPressed: {
                     opacity: 0.75,
                 },
-                cardHeader: {
+                topRow: {
                     flexDirection: 'row',
-                    alignItems: 'center',
+                    alignItems: 'flex-start',
                     justifyContent: 'space-between',
                     marginBottom: 8,
                 },
-                teamName: {
-                    fontSize: 22,
-                    fontWeight: '700',
+                nameBlock: {
                     flex: 1,
                     paddingRight: 12,
+                },
+                teamName: {
+                    fontSize: 21,
+                    fontWeight: '800',
+                    color: theme.text,
+                    marginBottom: 2,
+                },
+                rankBadge: {
+                    minWidth: 52,
+                    paddingVertical: 6,
+                    paddingHorizontal: 10,
+                    borderRadius: 999,
+                    borderWidth: 1,
+                    borderColor: theme.border,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    backgroundColor: theme.background,
+                },
+                rankBadgeText: {
+                    fontSize: 13,
+                    fontWeight: '800',
                     color: theme.text,
                 },
-                pollBadge: {
-                    fontSize: 18,
-                    fontWeight: '700',
-                    color: theme.text,
+                analyticsRow: {
+                    marginTop: 2,
+                },
+                analyticsLabel: {
+                    fontSize: 12,
+                    color: theme.mutedText,
+                    marginBottom: 4,
+                    textTransform: 'uppercase',
+                    letterSpacing: 0.4,
                 },
                 analyticsStrip: {
                     fontSize: 14,
-                    color: theme.mutedText,
+                    lineHeight: 20,
+                    color: theme.text,
                 },
                 errorTitle: {
                     fontSize: 18,
@@ -90,44 +127,33 @@ export default function TeamsScreen() {
                     marginBottom: 8,
                     color: theme.text,
                 },
+                errorText: {
+                    fontSize: 14,
+                    color: theme.mutedText,
+                },
             }),
-        [theme]
+        [theme, topTabPadding]
     );
 
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState<string | null>(null);
-    const [teams, setTeams] = useState<TeamRow[]>([]);
+    const {
+        data: payload,
+        loading,
+        error,
+    } = useCachedApi({
+        cacheKey: 'teams:week0',
+        endpoint: '/teams?week=0',
+        maxAgeMs: 1000 * 60 * 30,
+    });
 
-    useEffect(() => {
-        const loadTeams = async () => {
-            try {
-                setLoading(true);
-                setError(null);
-
-                const response = await fetch(`${API_BASE_URL}/teams?week=0`);
-                if (!response.ok) {
-                    throw new Error(`HTTP ${response.status}`);
-                }
-
-                const json = await response.json();
-                setTeams(json?.teams ?? []);
-            } catch (err: any) {
-                setError(err?.message ?? 'Unknown error');
-            } finally {
-                setLoading(false);
-            }
-        };
-
-        loadTeams();
-    }, []);
+    const teams: TeamRow[] = payload?.teams ?? [];
 
     const formatRankText = (team: TeamRow) => {
         const rank = team?.polls?.LSL?.rank;
         const next5 = team?.polls?.LSL?.next5_order;
 
         if (rank !== null && rank !== undefined) return `#${rank}`;
-        if (next5 !== null && next5 !== undefined) return `Next 5`;
-        return '';
+        if (next5 !== null && next5 !== undefined) return 'Next 5';
+        return 'Unranked';
     };
 
     const formatAnalyticsStrip = (team: TeamRow) => {
@@ -147,6 +173,7 @@ export default function TeamsScreen() {
     return (
         <ScrollView contentContainerStyle={styles.content}>
             <Text style={styles.screenTitle}>Teams</Text>
+            <Text style={styles.screenSubTitle}>Browse all tracked teams</Text>
 
             {loading ? (
                 <View style={styles.centerBlock}>
@@ -156,11 +183,11 @@ export default function TeamsScreen() {
             ) : error ? (
                 <View style={styles.teamCard}>
                     <Text style={styles.errorTitle}>Error</Text>
-                    <Text style={styles.analyticsStrip}>{error}</Text>
+                    <Text style={styles.errorText}>{error}</Text>
                 </View>
             ) : teams.length === 0 ? (
                 <View style={styles.teamCard}>
-                    <Text style={styles.analyticsStrip}>No teams available.</Text>
+                    <Text style={styles.errorText}>No teams available.</Text>
                 </View>
             ) : (
                 teams.map((team) => (
@@ -168,11 +195,23 @@ export default function TeamsScreen() {
                         key={team.team_id}
                         onPress={() => router.push(`/team/${team.team_id}`)}
                         style={({ pressed }) => [styles.teamCard, pressed && styles.teamCardPressed]}>
-                        <View style={styles.cardHeader}>
-                            <Text style={styles.teamName}>{team.team_name}</Text>
-                            <Text style={styles.pollBadge}>{formatRankText(team)}</Text>
+                        <View style={styles.topRow}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, paddingRight: 12 }}>
+                                <TeamLogo teamId={team.team_id} size={30} />
+                                <View style={{ marginLeft: 10, flex: 1 }}>
+                                    <Text style={styles.teamName}>{team.team_name}</Text>
+                                </View>
+                            </View>
+
+                            <View style={styles.rankBadge}>
+                                <Text style={styles.rankBadgeText}>{formatRankText(team)}</Text>
+                            </View>
                         </View>
-                        <Text style={styles.analyticsStrip}>{formatAnalyticsStrip(team)}</Text>
+
+                        <View style={styles.analyticsRow}>
+                            <Text style={styles.analyticsLabel}>Analytics Snapshot</Text>
+                            <Text style={styles.analyticsStrip}>{formatAnalyticsStrip(team)}</Text>
+                        </View>
                     </Pressable>
                 ))
             )}

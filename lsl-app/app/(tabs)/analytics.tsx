@@ -1,17 +1,21 @@
+import TeamLogo from '@/components/TeamLogo';
 import { AppColors } from '@/constants/app-colors';
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import { API_BASE_URL } from '@/lib/api';
-import { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useCachedApi } from '@/hooks/useCachedApi';
+import { useMemo } from 'react';
+import { ActivityIndicator, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 type LeaderItem = {
     rank?: number | null;
+    team_id?: string;
     team_name?: string;
     value?: number | null;
 } | null;
 
 type InsightItem = {
     title?: string;
+    team_id?: string;
     team_name?: string;
     summary?: string;
     value?: number | null;
@@ -27,20 +31,30 @@ type TableRow = {
 export default function AnalyticsScreen() {
     const colorScheme = useColorScheme() ?? 'light';
     const theme = AppColors[colorScheme];
+    const insets = useSafeAreaInsets();
+    const { width } = useWindowDimensions();
+    const isCompact = width < 430;
+    const topTabPadding = isCompact ? insets.top + 8 : 12;
 
     const styles = useMemo(
         () =>
             StyleSheet.create({
                 content: {
-                    padding: 20,
+                    paddingHorizontal: 20,
+                    paddingTop: topTabPadding,
                     paddingBottom: 40,
                     backgroundColor: theme.background,
                 },
                 screenTitle: {
                     fontSize: 32,
                     fontWeight: '800',
-                    marginBottom: 20,
+                    marginBottom: 6,
                     color: theme.text,
+                },
+                screenSubTitle: {
+                    fontSize: 15,
+                    color: theme.mutedText,
+                    marginBottom: 20,
                 },
                 section: {
                     marginBottom: 24,
@@ -61,27 +75,44 @@ export default function AnalyticsScreen() {
                     marginBottom: 12,
                     color: theme.text,
                 },
-                card: {
+                leadersGrid: {
+                    flexDirection: 'row',
+                    flexWrap: 'wrap',
+                    justifyContent: 'space-between',
+                },
+                leaderCard: {
+                    width: '48.5%',
                     borderWidth: 1,
                     borderColor: theme.border,
-                    borderRadius: 14,
+                    borderRadius: 16,
                     padding: 14,
                     marginBottom: 10,
                     backgroundColor: theme.card,
+                    minHeight: 118,
                 },
                 cardLabel: {
-                    fontSize: 14,
+                    fontSize: 13,
                     color: theme.mutedText,
-                    marginBottom: 6,
+                    marginBottom: 8,
+                    textTransform: 'uppercase',
+                    letterSpacing: 0.4,
+                },
+                leaderRow: {
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                },
+                leaderTextWrap: {
+                    marginLeft: 10,
+                    flex: 1,
                 },
                 cardTeam: {
-                    fontSize: 22,
+                    fontSize: 18,
                     fontWeight: '700',
-                    marginBottom: 4,
+                    marginBottom: 3,
                     color: theme.text,
                 },
                 cardValue: {
-                    fontSize: 15,
+                    fontSize: 14,
                     color: theme.mutedText,
                 },
                 listCard: {
@@ -91,22 +122,50 @@ export default function AnalyticsScreen() {
                     padding: 14,
                     backgroundColor: theme.card,
                 },
+                listRowWrap: {
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    marginBottom: 10,
+                },
+                rankNumber: {
+                    width: 34,
+                    fontSize: 16,
+                    fontWeight: '800',
+                    color: theme.text,
+                    textAlign: 'right',
+                    marginRight: 8,
+                },
+                rowTextWrap: {
+                    marginLeft: 10,
+                    flex: 1,
+                },
                 listRow: {
                     fontSize: 16,
-                    marginBottom: 8,
+                    fontWeight: '700',
                     color: theme.text,
                 },
+                listRowValue: {
+                    fontSize: 13,
+                    color: theme.mutedText,
+                    marginTop: 2,
+                },
                 insightBlock: {
-                    marginBottom: 12,
+                    flexDirection: 'row',
+                    alignItems: 'flex-start',
+                    marginBottom: 14,
+                },
+                insightTextWrap: {
+                    marginLeft: 10,
+                    flex: 1,
                 },
                 insightTitle: {
                     fontSize: 16,
                     fontWeight: '700',
-                    marginBottom: 4,
+                    marginBottom: 3,
                     color: theme.text,
                 },
                 insightTeam: {
-                    fontSize: 16,
+                    fontSize: 15,
                     marginBottom: 2,
                     color: theme.text,
                 },
@@ -135,35 +194,18 @@ export default function AnalyticsScreen() {
                     color: theme.mutedText,
                 },
             }),
-        [theme]
+        [theme, topTabPadding]
     );
 
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState<string | null>(null);
-    const [payload, setPayload] = useState<any>(null);
-
-    useEffect(() => {
-        const loadAnalytics = async () => {
-            try {
-                setLoading(true);
-                setError(null);
-
-                const response = await fetch(`${API_BASE_URL}/analytics?week=0`);
-                if (!response.ok) {
-                    throw new Error(`HTTP ${response.status}`);
-                }
-
-                const json = await response.json();
-                setPayload(json);
-            } catch (err: any) {
-                setError(err?.message ?? 'Unknown error');
-            } finally {
-                setLoading(false);
-            }
-        };
-
-        loadAnalytics();
-    }, []);
+    const {
+        data: payload,
+        loading,
+        error,
+    } = useCachedApi({
+        cacheKey: 'analytics:week0',
+        endpoint: '/analytics?week=0',
+        maxAgeMs: 1000 * 60 * 30,
+    });
 
     const leaders = payload?.leaders ?? {};
     const featuredInsights: InsightItem[] = payload?.featured_insights ?? [];
@@ -177,13 +219,18 @@ export default function AnalyticsScreen() {
     ];
 
     const renderLeaderCard = (label: string, item: LeaderItem) => (
-        <View key={label} style={styles.card}>
+        <View key={label} style={styles.leaderCard}>
             <Text style={styles.cardLabel}>{label}</Text>
-            <Text style={styles.cardTeam}>{item?.team_name ?? '—'}</Text>
-            <Text style={styles.cardValue}>
-                {item?.rank !== null && item?.rank !== undefined ? `#${item.rank}` : '—'}
-                {item?.value !== null && item?.value !== undefined ? ` • ${item.value}` : ''}
-            </Text>
+            <View style={styles.leaderRow}>
+                <TeamLogo teamId={item?.team_id} size={28} />
+                <View style={styles.leaderTextWrap}>
+                    <Text style={styles.cardTeam}>{item?.team_name ?? '—'}</Text>
+                    <Text style={styles.cardValue}>
+                        {item?.rank !== null && item?.rank !== undefined ? `#${item.rank}` : '—'}
+                        {item?.value !== null && item?.value !== undefined ? ` • ${item.value}` : ''}
+                    </Text>
+                </View>
+            </View>
         </View>
     );
 
@@ -195,10 +242,18 @@ export default function AnalyticsScreen() {
                     <Text style={styles.emptyText}>No data available.</Text>
                 ) : (
                     rows.slice(0, 5).map((row, index) => (
-                        <Text key={`${row.team_id ?? title}-${index}`} style={styles.listRow}>
-                            {row.rank !== null && row.rank !== undefined ? row.rank : index + 1}. {row.team_name}
-                            {row.value !== null && row.value !== undefined ? ` • ${row.value}` : ''}
-                        </Text>
+                        <View key={`${row.team_id ?? title}-${index}`} style={styles.listRowWrap}>
+                            <Text style={styles.rankNumber}>
+                                {row.rank !== null && row.rank !== undefined ? row.rank : index + 1}.
+                            </Text>
+                            <TeamLogo teamId={row.team_id} size={22} />
+                            <View style={styles.rowTextWrap}>
+                                <Text style={styles.listRow}>{row.team_name ?? '—'}</Text>
+                                {row.value !== null && row.value !== undefined ? (
+                                    <Text style={styles.listRowValue}>{row.value}</Text>
+                                ) : null}
+                            </View>
+                        </View>
                     ))
                 )}
             </View>
@@ -208,6 +263,7 @@ export default function AnalyticsScreen() {
     return (
         <ScrollView contentContainerStyle={styles.content}>
             <Text style={styles.screenTitle}>Analytics</Text>
+            <Text style={styles.screenSubTitle}>League-wide leaders, signals, and top metric tables</Text>
 
             {loading ? (
                 <View style={styles.centerBlock}>
@@ -223,7 +279,9 @@ export default function AnalyticsScreen() {
                 <>
                     <View style={styles.section}>
                         <Text style={styles.sectionTitle}>Leaders</Text>
-                        {leaderCards.map(({ label, item }) => renderLeaderCard(label, item))}
+                        <View style={styles.leadersGrid}>
+                            {leaderCards.map(({ label, item }) => renderLeaderCard(label, item))}
+                        </View>
                     </View>
 
                     <View style={styles.section}>
@@ -234,12 +292,15 @@ export default function AnalyticsScreen() {
                             ) : (
                                 featuredInsights.map((insight, index) => (
                                     <View key={`${insight.title ?? 'insight'}-${index}`} style={styles.insightBlock}>
-                                        <Text style={styles.insightTitle}>{insight.title ?? 'Insight'}</Text>
-                                        <Text style={styles.insightTeam}>{insight.team_name ?? '—'}</Text>
-                                        <Text style={styles.insightSummary}>{insight.summary ?? '—'}</Text>
-                                        {insight.value !== null && insight.value !== undefined ? (
-                                            <Text style={styles.insightValue}>{insight.value}</Text>
-                                        ) : null}
+                                        <TeamLogo teamId={insight.team_id} size={24} />
+                                        <View style={styles.insightTextWrap}>
+                                            <Text style={styles.insightTitle}>{insight.title ?? 'Insight'}</Text>
+                                            <Text style={styles.insightTeam}>{insight.team_name ?? '—'}</Text>
+                                            <Text style={styles.insightSummary}>{insight.summary ?? '—'}</Text>
+                                            {insight.value !== null && insight.value !== undefined ? (
+                                                <Text style={styles.insightValue}>{insight.value}</Text>
+                                            ) : null}
+                                        </View>
                                     </View>
                                 ))
                             )}

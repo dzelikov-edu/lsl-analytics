@@ -1,8 +1,11 @@
+import TeamLogo from '@/components/TeamLogo';
 import { AppColors } from '@/constants/app-colors';
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import { API_BASE_URL } from '@/lib/api';
-import { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useCachedApi } from '@/hooks/useCachedApi';
+import { router } from 'expo-router';
+import { useMemo, useState } from 'react';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 type Top25Row = {
     rank: number;
@@ -23,12 +26,17 @@ type PollKey = 'LSL' | 'LCAA';
 export default function RankingsScreen() {
     const colorScheme = useColorScheme() ?? 'light';
     const theme = AppColors[colorScheme];
+    const insets = useSafeAreaInsets();
+    const { width } = useWindowDimensions();
+    const isCompact = width < 430;
+    const topTabPadding = isCompact ? insets.top + 8 : 12;
 
     const styles = useMemo(
         () =>
             StyleSheet.create({
                 content: {
-                    padding: 20,
+                    paddingHorizontal: 20,
+                    paddingTop: topTabPadding,
                     paddingBottom: 40,
                     backgroundColor: theme.background,
                 },
@@ -89,9 +97,29 @@ export default function RankingsScreen() {
                     padding: 14,
                     backgroundColor: theme.card,
                 },
+                listRowWrap: {
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    marginBottom: 10,
+                },
+                listRowPressed: {
+                    opacity: 0.7,
+                },
+                rankNumber: {
+                    width: 34,
+                    fontSize: 16,
+                    fontWeight: '800',
+                    color: theme.text,
+                    textAlign: 'right',
+                    marginRight: 8,
+                },
+                rowTextWrap: {
+                    marginLeft: 10,
+                    flex: 1,
+                },
                 listRow: {
                     fontSize: 18,
-                    marginBottom: 10,
+                    fontWeight: '700',
                     color: theme.text,
                 },
                 errorTitle: {
@@ -109,38 +137,22 @@ export default function RankingsScreen() {
                     color: theme.mutedText,
                 },
             }),
-        [theme]
+        [theme, topTabPadding]
     );
 
     const [selectedPoll, setSelectedPoll] = useState<PollKey>('LSL');
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState<string | null>(null);
-    const [top25, setTop25] = useState<Top25Row[]>([]);
-    const [next5, setNext5] = useState<Next5Row[]>([]);
+    const {
+        data: payload,
+        loading,
+        error,
+    } = useCachedApi({
+        cacheKey: `poll:${selectedPoll}:week0`,
+        endpoint: `/polls/${selectedPoll}?week=0`,
+        maxAgeMs: 1000 * 60 * 30,
+    });
 
-    useEffect(() => {
-        const loadRankings = async () => {
-            try {
-                setLoading(true);
-                setError(null);
-
-                const response = await fetch(`${API_BASE_URL}/polls/${selectedPoll}?week=0`);
-                if (!response.ok) {
-                    throw new Error(`HTTP ${response.status}`);
-                }
-
-                const json = await response.json();
-                setTop25(json?.top25 ?? []);
-                setNext5(json?.next5 ?? []);
-            } catch (err: any) {
-                setError(err?.message ?? 'Unknown error');
-            } finally {
-                setLoading(false);
-            }
-        };
-
-        loadRankings();
-    }, [selectedPoll]);
+    const top25: Top25Row[] = payload?.top25 ?? [];
+    const next5: Next5Row[] = payload?.next5 ?? [];
 
     return (
         <ScrollView contentContainerStyle={styles.content}>
@@ -183,9 +195,21 @@ export default function RankingsScreen() {
                                 <Text style={styles.emptyText}>No Top 25 rankings available.</Text>
                             ) : (
                                 top25.map((row) => (
-                                    <Text key={row.team_id} style={styles.listRow}>
-                                        {row.rank}. {row.team_name}
-                                    </Text>
+                                    <Pressable
+                                        key={row.team_id}
+                                        onPress={() =>
+                                            router.push({
+                                                pathname: '/team/[teamId]',
+                                                params: { teamId: row.team_id },
+                                            })
+                                        }
+                                        style={({ pressed }) => [styles.listRowWrap, pressed && styles.listRowPressed]}>
+                                        <Text style={styles.rankNumber}>{row.rank}.</Text>
+                                        <TeamLogo teamId={row.team_id} size={24} />
+                                        <View style={styles.rowTextWrap}>
+                                            <Text style={styles.listRow}>{row.team_name}</Text>
+                                        </View>
+                                    </Pressable>
                                 ))
                             )}
                         </View>
@@ -198,9 +222,21 @@ export default function RankingsScreen() {
                                 <Text style={styles.emptyText}>No Next 5 teams available.</Text>
                             ) : (
                                 next5.map((row) => (
-                                    <Text key={row.team_id} style={styles.listRow}>
-                                        {row.order}. {row.team_name}
-                                    </Text>
+                                    <Pressable
+                                        key={row.team_id}
+                                        onPress={() =>
+                                            router.push({
+                                                pathname: '/team/[teamId]',
+                                                params: { teamId: row.team_id },
+                                            })
+                                        }
+                                        style={({ pressed }) => [styles.listRowWrap, pressed && styles.listRowPressed]}>
+                                        <Text style={styles.rankNumber}>{row.order}.</Text>
+                                        <TeamLogo teamId={row.team_id} size={24} />
+                                        <View style={styles.rowTextWrap}>
+                                            <Text style={styles.listRow}>{row.team_name}</Text>
+                                        </View>
+                                    </Pressable>
                                 ))
                             )}
                         </View>

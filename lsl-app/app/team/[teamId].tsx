@@ -1,8 +1,9 @@
+import TeamLogo from '@/components/TeamLogo';
 import { AppColors } from '@/constants/app-colors';
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import { API_BASE_URL } from '@/lib/api';
+import { useCachedApi } from '@/hooks/useCachedApi';
 import { router, useLocalSearchParams } from 'expo-router';
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 export default function TeamDetailScreen() {
@@ -36,10 +37,21 @@ export default function TeamDetailScreen() {
                     marginBottom: 18,
                     backgroundColor: theme.card,
                 },
+                heroTopRow: {
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    marginBottom: 10,
+                },
+                logoWrap: {
+                    marginRight: 12,
+                },
+                heroTextWrap: {
+                    flex: 1,
+                },
                 teamName: {
                     fontSize: 30,
                     fontWeight: '800',
-                    marginBottom: 8,
+                    marginBottom: 4,
                     color: theme.text,
                 },
                 primaryRecord: {
@@ -73,14 +85,19 @@ export default function TeamDetailScreen() {
                     color: theme.text,
                 },
                 analyticsGrid: {
-                    gap: 10,
+                    flexDirection: 'row',
+                    flexWrap: 'wrap',
+                    justifyContent: 'space-between',
                 },
                 analyticsCard: {
+                    width: '48.5%',
                     borderWidth: 1,
                     borderColor: theme.border,
                     borderRadius: 14,
                     padding: 14,
                     backgroundColor: theme.card,
+                    marginBottom: 10,
+                    minHeight: 112,
                 },
                 metricLabel: {
                     fontSize: 14,
@@ -148,79 +165,21 @@ export default function TeamDetailScreen() {
         [theme]
     );
 
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState<string | null>(null);
-    const [team, setTeam] = useState<any>(null);
-
-    useEffect(() => {
-        const loadTeam = async () => {
-            if (!teamId) return;
-
-            try {
-                setLoading(true);
-                setError(null);
-
-                const response = await fetch(`${API_BASE_URL}/teams/${teamId}?week=0`);
-                if (!response.ok) {
-                    throw new Error(`HTTP ${response.status}`);
-                }
-
-                const json = await response.json();
-                setTeam(json);
-            } catch (err: any) {
-                setError(err?.message ?? 'Unknown error');
-            } finally {
-                setLoading(false);
-            }
-        };
-
-        loadTeam();
-    }, [teamId]);
+    const {
+        data: team,
+        loading,
+        error,
+    } = useCachedApi({
+        cacheKey: `team:${teamId}:detail:latest:v1`,
+        endpoint: `/teams/${teamId}`,
+        maxAgeMs: 1000 * 60 * 30,
+        enabled: !!teamId,
+    });
 
     const lslRank = team?.polls?.LSL?.rank;
     const lslNext5 = team?.polls?.LSL?.next5_order;
     const lcaaRank = team?.polls?.LCAA?.rank;
     const lcaaNext5 = team?.polls?.LCAA?.next5_order;
-
-    const formatConferenceName = (name?: string | null) => {
-        if (!name) return null;
-
-        const normalized = name.trim();
-
-        const shortMap: Record<string, string> = {
-            'Atlantic Coast Conference': 'ACC',
-            'Southeastern Conference': 'SEC',
-            'Big Ten Conference': 'Big Ten',
-            'Big 12 Conference': 'Big 12',
-            'Big East Conference': 'Big East',
-            'Pacific-12 Conference': 'PAC-12',
-            'Pac-12 Conference': 'PAC-12',
-            'American Conference': 'AAC',
-            'Mountain West Conference': 'Mountain West',
-            'West Coast Conference': 'WCC',
-            'Missouri Valley Conference': 'Missouri Valley',
-            'Atlantic 10 Conference': 'A-10',
-            'Atlantic Ten Conference': 'A-10',
-            'Big West Conference': 'Big West',
-            'Missouri Valley Football Conference': 'Missouri Valley',
-        };
-
-        return shortMap[normalized] ?? normalized.replace(/\s+Conference$/, '');
-    };
-
-    const overallRecord = team?.record?.overall_record ?? '—';
-    const conferenceRecord = team?.record?.conference_record ?? '—';
-    const conferenceId = team?.conference_id ?? null;
-    const conferenceName = team?.conference_name ?? null;
-    const conferenceDisplayName = formatConferenceName(conferenceName);
-    const playersCount = team?.roster_summary?.players_count ?? 0;
-
-    const analyticsCards = [
-        { label: 'Power', item: team?.analytics?.power },
-        { label: 'Resume', item: team?.analytics?.resume },
-        { label: 'Form', item: team?.analytics?.form },
-        { label: 'SOS', item: team?.analytics?.sos },
-    ];
 
     const formatPollValue = (rank?: number | null, next5?: number | null) => {
         if (rank !== null && rank !== undefined) return `#${rank}`;
@@ -236,6 +195,46 @@ export default function TeamDetailScreen() {
             item.value !== null && item.value !== undefined ? ` • ${item.value}` : '';
         return `${rankText}${valueText}`;
     };
+
+    const formatConferenceName = (name?: string | null) => {
+        if (!name) return null;
+
+        const normalized = name.trim();
+
+        const shortMap: Record<string, string> = {
+            'Atlantic Coast Conference': 'ACC',
+            'Southeastern Conference': 'SEC',
+            'Big Ten Conference': 'Big Ten',
+            'Big 12 Conference': 'Big 12',
+            'Big East Conference': 'Big East',
+            'Pacific-12 Conference': 'Pac-12',
+            'Pac-12 Conference': 'Pac-12',
+            'American Athletic Conference': 'AAC',
+            'Mountain West Conference': 'Mountain West',
+            'West Coast Conference': 'WCC',
+            'Missouri Valley Conference': 'Missouri Valley',
+            'Atlantic 10 Conference': 'A-10',
+            'Atlantic Ten Conference': 'A-10',
+            'Big West Conference': 'Big West',
+            'Missouri Valley Football Conference': 'Missouri Valley',
+        };
+
+        return shortMap[normalized] ?? normalized.replace(/\s+Conference$/, '');
+    };
+
+    const overallRecord = team?.record?.overall_record ?? '—';
+    const conferenceRecord = team?.record?.conference_record ?? '—';
+
+    const conferenceName = team?.conference_name ?? null;
+    const conferenceDisplayName = formatConferenceName(conferenceName);
+    const playersCount = team?.roster_summary?.players_count ?? 0;
+
+    const analyticsCards = [
+        { label: 'Power', item: team?.analytics?.power },
+        { label: 'Resume', item: team?.analytics?.resume },
+        { label: 'Form', item: team?.analytics?.form },
+        { label: 'SOS', item: team?.analytics?.sos },
+    ];
 
     return (
         <ScrollView contentContainerStyle={styles.content}>
@@ -256,14 +255,27 @@ export default function TeamDetailScreen() {
             ) : (
                 <>
                     <View style={styles.heroCard}>
-                        <Text style={styles.teamName}>{team.team_name}</Text>
-                        <Text style={styles.primaryRecord}>{overallRecord}</Text>
+                        <View style={styles.heroTopRow}>
+                            <View style={styles.logoWrap}>
+                                <TeamLogo teamId={teamId} size={52} />
+                            </View>
+
+                            <View style={styles.heroTextWrap}>
+                                <Text style={styles.teamName}>{team.team_name}</Text>
+                                <Text style={styles.primaryRecord}>{overallRecord}</Text>
+                            </View>
+                        </View>
+
                         <Text style={styles.secondaryLine}>
-                            {conferenceDisplayName ? `${conferenceDisplayName} Record: ${conferenceRecord}` : `Conference Record: ${conferenceRecord}`}
+                            {conferenceDisplayName
+                                ? `${conferenceDisplayName} record: ${conferenceRecord}`
+                                : `Conference record: ${conferenceRecord}`}
                         </Text>
+
                         <Text style={styles.pollsLine}>
                             LSL: {formatPollValue(lslRank, lslNext5)} • LCAA: {formatPollValue(lcaaRank, lcaaNext5)}
                         </Text>
+
                         <Text style={styles.metaLine}>Players: {playersCount}</Text>
                     </View>
 

@@ -1,9 +1,12 @@
+import ConferenceLogo from '@/components/ConferenceLogo';
 import { AppColors } from '@/constants/app-colors';
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import { API_BASE_URL } from '@/lib/api';
+import { useCachedApi } from '@/hooks/useCachedApi';
+import { getConferenceBranding } from '@/lib/conferenceBranding';
 import { router } from 'expo-router';
-import { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useMemo } from 'react';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 type ConferenceRow = {
     conference_id: string;
@@ -22,20 +25,30 @@ type ConferenceRow = {
 export default function ConferencesScreen() {
     const colorScheme = useColorScheme() ?? 'light';
     const theme = AppColors[colorScheme];
+    const insets = useSafeAreaInsets();
+    const { width } = useWindowDimensions();
+    const isCompact = width < 430;
+    const topTabPadding = isCompact ? insets.top + 8 : 12;
 
     const styles = useMemo(
         () =>
             StyleSheet.create({
                 content: {
-                    padding: 20,
+                    paddingHorizontal: 20,
+                    paddingTop: topTabPadding,
                     paddingBottom: 40,
                     backgroundColor: theme.background,
                 },
                 screenTitle: {
                     fontSize: 32,
                     fontWeight: '800',
-                    marginBottom: 20,
+                    marginBottom: 6,
                     color: theme.text,
+                },
+                screenSubTitle: {
+                    fontSize: 15,
+                    color: theme.mutedText,
+                    marginBottom: 18,
                 },
                 centerBlock: {
                     paddingVertical: 40,
@@ -50,7 +63,7 @@ export default function ConferencesScreen() {
                 card: {
                     borderWidth: 1,
                     borderColor: theme.border,
-                    borderRadius: 14,
+                    borderRadius: 16,
                     padding: 14,
                     marginBottom: 12,
                     backgroundColor: theme.card,
@@ -58,15 +71,66 @@ export default function ConferencesScreen() {
                 cardPressed: {
                     opacity: 0.75,
                 },
+                topRow: {
+                    flexDirection: 'row',
+                    alignItems: 'flex-start',
+                    justifyContent: 'space-between',
+                    marginBottom: 10,
+                },
+                leftSide: {
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    flex: 1,
+                    paddingRight: 12,
+                },
+                nameBlock: {
+                    flex: 1,
+                    paddingLeft: 10,
+                },
                 conferenceName: {
-                    fontSize: 22,
-                    fontWeight: '700',
-                    marginBottom: 8,
+                    fontSize: 21,
+                    fontWeight: '800',
+                    marginBottom: 2,
                     color: theme.text,
                 },
-                context: {
-                    fontSize: 15,
+                conferenceId: {
+                    fontSize: 12,
                     color: theme.mutedText,
+                    textTransform: 'uppercase',
+                    letterSpacing: 0.4,
+                },
+                badge: {
+                    minWidth: 58,
+                    paddingVertical: 6,
+                    paddingHorizontal: 10,
+                    borderRadius: 999,
+                    borderWidth: 1,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    backgroundColor: theme.background,
+                },
+                badgeText: {
+                    fontSize: 13,
+                    fontWeight: '800',
+                    color: theme.text,
+                },
+                statsLabel: {
+                    fontSize: 12,
+                    color: theme.mutedText,
+                    marginBottom: 4,
+                    textTransform: 'uppercase',
+                    letterSpacing: 0.4,
+                },
+                statsLine: {
+                    fontSize: 14,
+                    lineHeight: 20,
+                    color: theme.text,
+                },
+                accentBar: {
+                    height: 4,
+                    width: 56,
+                    borderRadius: 999,
+                    marginTop: 12,
                 },
                 errorTitle: {
                     fontSize: 18,
@@ -74,43 +138,32 @@ export default function ConferencesScreen() {
                     marginBottom: 8,
                     color: theme.text,
                 },
+                errorText: {
+                    fontSize: 14,
+                    color: theme.mutedText,
+                },
             }),
-        [theme]
+        [theme, topTabPadding]
     );
 
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState<string | null>(null);
-    const [conferences, setConferences] = useState<ConferenceRow[]>([]);
+    const {
+        data: payload,
+        loading,
+        error,
+    } = useCachedApi({
+        cacheKey: 'conferences:list',
+        endpoint: '/conferences',
+        maxAgeMs: 1000 * 60 * 60,
+    });
 
-    useEffect(() => {
-        const loadConferences = async () => {
-            try {
-                setLoading(true);
-                setError(null);
-
-                const response = await fetch(`${API_BASE_URL}/conferences`);
-                if (!response.ok) {
-                    throw new Error(`HTTP ${response.status}`);
-                }
-
-                const json = await response.json();
-                setConferences(json?.conferences ?? []);
-            } catch (err: any) {
-                setError(err?.message ?? 'Unknown error');
-            } finally {
-                setLoading(false);
-            }
-        };
-
-        loadConferences();
-    }, []);
+    const conferences: ConferenceRow[] = payload?.conferences ?? [];
 
     const formatContext = (conf: ConferenceRow) => {
         const top25 = conf?.polls?.LSL?.top25_count ?? 0;
         const next5 = conf?.polls?.LSL?.next5_count ?? 0;
 
         if (top25 > 0 || next5 > 0) {
-            return `Teams: ${conf.teams_count ?? 0} • LSL Top 25: ${top25} • Next 5: ${next5}`;
+            return `Teams: ${conf.teams_count ?? 0} • Top 25: ${top25} • Next 5: ${next5}`;
         }
 
         return `Teams: ${conf.teams_count ?? 0}`;
@@ -119,6 +172,7 @@ export default function ConferencesScreen() {
     return (
         <ScrollView contentContainerStyle={styles.content}>
             <Text style={styles.screenTitle}>Conferences</Text>
+            <Text style={styles.screenSubTitle}>Browse conference standings and outlook</Text>
 
             {loading ? (
                 <View style={styles.centerBlock}>
@@ -128,22 +182,50 @@ export default function ConferencesScreen() {
             ) : error ? (
                 <View style={styles.card}>
                     <Text style={styles.errorTitle}>Error</Text>
-                    <Text style={styles.context}>{error}</Text>
+                    <Text style={styles.errorText}>{error}</Text>
                 </View>
             ) : conferences.length === 0 ? (
                 <View style={styles.card}>
-                    <Text style={styles.context}>No conferences available.</Text>
+                    <Text style={styles.errorText}>No conferences available.</Text>
                 </View>
             ) : (
-                conferences.map((conf) => (
-                    <Pressable
-                        key={conf.conference_id}
-                        onPress={() => router.push(`/conference/${conf.conference_id}`)}
-                        style={({ pressed }) => [styles.card, pressed && styles.cardPressed]}>
-                        <Text style={styles.conferenceName}>{conf.conference_name}</Text>
-                        <Text style={styles.context}>{formatContext(conf)}</Text>
-                    </Pressable>
-                ))
+                conferences.map((conf) => {
+                    const branding = getConferenceBranding(conf.conference_id);
+
+                    return (
+                        <Pressable
+                            key={conf.conference_id}
+                            onPress={() => router.push(`/conference/${conf.conference_id}`)}
+                            style={({ pressed }) => [styles.card, pressed && styles.cardPressed]}>
+                            <View style={styles.topRow}>
+                                <View style={styles.leftSide}>
+                                    <ConferenceLogo confId={conf.conference_id} size={30} />
+                                    <View style={styles.nameBlock}>
+                                        <Text style={styles.conferenceName}>{conf.conference_name}</Text>
+                                        <Text style={styles.conferenceId}>{branding.headerTitle}</Text>
+                                    </View>
+                                </View>
+
+                                <View
+                                    style={[
+                                        styles.badge,
+                                        {
+                                            borderColor: branding.accent,
+                                            backgroundColor: theme.card,
+                                        },
+                                    ]}>
+                                    <Text style={[styles.badgeText, { color: theme.text }]}>
+                                        {conf.teams_count ?? 0}T
+                                    </Text>
+                                </View>
+                            </View>
+
+                            <Text style={styles.statsLabel}>Conference Snapshot</Text>
+                            <Text style={styles.statsLine}>{formatContext(conf)}</Text>
+                            <View style={[styles.accentBar, { backgroundColor: branding.primary }]} />
+                        </Pressable>
+                    );
+                })
             )}
         </ScrollView>
     );

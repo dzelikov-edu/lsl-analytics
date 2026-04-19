@@ -1,9 +1,10 @@
+import TeamLogo from '@/components/TeamLogo';
 import { AppColors } from '@/constants/app-colors';
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import { API_BASE_URL } from '@/lib/api';
-import { useLocalSearchParams } from 'expo-router';
-import { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useCachedApi } from '@/hooks/useCachedApi';
+import { router, useLocalSearchParams } from 'expo-router';
+import { useMemo } from 'react';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 type ScheduleGame = {
     game_key: string;
@@ -32,11 +33,30 @@ export default function TeamScheduleScreen() {
                     paddingBottom: 40,
                     backgroundColor: theme.background,
                 },
-                header: {
+                headerCard: {
+                    borderWidth: 1,
+                    borderColor: theme.border,
+                    borderRadius: 16,
+                    padding: 14,
                     marginBottom: 16,
+                    backgroundColor: theme.card,
                 },
-                subTitle: {
-                    fontSize: 15,
+                headerRow: {
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                },
+                headerTextWrap: {
+                    marginLeft: 12,
+                    flex: 1,
+                },
+                headerTitle: {
+                    fontSize: 20,
+                    fontWeight: '800',
+                    color: theme.text,
+                    marginBottom: 2,
+                },
+                headerSubTitle: {
+                    fontSize: 14,
                     color: theme.mutedText,
                 },
                 centerBlock: {
@@ -52,10 +72,13 @@ export default function TeamScheduleScreen() {
                 card: {
                     borderWidth: 1,
                     borderColor: theme.border,
-                    borderRadius: 14,
+                    borderRadius: 16,
                     padding: 14,
                     marginBottom: 12,
                     backgroundColor: theme.card,
+                },
+                cardPressed: {
+                    opacity: 0.75,
                 },
                 sectionTitle: {
                     fontSize: 20,
@@ -71,45 +94,58 @@ export default function TeamScheduleScreen() {
                 metaLine: {
                     fontSize: 13,
                     color: theme.mutedText,
-                    marginBottom: 8,
+                    marginBottom: 10,
                 },
-                mainLine: {
-                    fontSize: 19,
+                topRow: {
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                },
+                textWrap: {
+                    marginLeft: 10,
+                    flex: 1,
+                },
+                opponentLine: {
+                    fontSize: 17,
                     fontWeight: '700',
                     color: theme.text,
+                    marginBottom: 4,
+                },
+                detailLine: {
+                    fontSize: 14,
+                    color: theme.mutedText,
+                },
+                emptyCard: {
+                    borderWidth: 1,
+                    borderColor: theme.border,
+                    borderRadius: 16,
+                    padding: 18,
+                    backgroundColor: theme.card,
+                },
+                emptyTitle: {
+                    fontSize: 18,
+                    fontWeight: '700',
+                    color: theme.text,
+                    marginBottom: 6,
+                },
+                emptyText: {
+                    fontSize: 14,
+                    lineHeight: 20,
+                    color: theme.mutedText,
                 },
             }),
         [theme]
     );
 
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState<string | null>(null);
-    const [payload, setPayload] = useState<any>(null);
-
-    useEffect(() => {
-        const loadSchedule = async () => {
-            if (!teamId) return;
-
-            try {
-                setLoading(true);
-                setError(null);
-
-                const response = await fetch(`${API_BASE_URL}/teams/${teamId}/schedule`);
-                if (!response.ok) {
-                    throw new Error(`HTTP ${response.status}`);
-                }
-
-                const json = await response.json();
-                setPayload(json);
-            } catch (err: any) {
-                setError(err?.message ?? 'Unknown error');
-            } finally {
-                setLoading(false);
-            }
-        };
-
-        loadSchedule();
-    }, [teamId]);
+    const {
+        data: payload,
+        loading,
+        error,
+    } = useCachedApi({
+        cacheKey: `team:${teamId}:schedule`,
+        endpoint: `/teams/${teamId}/schedule`,
+        maxAgeMs: 1000 * 60 * 30,
+        enabled: !!teamId,
+    });
 
     const games: ScheduleGame[] = payload?.games ?? payload?.schedule ?? [];
 
@@ -144,24 +180,50 @@ export default function TeamScheduleScreen() {
                 </View>
             ) : (
                 <>
-                    <View style={styles.header}>
-                        <Text style={styles.subTitle}>Upcoming Schedule</Text>
+                    <View style={styles.headerCard}>
+                        <View style={styles.headerRow}>
+                            <TeamLogo teamId={teamId} size={34} />
+                            <View style={styles.headerTextWrap}>
+                                <Text style={styles.headerTitle}>Schedule</Text>
+                                <Text style={styles.headerSubTitle}>
+                                    Upcoming and full season schedule
+                                </Text>
+                            </View>
+                        </View>
                     </View>
 
                     {games.length === 0 ? (
-                        <View style={styles.card}>
-                            <Text style={styles.body}>No upcoming games available.</Text>
+                        <View style={styles.emptyCard}>
+                            <Text style={styles.emptyTitle}>No schedule available</Text>
+                            <Text style={styles.emptyText}>
+                                Upcoming games will appear here once schedule data is available for this team.
+                            </Text>
                         </View>
                     ) : (
                         games.map((game) => (
-                            <View key={game.game_key} style={styles.card}>
+                            <Pressable
+                                key={game.game_key}
+                                onPress={() =>
+                                    router.push({
+                                        pathname: '/game/[gameKey]',
+                                        params: { gameKey: game.game_key },
+                                    })
+                                }
+                                style={({ pressed }) => [styles.card, pressed && styles.cardPressed]}>
                                 <Text style={styles.metaLine}>
                                     {game.display_date || game.date_key || 'TBD'} • {game.phase_display || game.phase || '—'} • Week {game.week ?? '—'}
                                 </Text>
-                                <Text style={styles.mainLine}>
-                                    {formatSite(game.site)} {formatOpponent(game)}
-                                </Text>
-                            </View>
+
+                                <View style={styles.topRow}>
+                                    <TeamLogo teamId={game.opponent_team_id} size={24} />
+                                    <View style={styles.textWrap}>
+                                        <Text style={styles.opponentLine}>
+                                            {formatSite(game.site)} {formatOpponent(game)}
+                                        </Text>
+                                        <Text style={styles.detailLine}>Scheduled</Text>
+                                    </View>
+                                </View>
+                            </Pressable>
                         ))
                     )}
                 </>

@@ -1,10 +1,12 @@
+import { getTeamLogo } from '@/lib/teamLogos';
+
 export type TeamBranding = {
     displayName: string;
     primary: string;
     secondary: string;
     accent: string;
     headerText: string;
-    logo: null | string;
+    logo: any | null;
 };
 
 const TEAM_BRANDING: Record<string, TeamBranding> = {
@@ -395,7 +397,7 @@ const TEAM_BRANDING: Record<string, TeamBranding> = {
     ST_JOHNS: {
         displayName: "St. John's",
         primary: '#BA0C2F',
-        secondary: '#FFFFFF',
+        secondary: '#041C2C',
         accent: '#808285',
         headerText: '#FFFFFF',
         logo: null,
@@ -573,9 +575,16 @@ const FALLBACK_BRANDING: TeamBranding = {
 
 export function getTeamBranding(teamId?: string | null): TeamBranding {
     if (!teamId) return FALLBACK_BRANDING;
+
     const normalized = String(teamId).trim().toUpperCase();
-    return TEAM_BRANDING[normalized] ?? {
-        ...FALLBACK_BRANDING,
-        displayName: normalized.replace(/_/g, ' '),
+    const base =
+        TEAM_BRANDING[normalized] ?? {
+            ...FALLBACK_BRANDING,
+            displayName: normalized.replace(/_/g, ' '),
+        };
+
+    return {
+        ...base,
+        logo: getTeamLogo(normalized),
     };
 }

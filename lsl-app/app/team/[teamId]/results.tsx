@@ -1,8 +1,9 @@
+import TeamLogo from '@/components/TeamLogo';
 import { AppColors } from '@/constants/app-colors';
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import { API_BASE_URL } from '@/lib/api';
+import { useCachedApi } from '@/hooks/useCachedApi';
 import { useLocalSearchParams } from 'expo-router';
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 type ResultGame = {
@@ -36,11 +37,30 @@ export default function TeamResultsScreen() {
                     paddingBottom: 40,
                     backgroundColor: theme.background,
                 },
-                header: {
+                headerCard: {
+                    borderWidth: 1,
+                    borderColor: theme.border,
+                    borderRadius: 16,
+                    padding: 14,
                     marginBottom: 16,
+                    backgroundColor: theme.card,
                 },
-                subTitle: {
-                    fontSize: 15,
+                headerRow: {
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                },
+                headerTextWrap: {
+                    marginLeft: 12,
+                    flex: 1,
+                },
+                headerTitle: {
+                    fontSize: 20,
+                    fontWeight: '800',
+                    color: theme.text,
+                    marginBottom: 2,
+                },
+                headerSubTitle: {
+                    fontSize: 14,
                     color: theme.mutedText,
                 },
                 centerBlock: {
@@ -56,7 +76,7 @@ export default function TeamResultsScreen() {
                 card: {
                     borderWidth: 1,
                     borderColor: theme.border,
-                    borderRadius: 14,
+                    borderRadius: 16,
                     padding: 14,
                     marginBottom: 12,
                     backgroundColor: theme.card,
@@ -75,51 +95,76 @@ export default function TeamResultsScreen() {
                 metaLine: {
                     fontSize: 13,
                     color: theme.mutedText,
+                    marginBottom: 10,
+                },
+                topRow: {
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
                     marginBottom: 8,
                 },
-                resultLine: {
-                    fontSize: 19,
+                leftSide: {
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    flex: 1,
+                    paddingRight: 12,
+                },
+                textWrap: {
+                    marginLeft: 10,
+                    flex: 1,
+                },
+                resultBadge: {
+                    fontSize: 15,
                     fontWeight: '800',
-                    marginBottom: 6,
                     color: theme.text,
                 },
-                mainLine: {
-                    fontSize: 17,
-                    fontWeight: '600',
+                scoreLine: {
+                    fontSize: 22,
+                    fontWeight: '800',
                     color: theme.text,
+                },
+                opponentLine: {
+                    fontSize: 17,
+                    fontWeight: '700',
+                    color: theme.text,
+                    marginBottom: 4,
+                },
+                detailLine: {
+                    fontSize: 14,
+                    color: theme.mutedText,
+                },
+                emptyCard: {
+                    borderWidth: 1,
+                    borderColor: theme.border,
+                    borderRadius: 16,
+                    padding: 18,
+                    backgroundColor: theme.card,
+                },
+                emptyTitle: {
+                    fontSize: 18,
+                    fontWeight: '700',
+                    color: theme.text,
+                    marginBottom: 6,
+                },
+                emptyText: {
+                    fontSize: 14,
+                    lineHeight: 20,
+                    color: theme.mutedText,
                 },
             }),
         [theme]
     );
 
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState<string | null>(null);
-    const [payload, setPayload] = useState<any>(null);
-
-    useEffect(() => {
-        const loadResults = async () => {
-            if (!teamId) return;
-
-            try {
-                setLoading(true);
-                setError(null);
-
-                const response = await fetch(`${API_BASE_URL}/teams/${teamId}/results`);
-                if (!response.ok) {
-                    throw new Error(`HTTP ${response.status}`);
-                }
-
-                const json = await response.json();
-                setPayload(json);
-            } catch (err: any) {
-                setError(err?.message ?? 'Unknown error');
-            } finally {
-                setLoading(false);
-            }
-        };
-
-        loadResults();
-    }, [teamId]);
+    const {
+        data: payload,
+        loading,
+        error,
+    } = useCachedApi({
+        cacheKey: `team:${teamId}:results`,
+        endpoint: `/teams/${teamId}/results`,
+        maxAgeMs: 1000 * 60 * 30,
+        enabled: !!teamId,
+    });
 
     const games: ResultGame[] = payload?.schedule ?? payload?.results ?? [];
 
@@ -147,6 +192,14 @@ export default function TeamResultsScreen() {
         return 'T';
     };
 
+    const resultLabel = (game: ResultGame) => {
+        const result = resultLetter(game);
+        if (result === 'W') return 'Win';
+        if (result === 'L') return 'Loss';
+        if (result === 'T') return 'Tie';
+        return 'Result';
+    };
+
     return (
         <ScrollView contentContainerStyle={styles.content}>
             {loading ? (
@@ -161,13 +214,22 @@ export default function TeamResultsScreen() {
                 </View>
             ) : (
                 <>
-                    <View style={styles.header}>
-                        <Text style={styles.subTitle}>Played Results</Text>
+                    <View style={styles.headerCard}>
+                        <View style={styles.headerRow}>
+                            <TeamLogo teamId={teamId} size={34} />
+                            <View style={styles.headerTextWrap}>
+                                <Text style={styles.headerTitle}>Results</Text>
+                                <Text style={styles.headerSubTitle}>Played games and final scores</Text>
+                            </View>
+                        </View>
                     </View>
 
                     {games.length === 0 ? (
-                        <View style={styles.card}>
-                            <Text style={styles.body}>No played games available.</Text>
+                        <View style={styles.emptyCard}>
+                            <Text style={styles.emptyTitle}>No results yet</Text>
+                            <Text style={styles.emptyText}>
+                                Played games will appear here once this team has completed games.
+                            </Text>
                         </View>
                     ) : (
                         games.map((game) => (
@@ -175,12 +237,24 @@ export default function TeamResultsScreen() {
                                 <Text style={styles.metaLine}>
                                     {game.display_date || game.date_key || 'TBD'} • {game.phase_display || game.phase || '—'} • Week {game.week ?? '—'}
                                 </Text>
-                                <Text style={styles.resultLine}>
-                                    {resultLetter(game)} {game.team_score ?? '—'}-{game.opp_score ?? '—'}
-                                </Text>
-                                <Text style={styles.mainLine}>
-                                    {formatSite(game.site)} {formatOpponent(game)}
-                                </Text>
+
+                                <View style={styles.topRow}>
+                                    <View style={styles.leftSide}>
+                                        <TeamLogo teamId={game.opponent_team_id} size={24} />
+                                        <View style={styles.textWrap}>
+                                            <Text style={styles.opponentLine}>
+                                                {formatSite(game.site)} {formatOpponent(game)}
+                                            </Text>
+                                            <Text style={styles.detailLine}>
+                                                {resultLetter(game)} • {resultLabel(game)}
+                                            </Text>
+                                        </View>
+                                    </View>
+
+                                    <Text style={styles.scoreLine}>
+                                        {game.team_score ?? '—'}-{game.opp_score ?? '—'}
+                                    </Text>
+                                </View>
                             </View>
                         ))
                     )}

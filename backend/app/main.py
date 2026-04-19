@@ -19,8 +19,427 @@ import threading
 from datetime import datetime
 from typing import Optional
 from fastapi.responses import JSONResponse
+from functools import lru_cache
 
 app = FastAPI(title="LSL Analytics Backend")
+
+@app.on_event("startup")
+def _warm_v1_caches():
+    try:
+        _cached_teams_index()
+        _cached_team_name_map_all()
+        _cached_conference_membership()
+        _cached_conferences_map()
+        _cached_records_snapshot()
+        _cached_polls()
+        _cached_week_phase_map()
+
+        _cached_preseason_power()
+        _cached_analytics_power_payload(0)
+        _home_analytics_preview(0)
+        _team_list_analytics_map(0)
+        _cached_team_record_map(0)
+        _cached_game_preview_support()
+        _cached_analytics_overview(0)
+
+        print("V1 caches warmed.")
+    except Exception as e:
+        print(f"Cache warm skipped/failed: {e}")
+
+@lru_cache(maxsize=1)
+def _cached_teams_index():
+    return load_teams_index()
+
+@lru_cache(maxsize=1)
+def _cached_players_snapshot():
+    return load_players_snapshot()
+
+@lru_cache(maxsize=1)
+def _cached_conference_membership():
+    return load_conference_membership()
+
+@lru_cache(maxsize=1)
+def _cached_conferences_map():
+    return load_conferences_map()
+
+@lru_cache(maxsize=1)
+def _cached_polls():
+    return load_polls()
+
+@lru_cache(maxsize=1)
+def _cached_week_phase_map():
+    return load_week_phase_map()
+
+@lru_cache(maxsize=256)
+def _cached_team_analytics_summary(team_id: str, week: int = 0):
+    tid = str(team_id).strip().upper()
+    return _team_analytics_summary(tid, week)
+
+@lru_cache(maxsize=1)
+def _cached_team_name_map_all():
+    return _team_name_map(active_only=False)
+
+@lru_cache(maxsize=1)
+def _cached_records_snapshot():
+    return load_records_snapshot()
+
+@lru_cache(maxsize=1)
+def _cached_game_preview_support():
+    games = _load_games_or_404()
+    teams = _cached_teams_index()
+    players = _cached_players_snapshot()
+    team_conf_map = _cached_conference_membership()
+    conf_names = _cached_conferences_map()
+    polls_rows = _cached_polls()
+
+    # ---- basic maps ----
+    games_by_key = {
+        str(g.get("game_key", "")).strip(): g
+        for g in games
+        if str(g.get("game_key", "")).strip()
+    }
+
+    team_index_map = {
+        str(t.team_id).strip().upper(): t
+        for t in teams
+    }
+
+    players_by_team = {}
+    for p in players:
+        tid = str(p.get("team_id", "")).strip().upper()
+        if not tid:
+            continue
+        players_by_team.setdefault(tid, []).append(p)
+
+    # ---- latest polls by team ----
+    polls_block_by_team = {}
+    try:
+        if polls_rows:
+            weeks = sorted({r["week"] for r in polls_rows})
+            w = weeks[-1]
+
+            by_team = {}
+            for r in polls_rows:
+                if r["week"] != w:
+                    continue
+
+                tid = str(r["team_id"]).strip().upper()
+                poll_name = str(r["poll"]).strip().upper()
+
+                if tid not in by_team:
+                    by_team[tid] = {
+                        "week": w,
+                        "LSL": {"rank": None, "next5_order": None},
+                        "LCAA": {"rank": None, "next5_order": None},
+                    }
+
+                if poll_name not in ("LSL", "LCAA"):
+                    continue
+
+                if r["bucket"] == "TOP25":
+                    by_team[tid][poll_name]["rank"] = int(r["bucket_order"])
+                    by_team[tid][poll_name]["next5_order"] = None
+                elif r["bucket"] == "NEXT5":
+                    by_team[tid][poll_name]["rank"] = None
+                    by_team[tid][poll_name]["next5_order"] = int(r["bucket_order"])
+
+            polls_block_by_team = by_team
+    except Exception:
+        polls_block_by_team = {}
+
+    # ---- precompute team records in one pass over played games ----
+    record_counts = {}
+
+    def ensure_team_record(tid: str):
+        if tid not in record_counts:
+            record_counts[tid] = {
+                "overall_w": 0,
+                "overall_l": 0,
+                "conf_w": 0,
+                "conf_l": 0,
+            }
+
+    for g in games:
+        ta = str(g.get("team_a", "")).strip().upper()
+        tb = str(g.get("team_b", "")).strip().upper()
+
+        if not ta or not tb:
+            continue
+
+        a_score = g.get("a_score")
+        b_score = g.get("b_score")
+        if a_score is None or b_score is None:
+            continue
+
+        ensure_team_record(ta)
+        ensure_team_record(tb)
+
+        ta_conf = team_conf_map.get(ta)
+        tb_conf = team_conf_map.get(tb)
+        is_conf_game = ta_conf and tb_conf and ta_conf == tb_conf
+
+        if a_score > b_score:
+            record_counts[ta]["overall_w"] += 1
+            record_counts[tb]["overall_l"] += 1
+            if is_conf_game:
+                record_counts[ta]["conf_w"] += 1
+                record_counts[tb]["conf_l"] += 1
+        elif a_score < b_score:
+            record_counts[tb]["overall_w"] += 1
+            record_counts[ta]["overall_l"] += 1
+            if is_conf_game:
+                record_counts[tb]["conf_w"] += 1
+                record_counts[ta]["conf_l"] += 1
+
+    records_by_team = {}
+    all_team_ids = set(team_index_map.keys()) | set(team_conf_map.keys()) | set(players_by_team.keys())
+    for tid in all_team_ids:
+        counts = record_counts.get(
+            tid,
+            {"overall_w": 0, "overall_l": 0, "conf_w": 0, "conf_l": 0},
+        )
+        records_by_team[tid] = {
+            "overall_record": f'{counts["overall_w"]}-{counts["overall_l"]}',
+            "conference_record": f'{counts["conf_w"]}-{counts["conf_l"]}',
+        }
+
+    # ---- precompute leaders by team ----
+    leaders_by_team = {}
+
+    for tid, team_players in players_by_team.items():
+        leaders_by_team[tid] = {}
+
+        for stat_key in ("ppg", "rpg", "apg", "spg"):
+            best = None
+            best_value = None
+
+            for p in team_players:
+                value = p.get(stat_key)
+                if value is None:
+                    continue
+                try:
+                    numeric = float(value)
+                except Exception:
+                    continue
+
+                if best is None or numeric > best_value:
+                    best = p
+                    best_value = numeric
+
+            if best is None:
+                leaders_by_team[tid][stat_key] = None
+            else:
+                leaders_by_team[tid][stat_key] = {
+                    "player_id": best.get("player_id"),
+                    "player_name": best.get("player_name"),
+                    "jersey_number": best.get("jersey_number"),
+                    "primary_position": best.get("primary_position"),
+                    "value": best_value,
+                }
+
+    return {
+        "games_by_key": games_by_key,
+        "team_index_map": team_index_map,
+        "players_by_team": players_by_team,
+        "team_conf_map": team_conf_map,
+        "conf_names": conf_names,
+        "polls_block_by_team": polls_block_by_team,
+        "records_by_team": records_by_team,
+        "leaders_by_team": leaders_by_team,
+    }
+
+@lru_cache(maxsize=16)
+def _has_played_games_through_week(week: int | None = None) -> bool:
+    games = _load_games_or_404()
+    w = 0 if week is None else week
+    
+    for g in games:
+        gw = _to_int_or_none(g.get("week"))
+        if gw is None or gw > w:
+            continue
+
+        if g.get("a_score") is not None and g.get("b_score") is not None:
+            return True
+    
+    return False
+
+@lru_cache(maxsize=1)
+def _cached_preseason_power():
+    return load_preseason_power()
+
+@lru_cache(maxsize=16)
+def _cached_analytics_power_payload(week: int | None = None):
+    w = 0 if week is None else week
+
+    rows = _cached_preseason_power()
+    if not rows:
+        return {
+            "week": w,
+            "metric": "power",
+            "meta": {
+                "title": "LSL Power",
+                "subtitle": "Who would be favored on a neutral floor today",
+                "source": "PreseasonPower",
+                "source_detail": "week_0_preseason_only",
+                "status": "no_data",
+            },
+            "count": 0,
+            "items": [],
+        }
+
+    subset = [r for r in rows if r["week"] == w]
+
+    if not subset:
+        return {
+            "week": w,
+            "metric": "power",
+            "meta": {
+                "title": "LSL Power",
+                "subtitle": "Who would be favored on a neutral floor today",
+                "source": "PreseasonPower",
+                "source_detail": "week_0_preseason_only",
+                "status": "week_not_available",
+            },
+            "count": 0,
+            "items": [],
+        }
+
+    name_map = _cached_team_name_map_all()
+    record_map = _analytics_record_map(w)
+    polls_map = _analytics_polls_map(w)
+
+    ranked = sorted(
+        subset,
+        key=lambda x: (-x["power_value"], name_map.get(x["team_id"], x["team_id"]))
+    )
+
+    items = []
+    for idx, row in enumerate(ranked, start=1):
+        tid = row["team_id"]
+        base = _analytics_base_row(
+            team_id=tid,
+            team_name=name_map.get(tid, tid),
+            value=row["power_value"],
+            rank=idx,
+            week=w,
+            tier=_power_tier_from_rank(idx),
+            trend="flat",
+            record_map=record_map,
+            polls_map=polls_map,
+        )
+
+        base["power"] = {
+            "source": "preseason",
+            "notes": row.get("notes", ""),
+        }
+
+        items.append(base)
+
+    return {
+        "week": w,
+        "metric": "power",
+        "meta": {
+            "title": "LSL Power",
+            "subtitle": "Who would be favored on a neutral floor today",
+            "source": "PreseasonPower",
+            "source_detail": "week_0_preseason_only",
+            "status": "ok",
+        },
+        "count": len(items),
+        "items": items,
+    }
+
+@lru_cache(maxsize=1)
+def _cached_team_conf_map_merged():
+    team_conf_map = dict(_cached_conference_membership())
+
+    for t in _cached_teams_index():
+        conf = getattr(t, "conference", None)
+        if conf:
+            team_conf_map.setdefault(
+                str(t.team_id).strip().upper(),
+                str(conf).strip().upper(),
+            )
+
+    return team_conf_map
+
+@lru_cache(maxsize=32)
+def _cached_team_record_map(week: int | None = None):
+    games = _load_games_or_404()
+    team_conf_map = _cached_team_conf_map_merged()
+
+    counts = {}
+
+    def ensure(tid: str):
+        if tid not in counts:
+            counts[tid] = {
+                "overall_wins": 0,
+                "overall_losses": 0,
+                "conference_wins": 0,
+                "conference_losses": 0,
+            }
+
+    for g in games:
+        ta = str(g.get("team_a", "")).strip().upper()
+        tb = str(g.get("team_b", "")).strip().upper()
+
+        if not ta or not tb:
+            continue
+
+        game_week = _to_int_or_none(g.get("week"))
+        if week is not None and game_week is not None and game_week > week:
+            continue
+
+        a_score = g.get("a_score")
+        b_score = g.get("b_score")
+        played = (a_score is not None) and (b_score is not None)
+        if not played:
+            continue
+
+        ensure(ta)
+        ensure(tb)
+
+        ta_conf = team_conf_map.get(ta)
+        tb_conf = team_conf_map.get(tb)
+        is_conf_game = ta_conf and tb_conf and ta_conf == tb_conf
+
+        if a_score > b_score:
+            counts[ta]["overall_wins"] += 1
+            counts[tb]["overall_losses"] += 1
+            if is_conf_game:
+                counts[ta]["conference_wins"] += 1
+                counts[tb]["conference_losses"] += 1
+        elif b_score > a_score:
+            counts[tb]["overall_wins"] += 1
+            counts[ta]["overall_losses"] += 1
+            if is_conf_game:
+                counts[tb]["conference_wins"] += 1
+                counts[ta]["conference_losses"] += 1
+
+    out = {}
+    for tid, c in counts.items():
+        out[tid] = {
+            "overall_wins": c["overall_wins"],
+            "overall_losses": c["overall_losses"],
+            "overall_record": f'{c["overall_wins"]}-{c["overall_losses"]}',
+            "conference_wins": c["conference_wins"],
+            "conference_losses": c["conference_losses"],
+            "conference_record": f'{c["conference_wins"]}-{c["conference_losses"]}',
+        }
+
+    return out
+
+@lru_cache(maxsize=1)
+def _cached_tracked_team_ids():
+    return {
+        t.team_id.strip().upper()
+        for t in _cached_teams_index()
+        if t.active
+    }
+
+@lru_cache(maxsize=1)
+def _cached_conf_games_snapshot():
+    return load_conf_games_snapshot()
 
 
 @app.get("/health")
@@ -52,7 +471,7 @@ def teams(week: int | None = None):
     """
     List teams (from TeamsIndex), plus LSL poll badge (latest poll week) for mobile list simplicity.
     """
-    teams = load_teams_index()
+    teams = _cached_teams_index()
     active = [t for t in teams if t.active]
 
     # ---- LSL poll badge maps (latest week) ----
@@ -61,7 +480,7 @@ def teams(week: int | None = None):
     poll_week = None
 
     try:
-        rows = load_polls()
+        rows = _cached_polls()
         if rows:
             available_weeks = sorted({r["week"] for r in rows})
             poll_week = week if week is not None else available_weeks[-1]
@@ -193,6 +612,11 @@ def _team_analytics_summary(team_id: str, week: int | None = None) -> dict:
                 break
     except Exception:
         pass
+
+    # Preseason week 0: only Power has real value right now.
+    # Skip Resume / Form / SOS entirely until in-season data
+    if not _has_played_games_through_week(w):
+        return summary
 
     # Resume / Form / SOS: keep additive and honest
     # Only populate if the route has real items and this team is present
@@ -372,6 +796,7 @@ def _lsl_rank_context_for_team_at_week(
     }
 
 
+@lru_cache(maxsize=16)
 def _team_list_analytics_map(week: int | None = None) -> dict[str, dict]:
     w = 0 if week is None else week
 
@@ -401,6 +826,11 @@ def _team_list_analytics_map(week: int | None = None) -> dict[str, dict]:
             }
     except Exception:
         pass
+
+    # Preseason / no played results yet:
+    # only Power is meaningful, so skip Resume/Form/SOS entirely.
+    if not _has_played_games_through_week(w):
+        return out
 
     try:
         resume_resp = analytics_resume(w)
@@ -458,24 +888,17 @@ def get_team(team_id: str, week: int | None = None):
     Also includes overall and conference records from played games through the selected week.
     """
     tid = team_id.strip().upper()
-    teams = load_teams_index()
+    teams = _cached_teams_index()
 
     match = next((t for t in teams if t.team_id.strip().upper() == tid), None)
     if not match:
         raise HTTPException(status_code=404, detail=f"Unknown team_id: {tid}")
 
-    name_map = _team_name_map(active_only=False)
-
-    team_conf_map = load_conference_membership()
-
-    # merge in TeamsIndex conference values too, so tracked-team data is always available
-    for t in teams:
-        conf = getattr(t, "conference", None)
-        if conf:
-            team_conf_map.setdefault(str(t.team_id).strip().upper(), str(conf).strip().upper())
+    name_map = _cached_team_name_map_all()
+    team_conf_map = _cached_team_conf_map_merged()
 
     team_conf = team_conf_map.get(tid)
-    conf_names = load_conferences_map()
+    conf_names = _cached_conferences_map()
     team_conf_name = conf_names.get(team_conf) if team_conf else None
 
     # ---- poll badge lookup ----
@@ -488,7 +911,7 @@ def get_team(team_id: str, week: int | None = None):
     selected_week = week
 
     try:
-        rows = load_polls()
+        rows = _cached_polls()
         if rows:
             weeks = sorted({r["week"] for r in rows})
             w = week if week is not None else weeks[-1]
@@ -513,60 +936,19 @@ def get_team(team_id: str, week: int | None = None):
         # Polls optional; keep nulls if anything goes wrong
         pass
 
-    # ---- record lookup from played games ----
-    overall_wins = 0
-    overall_losses = 0
-    conference_wins = 0
-    conference_losses = 0
+    # ---- record lookup from cached record map ----
+    record_block = {
+        "overall_wins": 0,
+        "overall_losses": 0,
+        "overall_record": "0-0",
+        "conference_wins": 0,
+        "conference_losses": 0,
+        "conference_record": "0-0",
+    }
 
     try:
-        games = _load_games_or_404()
-
-        for g in games:
-            ta = str(g.get("team_a", "")).strip().upper()
-            tb = str(g.get("team_b", "")).strip().upper()
-
-            if tid not in (ta, tb):
-                continue
-
-            game_week = _to_int_or_none(g.get("week"))
-            if selected_week is not None and game_week is not None and game_week > selected_week:
-                continue
-
-            a_score = g.get("a_score")
-            b_score = g.get("b_score")
-            played = (a_score is not None) and (b_score is not None)
-
-            if not played:
-                continue
-
-            if tid == ta:
-                team_score = a_score
-                opp_score = b_score
-                opponent_id = tb
-            else:
-                team_score = b_score
-                opp_score = a_score
-                opponent_id = ta
-
-            if team_score > opp_score:
-                overall_wins += 1
-                game_result = "W"
-            elif team_score < opp_score:
-                overall_losses += 1
-                game_result = "L"
-            else:
-                game_result = "T"
-
-            opponent_conf = team_conf_map.get(opponent_id)
-            if team_conf and opponent_conf and team_conf == opponent_conf:
-                if game_result == "W":
-                    conference_wins += 1
-                elif game_result == "L":
-                    conference_losses += 1
-
+        record_block = _cached_team_record_map(selected_week).get(tid, record_block)
     except Exception:
-        # Records optional; fall back to 0-0 if something goes wrong
         pass
 
     return {
@@ -579,14 +961,7 @@ def get_team(team_id: str, week: int | None = None):
         # ESPN-style poll badges (LSL primary, LCAA secondary)
         "polls": polls_block,
 
-        "record": {
-            "overall_wins": overall_wins,
-            "overall_losses": overall_losses,
-            "overall_record": f"{overall_wins}-{overall_losses}",
-            "conference_wins": conference_wins,
-            "conference_losses": conference_losses,
-            "conference_record": f"{conference_wins}-{conference_losses}",
-        },
+        "record": record_block,
 
         "analytics": _team_analytics_summary(tid, week),
 
@@ -979,6 +1354,7 @@ def _latest_records_week(rows: list[dict]) -> int | None:
     return weeks[-1] if weeks else None
 
 
+@lru_cache(maxsize=32)
 def _build_poll_maps_for_week(poll: str, week: int | None = None):
     """
     Returns: (poll_week, top25_rank_map, next5_order_map)
@@ -990,7 +1366,7 @@ def _build_poll_maps_for_week(poll: str, week: int | None = None):
     if poll_u not in ("LSL", "LCAA"):
         return (week, {}, {})
 
-    rows = load_polls()
+    rows = _cached_polls()
     if not rows:
         return (None, {}, {})
 
@@ -1064,9 +1440,9 @@ def conference_detail(conf_id: str, week: int | None = None, debug: bool = False
     """
     cid = conf_id.strip().upper()
 
-    membership = load_conference_membership()
-    conf_names = load_conferences_map()
-    records = load_records_snapshot()
+    membership = _cached_conference_membership()
+    conf_names = _cached_conferences_map()
+    records = _cached_records_snapshot()
 
     if not records:
         raise HTTPException(status_code=404, detail="No RecordsSnapshot data found. Fill RecordsSnapshot first.")
@@ -1083,10 +1459,10 @@ def conference_detail(conf_id: str, week: int | None = None, debug: bool = False
     # build records map for the week
     rec_map = {r["team_id"]: r for r in records if r["week"] == w}
 
-    name_map = _team_name_map(active_only=False)
+    name_map = _cached_team_name_map_all()
 
     # Identify tracked teams (has sheet) for UX
-    tracked = {t.team_id.strip().upper() for t in load_teams_index() if t.active}
+    tracked = _cached_tracked_team_ids()
 
     lsl_poll_week, lsl_top25_rank, lsl_next5_order = _build_poll_maps_for_week("LSL", w)
     lcaa_poll_week, lcaa_top25_rank, lcaa_next5_order = _build_poll_maps_for_week("LCAA", w)
@@ -1148,7 +1524,7 @@ def conference_detail(conf_id: str, week: int | None = None, debug: bool = False
 
     # ---- Head-to-head tie-breakers (universal) ----
     # Only applied within tie groups that share the same (conf_wins, conf_losses).
-    conf_games_all = load_conf_games_snapshot()
+    conf_games_all = _cached_conf_games_snapshot()
     conf_games = [
         g for g in conf_games_all
         if g["conference_id"] == cid and g["week"] <= w
@@ -1258,8 +1634,9 @@ def conference_detail(conf_id: str, week: int | None = None, debug: bool = False
     }
 
 
+@lru_cache(maxsize=16)
 def _analytics_record_map(week: int | None = None) -> dict[str, dict]:
-    records = load_records_snapshot()
+    records = _cached_records_snapshot()
     if not records:
         return {}
 
@@ -1279,6 +1656,7 @@ def _analytics_record_map(week: int | None = None) -> dict[str, dict]:
     return out
 
 
+@lru_cache(maxsize=16)
 def _analytics_polls_map(week: int | None = None) -> dict[str, dict]:
     lsl_week, lsl_top25, lsl_next5 = _build_poll_maps_for_week("LSL", week)
     lcaa_week, lcaa_top25, lcaa_next5 = _build_poll_maps_for_week("LCAA", week)
@@ -1485,12 +1863,11 @@ def _analytics_featured_insights(week: int | None = None) -> list[dict]:
     return insights
 
 
-@app.get("/analytics")
-def analytics_overview(week: int | None = None):
-    power = analytics_power(week)
-    resume = analytics_resume(week)
-    form = analytics_form(week)
-    sos = analytics_sos(week)
+@lru_cache(maxsize=16)
+def _cached_analytics_overview(week: int | None = None):
+    w = 0 if week is None else week
+
+    power = analytics_power(w)
 
     def leader_from(resp: dict) -> dict | None:
         items = resp.get("items", [])
@@ -1508,8 +1885,37 @@ def analytics_overview(week: int | None = None):
             },
         }
 
+    # Preseason / no played games yet:
+    # only Power is meaningful, so skip Resume/Form/SOS and featured insights.
+    if not _has_played_games_through_week(w):
+        return {
+            "week": w,
+            "meta": {
+                "title": "Analytics",
+                "subtitle": "League-wide advanced team metrics",
+                "metrics_available": ["power", "resume", "form", "sos"],
+            },
+            "leaders": {
+                "power": leader_from(power),
+                "resume": None,
+                "form": None,
+                "sos": None,
+            },
+            "featured_insights": [],
+            "top_tables": {
+                "power": power.get("items", [])[:5],
+                "resume": [],
+                "form": [],
+                "sos": [],
+            },
+        }
+
+    resume = analytics_resume(w)
+    form = analytics_form(w)
+    sos = analytics_sos(w)
+
     return {
-        "week": week,
+        "week": w,
         "meta": {
             "title": "Analytics",
             "subtitle": "League-wide advanced team metrics",
@@ -1521,7 +1927,7 @@ def analytics_overview(week: int | None = None):
             "form": leader_from(form),
             "sos": leader_from(sos),
         },
-        "featured_insights": _analytics_featured_insights(week),
+        "featured_insights": _analytics_featured_insights(w),
         "top_tables": {
             "power": power.get("items", [])[:5],
             "resume": resume.get("items", [])[:5],
@@ -1529,6 +1935,10 @@ def analytics_overview(week: int | None = None):
             "sos": sos.get("items", [])[:5],
         },
     }
+
+@app.get("/analytics")
+def analytics_overview(week: int | None = None):
+    return _cached_analytics_overview(week)
 
 
 def _power_tier_from_rank(rank: int) -> str:
@@ -1543,87 +1953,7 @@ def _power_tier_from_rank(rank: int) -> str:
 
 @app.get("/analytics/power")
 def analytics_power(week: int | None = None):
-    w = 0 if week is None else week
-
-    rows = load_preseason_power()
-    if not rows:
-        return {
-            "week": w,
-            "metric": "power",
-            "meta": {
-                "title": "LSL Power",
-                "subtitle": "Who would be favored on a neutral floor today",
-                "source": "PreseasonPower",
-                "source_detail": "week_0_preseason_only",
-                "status": "no_data",
-            },
-            "count": 0,
-            "items": [],
-        }
-
-    subset = [r for r in rows if r["week"] == w]
-
-    # For now, only preseason week-0 is implemented with real data.
-    # Later, in-season Power can replace or extend this.
-    if not subset:
-        return {
-            "week": w,
-            "metric": "power",
-            "meta": {
-                "title": "LSL Power",
-                "subtitle": "Who would be favored on a neutral floor today",
-                "source": "PreseasonPower",
-                "source_detail": "week_0_preseason_only",
-                "status": "week_not_available",
-            },
-            "count": 0,
-            "items": [],
-        }
-
-    name_map = _team_name_map(active_only=False)
-    record_map = _analytics_record_map(w)
-    polls_map = _analytics_polls_map(w)
-
-    ranked = sorted(
-        subset,
-        key=lambda x: (-x["power_value"], name_map.get(x["team_id"], x["team_id"]))
-    )
-
-    items = []
-    for idx, row in enumerate(ranked, start=1):
-        tid = row["team_id"]
-        base = _analytics_base_row(
-            team_id=tid,
-            team_name=name_map.get(tid, tid),
-            value=row["power_value"],
-            rank=idx,
-            week=w,
-            tier=_power_tier_from_rank(idx),
-            trend="flat",
-            record_map=record_map,
-            polls_map=polls_map,
-        )
-
-        base["power"] = {
-            "source": "preseason",
-            "notes": row.get("notes", ""),
-        }
-
-        items.append(base)
-
-    return {
-        "week": w,
-        "metric": "power",
-        "meta": {
-            "title": "LSL Power",
-            "subtitle": "Who would be favored on a neutral floor today",
-            "source": "PreseasonPower",
-            "source_detail": "week_0_preseason_only",
-            "status": "ok",
-        },
-        "count": len(items),
-        "items": items,
-    }
+    return _cached_analytics_power_payload(week)
 
 
 def _resume_tier_from_rank(rank: int) -> str:
@@ -2324,11 +2654,11 @@ def analytics_sos(week: int | None = None):
     }
 
 
+@lru_cache(maxsize=16)
 def _home_analytics_preview(week: int | None = None) -> dict:
-    power = analytics_power(week)
-    resume = analytics_resume(week)
-    form = analytics_form(week)
-    sos = analytics_sos(week)
+    w = 0 if week is None else week
+
+    power = analytics_power(w)
 
     def leader_from(resp: dict) -> dict | None:
         items = resp.get("items", [])
@@ -2347,8 +2677,25 @@ def _home_analytics_preview(week: int | None = None) -> dict:
             },
         }
 
+    # Preseason / no played results yet:
+    # only Power is meaningful, so skip Resume/Form/SOS entirely.
+    if not _has_played_games_through_week(w):
+        return {
+            "week": w,
+            "leaders": {
+                "power": leader_from(power),
+                "resume": None,
+                "form": None,
+                "sos": None,
+            },
+        }
+
+    resume = analytics_resume(w)
+    form = analytics_form(w)
+    sos = analytics_sos(w)
+
     return {
-        "week": week,
+        "week": w,
         "leaders": {
             "power": leader_from(power),
             "resume": leader_from(resume),
@@ -2383,8 +2730,8 @@ def home(
             meta = json.load(f)
 
     games = _load_games_or_404()
-    name_map = _team_name_map(active_only=False)
-    phase_map = load_week_phase_map()
+    name_map = _cached_team_name_map_all()
+    phase_map = _cached_week_phase_map()
 
     # Build LSL poll maps (latest week in Polls sheet)
     lsl_top25_rank = {}   # team_id -> 1..25
@@ -2392,7 +2739,7 @@ def home(
     lsl_poll_week = None
 
     try:
-        poll_rows = load_polls()
+        poll_rows = _cached_polls()
         if poll_rows:
             lsl_poll_week = max(r["week"] for r in poll_rows)
             lsl_rows = [r for r in poll_rows if r["week"] == lsl_poll_week and r["poll"] == "LSL"]
@@ -2408,7 +2755,7 @@ def home(
 
     tracked_team_ids = {
         str(t.team_id).strip().upper()
-        for t in load_teams_index()
+        for t in _cached_teams_index()
         if getattr(t, "active", False)
     }
 
@@ -2529,7 +2876,6 @@ def home(
 
     # First try: latest/requested LSL poll
     try:
-        poll_rows = load_polls()
         if poll_rows:
             available_weeks = sorted({r["week"] for r in poll_rows})
             rankings_preview_week = available_weeks[-1]
@@ -3308,9 +3654,126 @@ def _to_int_or_none(v):
 @app.get("/games/{game_key}")
 def get_game_by_key(game_key: str):
     games = _load_games_or_404()
-    name_map = _team_name_map(active_only=False)
-    phase_map = load_week_phase_map()
+    name_map = _cached_team_name_map_all()
+    phase_map = _cached_week_phase_map()
+    support = _cached_game_preview_support()
+
     key = game_key.strip()
+
+    team_index_map = support["team_index_map"]
+    players_by_team = support["players_by_team"]
+    team_conf_map = support["team_conf_map"]
+    conf_names = support["conf_names"]
+    polls_block_by_team = support["polls_block_by_team"]
+
+    records_by_team = support["records_by_team"]
+    leaders_by_team = support["leaders_by_team"]
+
+    def _record_for_team(tid: str):
+        tid = str(tid).strip().upper()
+        conf_id = team_conf_map.get(tid)
+
+        overall_w = overall_l = 0
+        conf_w = conf_l = 0
+
+        for g in games:
+            ta = str(g.get("team_a", "")).strip().upper()
+            tb = str(g.get("team_b", "")).strip().upper()
+
+            if tid not in (ta, tb):
+                continue
+
+            a_score = g.get("a_score")
+            b_score = g.get("b_score")
+            if a_score is None or b_score is None:
+                continue
+
+            if tid == ta:
+                team_score = a_score
+                opp_score = b_score
+                opp_id = tb
+            else:
+                team_score = b_score
+                opp_score = a_score
+                opp_id = ta
+
+            if team_score > opp_score:
+                overall_w += 1
+            elif team_score < opp_score:
+                overall_l += 1
+
+            opp_conf = team_conf_map.get(opp_id)
+            if conf_id and opp_conf and conf_id == opp_conf:
+                if team_score > opp_score:
+                    conf_w += 1
+                elif team_score < opp_score:
+                    conf_l += 1
+
+        return {
+            "overall_record": f"{overall_w}-{overall_l}",
+            "conference_record": f"{conf_w}-{conf_l}",
+        }
+
+    def _leader_for(team_id: str, stat_key: str):
+        tid = str(team_id).strip().upper()
+        team_players = players_by_team.get(tid, [])
+
+        best = None
+        best_value = None
+
+        for p in team_players:
+            value = p.get(stat_key)
+            if value is None:
+                continue
+            try:
+                numeric = float(value)
+            except Exception:
+                continue
+
+            if best is None or numeric > best_value:
+                best = p
+                best_value = numeric
+
+        if best is None:
+            return None
+
+        return {
+            "player_id": best.get("player_id"),
+            "player_name": best.get("player_name"),
+            "jersey_number": best.get("jersey_number"),
+            "primary_position": best.get("primary_position"),
+            "value": best_value,
+        }
+
+    def _team_preview(team_id: str):
+        tid = str(team_id).strip().upper()
+        team_row = team_index_map.get(tid)
+        conf_id = team_conf_map.get(tid)
+        conf_name = conf_names.get(conf_id) if conf_id else None
+
+        return {
+            "team_id": tid,
+            "team_name": team_row.team_name if team_row else name_map.get(tid, tid),
+            "conference_id": conf_id,
+            "conference_name": conf_name,
+            "record": records_by_team.get(
+                tid,
+                {"overall_record": "0-0", "conference_record": "0-0"},
+            ),
+            "polls": polls_block_by_team.get(
+                tid,
+                {
+                    "week": None,
+                    "LSL": {"rank": None, "next5_order": None},
+                    "LCAA": {"rank": None, "next5_order": None},
+                },
+            ),
+            "analytics": _cached_team_analytics_summary(tid, 0),
+            "leaders": leaders_by_team.get(
+                tid,
+                {"ppg": None, "rpg": None, "apg": None, "spg": None},
+            ),
+        }
 
     for g in games:
         if str(g.get("game_key", "")).strip() == key:
@@ -3318,18 +3781,43 @@ def get_game_by_key(game_key: str):
             tb = str(g.get("team_b", "")).strip().upper()
             home_id = str(g.get("home_id", "")).strip().upper()
             away_id = str(g.get("away_id", "")).strip().upper()
+            venue = str(g.get("venue", "")).strip().upper()
 
             phase_v = str(g.get("phase", "")).strip().upper()
             week_v = _to_int_or_none(g.get("week"))
+            date_key = str(g.get("date_key", "")).strip()
+
+            a_score = g.get("a_score")
+            b_score = g.get("b_score")
+            played = (a_score is not None) and (b_score is not None)
+
+            home_name = name_map.get(home_id, home_id)
+            away_name = name_map.get(away_id, away_id)
+
+            if venue == "H":
+                matchup_display = f"{away_name} at {home_name}"
+            else:
+                matchup_display = f"{away_name} vs {home_name}"
 
             return {
-                **g,
+                "game_key": g.get("game_key"),
+                "played": played,
                 "phase": phase_v,
                 "phase_display": _phase_display_name(phase_v, week_v, phase_map),
+                "week": week_v,
+                "date_key": date_key,
+                "display_date": _format_date_key_mmdd(date_key),
+                "matchup_display": matchup_display,
+                "team_a": ta,
+                "team_b": tb,
                 "team_a_name": name_map.get(ta, ta),
                 "team_b_name": name_map.get(tb, tb),
-                "home_name": name_map.get(home_id, home_id),
-                "away_name": name_map.get(away_id, away_id),
+                "home_id": home_id,
+                "home_name": home_name,
+                "away_id": away_id,
+                "away_name": away_name,
+                "home_team": _team_preview(home_id),
+                "away_team": _team_preview(away_id),
             }
 
     raise HTTPException(status_code=404, detail=f"game_key not found: {key}")
@@ -3721,6 +4209,39 @@ def team_roster(team_id: str):
             "team": f"/teams/{tid}",
             "schedule": f"/teams/{tid}/schedule",
             "results": f"/teams/{tid}/results",
+        },
+    }
+
+
+@app.get("/players/{player_id}")
+def get_player(player_id: str):
+    pid = player_id.strip().upper()
+
+    rows = load_players_snapshot()
+    match = next((r for r in rows if str(r.get("player_id", "")).strip().upper() == pid), None)
+
+    if not match:
+        raise HTTPException(status_code=404, detail=f"Player '{pid}' not found")
+
+    team_id = str(match.get("team_id", "")).strip().upper()
+    team_name = None
+
+    try:
+        teams = load_teams_index()
+        team_match = next((t for t in teams if t.team_id.strip().upper() == team_id), None)
+        if team_match:
+            team_name = team_match.team_name
+    except Exception:
+        team_name = None
+
+    return {
+        **match,
+        "team_name": team_name,
+        "links": {
+            "team": f"/teams/{team_id}",
+            "roster": f"/teams/{team_id}/roster",
+            "schedule": f"/teams/{team_id}/schedule",
+            "results": f"/teams/{team_id}/results",
         },
     }
 
