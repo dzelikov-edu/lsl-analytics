@@ -2812,6 +2812,13 @@ async def _load_games_from_db():
         # .model_dump() is the Pydantic v2 way to convert the DB object to a dict
         # if using older pydantic, use .dict()
         return [g.model_dump() for g in games]
+    
+
+@app.get("/")
+async def root():
+    # If the app hits the base URL, just give it the home data
+    return await home()
+
 
 @app.get("/home")
 async def home(
@@ -2838,6 +2845,7 @@ async def home(
             meta = json.load(f)
 
     games = await _load_games_from_db()
+    print(f"iPad request received. Games in DB: {len(games)}")
     if not games:
         raise HTTPException(status_code=404, detail="No games found in database. Run /refresh first.")
 

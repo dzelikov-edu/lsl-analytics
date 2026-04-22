@@ -251,7 +251,7 @@ export default function HomeScreen() {
     loading,
     error,
   } = useCachedApi({
-    cacheKey: 'home:week0',
+    cacheKey: 'home-data',
     endpoint: '/home',
     maxAgeMs: 1000 * 60 * 10,
   });
