@@ -7,7 +7,7 @@ from app.workers.push_sender import notify_team
 from app.settings import settings
 from app.sheets_client import get_sheets_service, read_range
 
-from app.models_devices import NotificationLog
+from app.models_devices import Game, NotificationLog
 from app.db import AsyncSessionLocal
 from sqlmodel import select
 
@@ -864,3 +864,25 @@ async def ingest_league(teams: List[TeamIndexRow]) -> dict:
                     ))
 
     return {"summary": summary, "games_by_key": global_unique}
+
+async def save_games_to_db(games_by_key: Dict[str, dict]):
+    async with AsyncSessionLocal() as session:
+        for key, data in games_by_key.items():
+            # Create a Game object
+            game = Game(
+                game_key=key,
+                phase=data['phase'],
+                week=data['week'],
+                team_a=data['team_a'],
+                team_b=data['team_b'],
+                venue=data['venue'],
+                home_id=data['home_id'],
+                away_id=data['away_id'],
+                a_score=data.get('a_score'),
+                b_score=data.get('b_score'),
+                date_key=data.get('date_key')
+            )
+            # Use 'merge' to update existing games or create new ones
+            await session.merge(game)
+        await session.commit()
+    print(f"Successfully saved {len(games_by_key)} games to Database.")

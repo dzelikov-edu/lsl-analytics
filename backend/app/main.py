@@ -2,7 +2,7 @@ from dotenv import load_dotenv
 import pathlib, os
 load_dotenv(pathlib.Path(__file__).resolve().parent.parent / ".env")
 
-from fastapi import FastAPI, HTTPException, Request, Response
+from fastapi import FastAPI, HTTPException, Request, Response, BackgroundTasks
 from starlette.middleware.base import BaseHTTPMiddleware
 from app.ingest import (
     load_teams_index,
@@ -32,6 +32,11 @@ from fastapi.responses import JSONResponse
 from functools import lru_cache
 
 from app.db import init_db
+from app.db import AsyncSessionLocal
+from app.models_devices import Game
+from sqlmodel import select
+from app.ingest import save_games_to_db
+
 
 from app.routers.devices_favorites import router as devices_favorites_router
 from app.routers.auth import router as auth_router
@@ -1226,9 +1231,10 @@ def _team_name_map(active_only: bool = False) -> dict:
 
 
 @app.post("/refresh")
-async def refresh_league():
+async def refresh_league(background_tasks: BackgroundTasks):
     """
-    Pulls all active team ScheduleExport tabs, dedupes to league-wide games, and writes to data/games.json
+    Pulls team data from Google Sheets and saves it permanently to the Postgres Database.
+    Runs as a background task to prevent timeouts.
     """
     if not _try_acquire_refresh_lock():
         return JSONResponse(
@@ -1236,38 +1242,30 @@ async def refresh_league():
             content={"ok": False, "detail": "Refresh already running. Try again in a moment."}
         )
 
-    try:
-        _ensure_data_dir()
+    async def run_ingest():
+        try:
+            print("Starting background ingest...")
+            teams = load_teams_index()
+            result = await ingest_league(teams)
+            games_by_key = result["games_by_key"]
+            
+            # Save the results to the permanent Postgres Database
+            await save_games_to_db(games_by_key)
+            
+            print(f"Background ingest complete. {len(games_by_key)} games are now permanent in DB.")
+        except Exception as e:
+            print(f"Background ingest failed: {e}")
+        finally:
+            _release_refresh_lock()
 
-        teams = load_teams_index()
-        result = await ingest_league(teams)
-        summary = result["summary"]
-        games_by_key = result["games_by_key"]
+    # This tells FastAPI to start the work and return the response below immediately
+    background_tasks.add_task(run_ingest)
 
-        # write games.json as a list for easier downstream reading
-        games_list = []
-        for game_key, g in games_by_key.items():
-            games_list.append({
-                "game_key": game_key,
-                **g
-            })
+    return {
+        "ok": True, 
+        "detail": "Ingest started in background. Data will appear on iPad shortly. Watch Render logs for progress."
+    }
 
-        with open(GAMES_JSON_PATH, "w", encoding="utf-8") as f:
-            json.dump(games_list, f, indent=2)
-
-        meta = {
-            "refreshed_at": datetime.utcnow().isoformat() + "Z",
-            "games_path": GAMES_JSON_PATH,
-            "games_count": len(games_list),
-            "summary": summary,
-        }
-        with open(REFRESH_META_PATH, "w", encoding="utf-8") as f:
-            json.dump(meta, f, indent=2)
-
-        return meta
-
-    finally:
-        _release_refresh_lock()
 
 
 @app.get("/refresh/meta")
@@ -2790,8 +2788,17 @@ def _home_analytics_preview(week: int | None = None) -> dict:
     }
 
 
+async def _load_games_from_db():
+    async with AsyncSessionLocal() as session:
+        statement = select(Game)
+        results = await session.exec(statement)
+        games = results.all()
+        # Convert SQLModel objects back to dictionaries so your logic doesn't break
+        return [g.dict() for g in games]
+
+
 @app.get("/home")
-def home(
+async def home(
     team_id: Optional[str] = None,
     days: int = 3,
     top_n: int = 25,
@@ -2814,7 +2821,10 @@ def home(
         with open(REFRESH_META_PATH, "r", encoding="utf-8") as f:
             meta = json.load(f)
 
-    games = _load_games_or_404()
+    games = await _load_games_from_db()
+    if not games:
+        raise HTTPException(status_code=404, detail="No games found in database. Run /refresh first.")
+
     name_map = _cached_team_name_map_all()
     phase_map = _cached_week_phase_map()
 

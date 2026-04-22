@@ -31,3 +31,16 @@ class NotificationLog(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     game_key: str = Field(index=True, unique=True)
     sent_at: datetime = Field(default_factory=datetime.utcnow)
+
+class Game(SQLModel, table=True):
+    game_key: str = Field(primary_key=True)
+    phase: str
+    week: str
+    team_a: str
+    team_b: str
+    venue: str
+    home_id: str
+    away_id: str
+    a_score: Optional[int] = None
+    b_score: Optional[int] = None
+    date_key: Optional[str] = None
