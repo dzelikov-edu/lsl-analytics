@@ -15,3 +15,5 @@ redis
 sqlmodel
 python-dotenv
 email-validator
+asyncpg
+aiosqlite
