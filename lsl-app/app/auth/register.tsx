@@ -1,31 +1,36 @@
 import { useState } from 'react';
-import { View, Text, TextInput, Pressable, StyleSheet, ActivityIndicator, Alert } from 'react-native';
+import { View, Text, TextInput, Pressable, StyleSheet, ActivityIndicator, Alert, ScrollView } from 'react-native';
 import { router } from 'expo-router';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { AppColors } from '@/constants/app-colors';
 import Constants from 'expo-constants';
 import { saveToken } from '../../lib/auth-storage';
 
-export default function LoginScreen() {
+export default function RegisterScreen() {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
+    const [confirmPassword, setConfirmPassword] = useState('');
     const [loading, setLoading] = useState(false);
 
     const colorScheme = useColorScheme() ?? 'light';
     const theme = AppColors[colorScheme];
 
-    const handleLogin = async () => {
-        if (!email || !password) {
+    const handleRegister = async () => {
+        if (!email || !password || !confirmPassword) {
             Alert.alert('Error', 'Please fill in all fields');
             return;
         }
 
+        if (password !== confirmPassword) {
+            Alert.alert('Error', 'Passwords do not match');
+            return;
+        }
+
         setLoading(true);
-        // Use the dynamic backend URL from our config
         const backendUrl = Constants.expoConfig?.extra?.backendUrl || 'http://localhost:8000';
 
         try {
-            const response = await fetch(`${backendUrl}/auth/login`, {
+            const response = await fetch(`${backendUrl}/auth/register`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ email, password }),
@@ -35,11 +40,10 @@ export default function LoginScreen() {
 
             if (response.ok) {
                 await saveToken(data.access_token);
-                Alert.alert('Success', 'Logged in successfully!');
-                // replace ensures the user can't just press "back" to go back to the login screen
+                Alert.alert('Success', 'Account created successfully!');
                 router.replace('/(tabs)');
             } else {
-                Alert.alert('Login Failed', data.detail || 'Invalid credentials');
+                Alert.alert('Registration Failed', data.detail || 'Could not create account');
             }
         } catch (error) {
             console.error(error);
@@ -50,8 +54,8 @@ export default function LoginScreen() {
     };
 
     return (
-        <View style={[styles.container, { backgroundColor: theme.background }]}>
-            <Text style={[styles.title, { color: theme.text }]}>Legends CBB Login</Text>
+        <ScrollView contentContainerStyle={[styles.container, { backgroundColor: theme.background }]}>
+            <Text style={[styles.title, { color: theme.text }]}>Create Account</Text>
 
             <TextInput
                 style={[styles.input, { borderColor: theme.border, color: theme.text }]}
@@ -72,29 +76,38 @@ export default function LoginScreen() {
                 secureTextEntry
             />
 
+            <TextInput
+                style={[styles.input, { borderColor: theme.border, color: theme.text }]}
+                placeholder="Confirm Password"
+                placeholderTextColor={theme.mutedText}
+                value={confirmPassword}
+                onChangeText={setConfirmPassword}
+                secureTextEntry
+            />
+
             <Pressable
                 style={[styles.button, { backgroundColor: theme.card, opacity: loading ? 0.7 : 1 }]}
-                onPress={handleLogin}
+                onPress={handleRegister}
                 disabled={loading}
             >
                 {loading ? (
                     <ActivityIndicator color={theme.text} />
                 ) : (
-                    <Text style={{ color: theme.text, fontWeight: '600' }}>Login</Text>
+                    <Text style={{ color: theme.text, fontWeight: '600' }}>Sign Up</Text>
                 )}
             </Pressable>
 
-            <Pressable onPress={() => router.push('/auth/register')} style={{ marginTop: 20 }}>
+            <Pressable onPress={() => router.push('/auth/login')} style={{ marginTop: 20 }}>
                 <Text style={{ color: theme.text, textAlign: 'center' }}>
-                    Don't have an account? <Text style={{ fontWeight: 'bold', color: '#007AFF' }}>Sign Up</Text>
+                    Already have an account? <Text style={{ fontWeight: 'bold', color: '#007AFF' }}>Login</Text>
                 </Text>
             </Pressable>
-        </View>
+        </ScrollView>
     );
 }
 
 const styles = StyleSheet.create({
-    container: { flex: 1, justifyContent: 'center', padding: 20 },
+    container: { flexGrow: 1, justifyContent: 'center', padding: 20 },
     title: { fontSize: 24, fontWeight: 'bold', marginBottom: 20, textAlign: 'center' },
     input: { borderWidth: 1, borderRadius: 8, padding: 12, marginBottom: 15 },
     button: { padding: 15, borderRadius: 8, alignItems: 'center', minHeight: 50, justifyContent: 'center' },
