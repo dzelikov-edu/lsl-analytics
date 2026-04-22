@@ -1,4 +1,9 @@
-from fastapi import FastAPI, HTTPException
+from dotenv import load_dotenv
+import pathlib, os
+load_dotenv(pathlib.Path(__file__).resolve().parent.parent / ".env")
+
+from fastapi import FastAPI, HTTPException, Request, Response
+from starlette.middleware.base import BaseHTTPMiddleware
 from app.ingest import (
     load_teams_index,
     ingest_preview_for_one_team,
@@ -15,13 +20,74 @@ from app.ingest import (
 
 import json
 import os
+from fastapi.middleware.cors import CORSMiddleware
 import threading
+
+from fastapi_limiter import FastAPILimiter
+import redis.asyncio as redis  # New import for async Redis
+
 from datetime import datetime
 from typing import Optional
 from fastapi.responses import JSONResponse
 from functools import lru_cache
 
+from app.routers.devices_favorites import router as devices_favorites_router
+from app.routers.auth import router as auth_router
+from app.routers.admin import router as admin_router
+
 app = FastAPI(title="LSL Analytics Backend")
+
+@app.on_event("startup")
+async def startup():
+    redis_client = redis.Redis(host='localhost', port=6379)
+    await FastAPILimiter.init(redis_client)
+
+@app.on_event("shutdown") 
+async def shutdown():
+    await FastAPILimiter.close()
+
+
+# CORS: allow localhost by default; add more origins via env var CORS_EXTRA_ORIGINS
+ALLOWED_ORIGINS = [
+    "http://localhost:19006",
+    "http://localhost:8000",
+    "http://127.0.0.1:8000",
+]
+print("CORS allowed origins:", ALLOWED_ORIGINS)
+
+extra = os.getenv("CORS_EXTRA_ORIGINS")
+if extra:
+    ALLOWED_ORIGINS += [o.strip() for o in extra.split(",") if o.strip()]
+
+class LimitUploadSize(BaseHTTPMiddleware):
+    def __init__(self, app, max_upload_size: int) -> None:
+        super().__init__(app)
+        self.max_upload_size = max_upload_size
+
+    async def dispatch(self, request: Request, call_next):
+        if request.method == "POST" or request.method == "PUT":
+            content_length = request.headers.get("content-length")
+            if content_length:
+                if int(content_length) > self.max_upload_size:
+                    return Response(content=b"Request body too large", status_code=413)
+        return await call_next(request)
+
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=ALLOWED_ORIGINS,
+    allow_credentials=True,
+    allow_methods=["GET", "POST", "DELETE", "OPTIONS"],
+    allow_headers=["*"],
+)
+
+app.add_middleware(LimitUploadSize, max_upload_size=1_000_000) # 1MB limit
+
+
+app.include_router(auth_router)
+app.include_router(devices_favorites_router)
+app.include_router(admin_router)
+
 
 @app.on_event("startup")
 def _warm_v1_caches():
@@ -1141,7 +1207,7 @@ def _team_name_map(active_only: bool = False) -> dict:
 
 
 @app.post("/refresh")
-def refresh_league():
+async def refresh_league():
     """
     Pulls all active team ScheduleExport tabs, dedupes to league-wide games, and writes to data/games.json
     """
@@ -1155,7 +1221,7 @@ def refresh_league():
         _ensure_data_dir()
 
         teams = load_teams_index()
-        result = ingest_league(teams)
+        result = await ingest_league(teams)
         summary = result["summary"]
         games_by_key = result["games_by_key"]
 

@@ -1,8 +1,15 @@
 from dataclasses import dataclass
 from typing import Dict, List, Optional, Tuple
 
+import asyncio
+from app.workers.push_sender import notify_team
+
 from app.settings import settings
 from app.sheets_client import get_sheets_service, read_range
+
+from app.models_devices import NotificationLog
+from app.db import AsyncSessionLocal
+from sqlmodel import select
 
 
 @dataclass(frozen=True)
@@ -758,7 +765,7 @@ def ingest_preview_for_one_team(team_sheet_id: str, export_tab: str):
     }
 
 
-def ingest_league(teams: List[TeamIndexRow]) -> dict:
+async def ingest_league(teams: List[TeamIndexRow]) -> dict:
     active = [t for t in teams if t.active]
 
     totals = {
@@ -818,5 +825,42 @@ def ingest_league(teams: List[TeamIndexRow]) -> dict:
         "failures": failures[:20],  # return first 20 failures to keep response small
         "failures_count": len(failures),
     }
+
+    # NEW: Trigger notifications only for games not yet notified
+    async with AsyncSessionLocal() as session:
+        for game_key, game_data in global_unique.items():
+            home_id = game_data.get("home_id")
+            away_id = game_data.get("away_id")
+            home_score = game_data.get("a_score")
+            away_score = game_data.get("b_score")
+
+            if home_score is not None and away_score is not None:
+                # 1. Check if we already notified for this specific game
+                statement = select(NotificationLog).where(NotificationLog.game_key == game_key)
+                results = await session.exec(statement)
+                already_notified = results.one_or_none()
+
+                if not already_notified:
+                    # 2. Record that we are notifying now so it only happens once
+                    session.add(NotificationLog(game_key=game_key))
+                    await session.commit()
+
+                    # 3. Trigger the pushes (background tasks)
+                    title = f"Final: {game_data.get('team_a', 'Game')} vs {game_data.get('team_b', 'Opponent')}"
+                    body = f"{home_id}: {home_score}, {away_id}: {away_score}"
+                    
+                    print(f"Triggering auto-push for new result: {game_key}")
+                    asyncio.create_task(notify_team(
+                        team_id=home_id, 
+                        title=title, 
+                        body=body,
+                        data={"game_key": game_key, "team_id": home_id, "score": f"{home_score}-{away_score}"}
+                    ))
+                    asyncio.create_task(notify_team(
+                        team_id=away_id, 
+                        title=title, 
+                        body=body,
+                        data={"game_key": game_key, "team_id": away_id, "score": f"{home_score}-{away_score}"}
+                    ))
 
     return {"summary": summary, "games_by_key": global_unique}

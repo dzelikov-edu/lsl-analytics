@@ -5,3 +5,7 @@ google-api-python-client
 google-auth
 python-dateutil
 pydantic
+pyjwt[crypto]
+passlib[bcrypt]
+python-multipart
+email-validator

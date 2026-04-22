@@ -4,3 +4,20 @@ backend/data/
 # Python cache
 __pycache__/
 *.pyc
+lsl-app/.env
+
+# Python virtual environment
+backend/.venv/
+
+# Local databases
+backend/*.db
+
+# Expo/Node backups and temporary files
+lsl-app/app.json.bak
+lsl-app/expo-config.json
+lsl-app/.expo/
+lsl-app/node_modules/
+
+# Mac/Windows system files
+.DS_Store
+Thumbs.db

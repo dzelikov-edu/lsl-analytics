@@ -1,15 +1,90 @@
 import TeamLogo from '@/components/TeamLogo';
 import { AppColors } from '@/constants/app-colors';
+import { getToken } from '../../lib/auth-storage';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useCachedApi } from '@/hooks/useCachedApi';
 import { router, useLocalSearchParams } from 'expo-router';
-import { useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 export default function TeamDetailScreen() {
     const { teamId } = useLocalSearchParams<{ teamId: string }>();
     const colorScheme = useColorScheme() ?? 'light';
     const theme = AppColors[colorScheme];
+
+    const [isFavorite, setIsFavorite] = useState(false);
+    const [favoriteLoading, setFavoriteLoading] = useState(false);
+
+    const backendBaseUrl = 'http://192.168.1.108:8000'; // adjust later for production
+
+    async function fetchFavoritesForUser(): Promise<string[]> {
+        try {
+            const token = await getToken(); // Get stored token
+            if (!token) return [];
+
+            const res = await fetch(`${backendBaseUrl}/api/favorites`, {
+                headers: { 'Authorization': `Bearer ${token}` } // Send token
+            });
+            if (!res.ok) return [];
+            const data = await res.json();
+            return Array.isArray(data) ? data : [];
+        } catch (e) {
+            console.log('Error fetching favorites', e);
+            return [];
+        }
+    }
+
+    async function addFavorite(teamId: string) {
+        try {
+            const token = await getToken(); // Get stored token
+            const res = await fetch(`${backendBaseUrl}/api/favorites`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}` // Send token
+                },
+                body: JSON.stringify({ teamId }),
+            });
+            if (!res.ok) console.log('Failed to add favorite', res.status);
+        } catch (e) {
+            console.log('Error adding favorite', e);
+        }
+    }
+
+    async function removeFavorite(teamId: string) {
+        try {
+            const token = await getToken(); // Get stored token
+            const res = await fetch(`${backendBaseUrl}/api/favorites/${encodeURIComponent(teamId)}`, {
+                method: 'DELETE',
+                headers: { 'Authorization': `Bearer ${token}` } // Send token
+            });
+            if (!res.ok) console.log('Failed to remove favorite', res.status);
+        } catch (e) {
+            console.log('Error removing favorite', e);
+        }
+    }
+
+    useEffect(() => {
+        if (!teamId) return;
+        let cancelled = false;
+
+        const load = async () => {
+            setFavoriteLoading(true);
+            const favs = await fetchFavoritesForUser();
+            if (!cancelled) {
+                const tid = String(teamId).toUpperCase();
+                setIsFavorite(favs.map(t => String(t).toUpperCase()).includes(tid));
+                setFavoriteLoading(false);
+            }
+        };
+
+        load();
+
+        return () => {
+            cancelled = true;
+        };
+    }, [teamId]);
+
 
     const styles = useMemo(
         () =>
@@ -277,6 +352,49 @@ export default function TeamDetailScreen() {
                         </Text>
 
                         <Text style={styles.metaLine}>Players: {playersCount}</Text>
+
+                        <Pressable
+                            style={({ pressed }) => [
+                                {
+                                    marginTop: 12,
+                                    paddingVertical: 8,
+                                    paddingHorizontal: 16,
+                                    borderRadius: 999,
+                                    borderWidth: 1,
+                                    borderColor: theme.border,
+                                    backgroundColor: pressed ? theme.border : theme.card,
+                                    alignSelf: 'flex-start',
+                                },
+                            ]}
+                            disabled={favoriteLoading}
+                            onPress={async () => {
+                                if (!teamId) return;
+                                const tid = String(teamId);
+                                setFavoriteLoading(true);
+                                if (isFavorite) {
+                                    await removeFavorite(tid);
+                                    setIsFavorite(false);
+                                } else {
+                                    await addFavorite(tid);
+                                    setIsFavorite(true);
+                                }
+                                setFavoriteLoading(false);
+                            }}
+                        >
+                            <Text
+                                style={{
+                                    color: theme.text,
+                                    fontWeight: '600',
+                                }}
+                            >
+                                {favoriteLoading
+                                    ? 'Updating...'
+                                    : isFavorite
+                                        ? 'Unfavorite Team'
+                                        : 'Favorite Team'}
+                            </Text>
+                        </Pressable>
+
                     </View>
 
                     <View style={styles.section}>
