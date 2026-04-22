@@ -6,7 +6,7 @@ from typing import Optional
 class Settings(BaseSettings):
     # existing/required env vars (uppercase names preserved)
     MASTER_SHEET_ID: str = Field(..., env="MASTER_SHEET_ID")
-    GOOGLE_SERVICE_ACCOUNT_JSON: str = Field(..., env="GOOGLE_SERVICE_ACCOUNT_JSON")
+    GOOGLE_SERVICE_ACCOUNT_JSON: Optional[str] = Field(None, env="GOOGLE_SERVICE_ACCOUNT_JSON")
     GOOGLE_SERVICE_ACCOUNT_VALUE: Optional[str] = Field(None, env="GOOGLE_SERVICE_ACCOUNT_VALUE")
 
     # new config fields (useful for other code)
