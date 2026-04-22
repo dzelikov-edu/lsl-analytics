@@ -31,7 +31,7 @@ from typing import Optional
 from fastapi.responses import JSONResponse
 from functools import lru_cache
 
-from app.db import init_db
+from app.db import init_db, engine
 from app.db import AsyncSessionLocal
 from app.models_devices import Game
 from sqlmodel import select
@@ -2793,9 +2793,9 @@ async def _load_games_from_db():
         statement = select(Game)
         results = await session.exec(statement)
         games = results.all()
-        # Convert SQLModel objects back to dictionaries so your logic doesn't break
-        return [g.dict() for g in games]
-
+        # .model_dump() is the Pydantic v2 way to convert the DB object to a dict
+        # if using older pydantic, use .dict()
+        return [g.model_dump() for g in games]
 
 @app.get("/home")
 async def home(
@@ -3548,6 +3548,25 @@ async def home(
             "refresh": "/refresh",
         },
     }
+
+
+@app.get("/debug-db")
+async def debug_db():
+    async with AsyncSessionLocal() as session:
+        # Check what the actual connection string looks like (safely)
+        db_url = str(engine.url)
+        
+        # Check the table content
+        statement = select(Game)
+        results = await session.exec(statement)
+        games = results.all()
+        
+        return {
+            "database_host": db_url.split('@')[-1],
+            "games_found": len(games),
+            "is_postgres": "postgresql" in db_url
+        }
+
 
 
 @app.get("/games")
