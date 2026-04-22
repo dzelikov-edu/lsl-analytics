@@ -114,8 +114,20 @@ app.include_router(admin_router)
 
 
 @app.on_event("startup")
-def _warm_v1_caches():
+async def _warm_v1_caches():
     try:
+        # 1. Check if the Database actually has data before trying to warm
+        async with AsyncSessionLocal() as session:
+            statement = select(Game).limit(1)
+            results = await session.exec(statement)
+            has_data = results.first()
+            
+        if not has_data:
+            print("V1 Cache warm skipped: Database is empty. Please run POST /refresh.")
+            return
+
+        # 2. Warm metadata caches (Teams, Conferences, Polls)
+        # These usually pull from Sheets or are independent of the games file
         _cached_teams_index()
         _cached_team_name_map_all()
         _cached_conference_membership()
@@ -124,17 +136,21 @@ def _warm_v1_caches():
         _cached_polls()
         _cached_week_phase_map()
 
-        _cached_preseason_power()
-        _cached_analytics_power_payload(0)
-        _home_analytics_preview(0)
-        _team_list_analytics_map(0)
-        _cached_team_record_map(0)
-        _cached_game_preview_support()
-        _cached_analytics_overview(0)
+        # 3. Warm analytics (wrapped in try/except)
+        # These might still look for 'games.json'. By wrapping them,
+        # we prevent the whole app from crashing if they can't find the file.
+        try:
+            _cached_preseason_power()
+            _home_analytics_preview(0)
+            _cached_analytics_overview(0)
+            print("V1 Analytics caches warmed.")
+        except Exception as analytics_err:
+            print(f"Analytics warming deferred: {analytics_err}")
 
-        print("V1 caches warmed.")
+        print("V1 core caches warmed from Postgres.")
     except Exception as e:
         print(f"Cache warm skipped/failed: {e}")
+
 
 @lru_cache(maxsize=1)
 def _cached_teams_index():
