@@ -9,3 +9,9 @@ pyjwt[crypto]
 passlib[bcrypt]
 python-multipart
 email-validator
+httpx
+fastapi-limiter
+redis
+sqlmodel
+python-dotenv
+email-validator
