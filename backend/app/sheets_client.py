@@ -1,6 +1,8 @@
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
 
+import json
+import os
 import time
 import random
 import socket
@@ -8,12 +10,24 @@ from googleapiclient.errors import HttpError
 
 SCOPES = ["https://www.googleapis.com/auth/spreadsheets.readonly"]
 
-
 def get_sheets_service(service_account_json_path: str):
-    creds = service_account.Credentials.from_service_account_file(
-        service_account_json_path, scopes=SCOPES
-    )
+    # Check if the raw JSON value is in environment variables (for Cloud/Render)
+    json_value = os.getenv("GOOGLE_SERVICE_ACCOUNT_VALUE")
+    
+    if json_value:
+        # Load credentials directly from the environment variable string
+        info = json.loads(json_value)
+        creds = service_account.Credentials.from_service_account_info(
+            info, scopes=SCOPES
+        )
+    else:
+        # Fallback to the local file path (for your Laptop)
+        creds = service_account.Credentials.from_service_account_file(
+            service_account_json_path, scopes=SCOPES
+        )
+        
     return build("sheets", "v4", credentials=creds)
+
 
 
 def read_range(service, spreadsheet_id: str, a1_range: str, max_retries: int = 6):
