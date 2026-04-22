@@ -2846,7 +2846,8 @@ async def home(
     games = await _load_games_from_db()
     # DEBUG LOG: Let's see the raw type
     print(f"iPad request received. Games type: {type(games)}. Count: {len(games)}")
-    # if not games:
+    if not games:
+        games = []
     #    raise HTTPException(status_code=404, detail="No games found...")
     
     # REMOVE THE 'if not games' 404 BLOCK TEMPORARILY
@@ -2895,7 +2896,10 @@ async def home(
     days = max(1, min(days, 14))
     top_n = max(5, min(top_n, 100))
 
-    analytics_preview = _home_analytics_preview()
+    try:
+        analytics_preview = _home_analytics_preview()
+    except Exception:
+        analytics_preview = {}
 
     def _phase_rank(p: str) -> int:
         return {"REG_SEASON": 1, "CONF_TOURNEY": 2, "NAT_TOURNEY": 3}.get(p, 9)
@@ -3543,10 +3547,11 @@ async def home(
     # ---- response ----
     status_block = {
         "ok": True,
-        "refreshed_at": meta.get("refreshed_at") if meta else None,
-        "games_count": meta.get("games_count") if meta else len(games),
-        "summary": meta.get("summary") if meta else None,
+        "refreshed_at": meta.get("refreshed_at") if (meta and isinstance(meta, dict)) else datetime.utcnow().isoformat(),
+        "games_count": meta.get("games_count") if (meta and isinstance(meta, dict)) else len(games),
+        "summary": meta.get("summary") if (meta and isinstance(meta, dict)) else {"detail": "Persistent mode"},
     }
+
 
     return {
         "status": status_block,
@@ -3779,9 +3784,10 @@ def get_games(
 
 
 def _load_games_or_404():
-    _ensure_data_dir()
+    # We are using Postgres now, so we just return an empty list 
+    # if the file is missing, instead of crashing the app with a 404.
     if not os.path.exists(GAMES_JSON_PATH):
-        raise HTTPException(status_code=404, detail="No games.json found. Run POST /refresh first.")
+        return []
     with open(GAMES_JSON_PATH, "r", encoding="utf-8") as f:
         return json.load(f)
     
