@@ -39,8 +39,13 @@ app = FastAPI(title="LSL Analytics Backend")
 
 @app.on_event("startup")
 async def startup():
-    redis_client = redis.Redis(host='localhost', port=6379)
+    # Use the cloud Redis URL if available, otherwise fallback to local for your laptop
+    redis_url = os.getenv("REDIS_URL", "redis://localhost:6379")
+    
+    # We already imported redis.asyncio as 'redis' at the top, so we use it here
+    redis_client = redis.from_url(redis_url, encoding="utf-8", decode_responses=True)
     await FastAPILimiter.init(redis_client)
+
 
 @app.on_event("shutdown") 
 async def shutdown():
