@@ -31,6 +31,8 @@ from typing import Optional
 from fastapi.responses import JSONResponse
 from functools import lru_cache
 
+from app.db import init_db
+
 from app.routers.devices_favorites import router as devices_favorites_router
 from app.routers.auth import router as auth_router
 from app.routers.admin import router as admin_router
@@ -39,12 +41,24 @@ app = FastAPI(title="LSL Analytics Backend")
 
 @app.on_event("startup")
 async def startup():
-    # Use the cloud Redis URL if available, otherwise fallback to local for your laptop
-    redis_url = os.getenv("REDIS_URL", "redis://localhost:6379")
-    
-    # We already imported redis.asyncio as 'redis' at the top, so we use it here
-    redis_client = redis.from_url(redis_url, encoding="utf-8", decode_responses=True)
-    await FastAPILimiter.init(redis_client)
+    # 1. Initialize the Cloud Database Tables
+    try:
+        # This creates your Users, Devices, and Favorites tables in Postgres
+        await init_db()
+        print("Database tables verified/created.")
+    except Exception as e:
+        print(f"Database init failed: {e}")
+
+    # 2. Initialize Redis for Rate Limiting
+    try:
+        redis_url = os.getenv("REDIS_URL", "redis://localhost:6379")
+        # Use the 'redis' alias you imported at the top
+        redis_client = redis.from_url(redis_url, encoding="utf-8", decode_responses=True)
+        await FastAPILimiter.init(redis_client)
+        print("Redis limiter initialized.")
+    except Exception as e:
+        print(f"Redis init failed: {e}")
+
 
 
 @app.on_event("shutdown") 
