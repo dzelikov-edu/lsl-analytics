@@ -4203,7 +4203,7 @@ def calendar(
     
 
 @app.get("/teams/{team_id}/schedule")
-def team_schedule(
+async def team_schedule(
     team_id: str,
     include_unplayed: bool = True,
     phase: Optional[str] = None,
@@ -4216,7 +4216,7 @@ def team_schedule(
       - phase: filter by phase (e.g., REG_SEASON)
       - week: filter by week number (int)
     """
-    games = _load_games_or_404()
+    games = await _load_games_from_db()
     tid = team_id.strip().upper()
     phase_map = load_week_phase_map()
     name_map = _team_name_map(active_only=False)
@@ -4327,11 +4327,11 @@ def team_schedule(
 
 
 @app.get("/teams/{team_id}/results")
-def team_results(team_id: str, phase: Optional[str] = None):
+async def team_results(team_id: str, phase: Optional[str] = None):
     """
     Played games only (wrapper around /schedule).
     """
-    return team_schedule(team_id=team_id, include_unplayed=False, phase=phase, week=None)
+    return await team_schedule(team_id=team_id, include_unplayed=False, phase=phase, week=None)
 
 
 @app.get("/teams/{team_id}/roster")
