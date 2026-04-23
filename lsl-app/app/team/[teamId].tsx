@@ -1,4 +1,5 @@
 import TeamLogo from '@/components/TeamLogo';
+import { API_BASE_URL } from '../../lib/api';
 import { AppColors } from '@/constants/app-colors';
 import { getToken } from '../../lib/auth-storage';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -15,14 +16,12 @@ export default function TeamDetailScreen() {
     const [isFavorite, setIsFavorite] = useState(false);
     const [favoriteLoading, setFavoriteLoading] = useState(false);
 
-    const backendBaseUrl = 'http://192.168.1.108:8000'; // adjust later for production
-
     async function fetchFavoritesForUser(): Promise<string[]> {
         try {
             const token = await getToken(); // Get stored token
             if (!token) return [];
 
-            const res = await fetch(`${backendBaseUrl}/api/favorites`, {
+            const res = await fetch(`${API_BASE_URL}/api/favorites`, {
                 headers: { 'Authorization': `Bearer ${token}` } // Send token
             });
             if (!res.ok) return [];
@@ -37,7 +36,7 @@ export default function TeamDetailScreen() {
     async function addFavorite(teamId: string) {
         try {
             const token = await getToken(); // Get stored token
-            const res = await fetch(`${backendBaseUrl}/api/favorites`, {
+            const res = await fetch(`${API_BASE_URL}/api/favorites`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -54,7 +53,7 @@ export default function TeamDetailScreen() {
     async function removeFavorite(teamId: string) {
         try {
             const token = await getToken(); // Get stored token
-            const res = await fetch(`${backendBaseUrl}/api/favorites/${encodeURIComponent(teamId)}`, {
+            const res = await fetch(`${API_BASE_URL}/api/favorites/${encodeURIComponent(teamId)}`, {
                 method: 'DELETE',
                 headers: { 'Authorization': `Bearer ${token}` } // Send token
             });
