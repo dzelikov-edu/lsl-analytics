@@ -42,10 +42,20 @@ from app.routers.devices_favorites import router as devices_favorites_router
 from app.routers.auth import router as auth_router
 from app.routers.admin import router as admin_router
 
+GLOBAL_GAMES_LIST = []
+
 app = FastAPI(title="LSL Analytics Backend")
 
 @app.on_event("startup")
 async def startup():
+    global GLOBAL_GAMES_LIST
+    print("Pre-loading games into global cache...")
+    try:
+        GLOBAL_GAMES_LIST = await _load_games_from_db()
+        print(f"V1 core caches warmed from Postgres. Count: {len(GLOBAL_GAMES_LIST)}")
+    except Exception as e:
+        print(f"Failed to warm games cache: {e}")
+        GLOBAL_GAMES_LIST = []
     # 1. Initialize the Cloud Database Tables
     try:
         # This creates your Users, Devices, and Favorites tables in Postgres
@@ -191,7 +201,8 @@ def _cached_records_snapshot():
 
 @lru_cache(maxsize=1)
 def _cached_game_preview_support():
-    games = _load_games_or_404()
+    global GLOBAL_GAMES_LIST
+    games = GLOBAL_GAMES_LIST
     teams = _cached_teams_index()
     players = _cached_players_snapshot()
     team_conf_map = _cached_conference_membership()
@@ -2808,9 +2819,9 @@ async def _load_games_from_db():
     async with AsyncSessionLocal() as session:
         statement = select(Game)
         results = await session.exec(statement)
-        games_rows = results.all()
-        # Ensure we are actually returning the list here
-        return [g.model_dump() for g in games_rows] if games_rows else []
+        games = results.all()
+        # Return the list of dicts
+        return [g.model_dump() for g in games] if games else []
     
 
 @app.get("/")
