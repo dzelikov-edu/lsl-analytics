@@ -2806,10 +2806,11 @@ def _home_analytics_preview(week: int | None = None) -> dict:
 
 async def _load_games_from_db():
     async with AsyncSessionLocal() as session:
-        # We fetch the rows, but we only do it for the routes that truly need the full list
         statement = select(Game)
         results = await session.exec(statement)
-        # We call .all() once
+        games_rows = results.all()
+        # Ensure we are actually returning the list here
+        return [g.model_dump() for g in games_rows] if games_rows else []
     
 
 @app.get("/")
@@ -2842,11 +2843,18 @@ async def home(
             meta = json.load(f)
 
     games = await _load_games_from_db()
-    # DEBUG LOG: Let's see the raw type
-    print(f"iPad request received. Games type: {type(games)}. Count: {len(games)}")
-    if not games:
+    
+    # --- MOVE THIS UP ---
+    if games is None:
         games = []
-    #    raise HTTPException(status_code=404, detail="No games found...")
+    
+    # DEBUG LOG: Now this is safe because games is guaranteed to be a list
+    print(f"iPad request received. Games type: {type(games)}. Count: {len(games)}")
+    
+    # if not games:
+        # games = []  <-- You can remove this line now since we did it above
+        # raise HTTPException...
+
     
     # REMOVE THE 'if not games' 404 BLOCK TEMPORARILY
     # This ensures that even if something is weird with the list, 
