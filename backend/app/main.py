@@ -34,7 +34,7 @@ from functools import lru_cache
 from app.db import init_db, engine
 from app.db import AsyncSessionLocal
 from app.models_devices import Game
-from sqlmodel import select
+from sqlmodel import select, or_  # Ensure or_ is here
 from app.ingest import save_games_to_db
 
 
@@ -2806,12 +2806,10 @@ def _home_analytics_preview(week: int | None = None) -> dict:
 
 async def _load_games_from_db():
     async with AsyncSessionLocal() as session:
+        # We fetch the rows, but we only do it for the routes that truly need the full list
         statement = select(Game)
         results = await session.exec(statement)
-        games = results.all()
-        # .model_dump() is the Pydantic v2 way to convert the DB object to a dict
-        # if using older pydantic, use .dict()
-        return [g.model_dump() for g in games]
+        # We call .all() once
     
 
 @app.get("/")
@@ -3801,12 +3799,21 @@ def _to_int_or_none(v):
 
 @app.get("/games/{game_key}")
 async def get_game_by_key(game_key: str):
-    games = await _load_games_from_db()
+    key = game_key.strip()
+
+    async with AsyncSessionLocal() as session:
+        statement = select(Game).where(Game.game_key == key)
+        result = await session.exec(statement)
+        game_row = result.one_or_none()
+
+    if not game_row:
+        raise HTTPException(status_code=404, detail=f"game_key not found: {key}")
+
+    g = game_row.model_dump()
+
     name_map = _cached_team_name_map_all()
     phase_map = _cached_week_phase_map()
     support = _cached_game_preview_support()
-
-    key = game_key.strip()
 
     team_index_map = support["team_index_map"]
     players_by_team = support["players_by_team"]
@@ -3816,82 +3823,6 @@ async def get_game_by_key(game_key: str):
 
     records_by_team = support["records_by_team"]
     leaders_by_team = support["leaders_by_team"]
-
-    def _record_for_team(tid: str):
-        tid = str(tid).strip().upper()
-        conf_id = team_conf_map.get(tid)
-
-        overall_w = overall_l = 0
-        conf_w = conf_l = 0
-
-        for g in games:
-            ta = str(g.get("team_a", "")).strip().upper()
-            tb = str(g.get("team_b", "")).strip().upper()
-
-            if tid not in (ta, tb):
-                continue
-
-            a_score = g.get("a_score")
-            b_score = g.get("b_score")
-            if a_score is None or b_score is None:
-                continue
-
-            if tid == ta:
-                team_score = a_score
-                opp_score = b_score
-                opp_id = tb
-            else:
-                team_score = b_score
-                opp_score = a_score
-                opp_id = ta
-
-            if team_score > opp_score:
-                overall_w += 1
-            elif team_score < opp_score:
-                overall_l += 1
-
-            opp_conf = team_conf_map.get(opp_id)
-            if conf_id and opp_conf and conf_id == opp_conf:
-                if team_score > opp_score:
-                    conf_w += 1
-                elif team_score < opp_score:
-                    conf_l += 1
-
-        return {
-            "overall_record": f"{overall_w}-{overall_l}",
-            "conference_record": f"{conf_w}-{conf_l}",
-        }
-
-    def _leader_for(team_id: str, stat_key: str):
-        tid = str(team_id).strip().upper()
-        team_players = players_by_team.get(tid, [])
-
-        best = None
-        best_value = None
-
-        for p in team_players:
-            value = p.get(stat_key)
-            if value is None:
-                continue
-            try:
-                numeric = float(value)
-            except Exception:
-                continue
-
-            if best is None or numeric > best_value:
-                best = p
-                best_value = numeric
-
-        if best is None:
-            return None
-
-        return {
-            "player_id": best.get("player_id"),
-            "player_name": best.get("player_name"),
-            "jersey_number": best.get("jersey_number"),
-            "primary_position": best.get("primary_position"),
-            "value": best_value,
-        }
 
     def _team_preview(team_id: str):
         tid = str(team_id).strip().upper()
@@ -3923,52 +3854,48 @@ async def get_game_by_key(game_key: str):
             ),
         }
 
-    for g in games:
-        if str(g.get("game_key", "")).strip() == key:
-            ta = str(g.get("team_a", "")).strip().upper()
-            tb = str(g.get("team_b", "")).strip().upper()
-            home_id = str(g.get("home_id", "")).strip().upper()
-            away_id = str(g.get("away_id", "")).strip().upper()
-            venue = str(g.get("venue", "")).strip().upper()
+    ta = str(g.get("team_a", "")).strip().upper()
+    tb = str(g.get("team_b", "")).strip().upper()
+    home_id = str(g.get("home_id", "")).strip().upper()
+    away_id = str(g.get("away_id", "")).strip().upper()
+    venue = str(g.get("venue", "")).strip().upper()
 
-            phase_v = str(g.get("phase", "")).strip().upper()
-            week_v = _to_int_or_none(g.get("week"))
-            date_key = str(g.get("date_key", "")).strip()
+    phase_v = str(g.get("phase", "")).strip().upper()
+    week_v = _to_int_or_none(g.get("week"))
+    date_key = str(g.get("date_key", "")).strip()
 
-            a_score = g.get("a_score")
-            b_score = g.get("b_score")
-            played = (a_score is not None) and (b_score is not None)
+    a_score = g.get("a_score")
+    b_score = g.get("b_score")
+    played = (a_score is not None) and (b_score is not None)
 
-            home_name = name_map.get(home_id, home_id)
-            away_name = name_map.get(away_id, away_id)
+    home_name = name_map.get(home_id, home_id)
+    away_name = name_map.get(away_id, away_id)
 
-            if venue == "H":
-                matchup_display = f"{away_name} at {home_name}"
-            else:
-                matchup_display = f"{away_name} vs {home_name}"
+    if venue == "H":
+        matchup_display = f"{away_name} at {home_name}"
+    else:
+        matchup_display = f"{away_name} vs {home_name}"
 
-            return {
-                "game_key": g.get("game_key"),
-                "played": played,
-                "phase": phase_v,
-                "phase_display": _phase_display_name(phase_v, week_v, phase_map),
-                "week": week_v,
-                "date_key": date_key,
-                "display_date": _format_date_key_mmdd(date_key),
-                "matchup_display": matchup_display,
-                "team_a": ta,
-                "team_b": tb,
-                "team_a_name": name_map.get(ta, ta),
-                "team_b_name": name_map.get(tb, tb),
-                "home_id": home_id,
-                "home_name": home_name,
-                "away_id": away_id,
-                "away_name": away_name,
-                "home_team": _team_preview(home_id),
-                "away_team": _team_preview(away_id),
-            }
-
-    raise HTTPException(status_code=404, detail=f"game_key not found: {key}")
+    return {
+        "game_key": g.get("game_key"),
+        "played": played,
+        "phase": phase_v,
+        "phase_display": _phase_display_name(phase_v, week_v, phase_map),
+        "week": week_v,
+        "date_key": date_key,
+        "display_date": _format_date_key_mmdd(date_key),
+        "matchup_display": matchup_display,
+        "team_a": ta,
+        "team_b": tb,
+        "team_a_name": name_map.get(ta, ta),
+        "team_b_name": name_map.get(tb, tb),
+        "home_id": home_id,
+        "home_name": home_name,
+        "away_id": away_id,
+        "away_name": away_name,
+        "home_team": _team_preview(home_id),
+        "away_team": _team_preview(away_id),
+    }
 
 
 @app.get("/matchup/{team1}/{team2}")
@@ -4216,8 +4143,14 @@ async def team_schedule(
       - phase: filter by phase (e.g., REG_SEASON)
       - week: filter by week number (int)
     """
-    games = await _load_games_from_db()
     tid = team_id.strip().upper()
+    async with AsyncSessionLocal() as session:
+        # This tells the database: "Give me only the games for this specific team"
+        statement = select(Game).where(or_(Game.team_a == tid, Game.team_b == tid))
+        results = await session.exec(statement)
+        # Instead of 1,471 games, this list will now only be ~30 games
+        games = [g.model_dump() for g in results.all()]
+
     phase_map = load_week_phase_map()
     name_map = _team_name_map(active_only=False)
     grouped_lsl_polls = _load_lsl_polls_grouped_by_week()
