@@ -1409,7 +1409,7 @@ def poll_single(poll: str, week: int | None = None):
     if poll_u not in ("LSL", "LCAA"):
         raise HTTPException(status_code=400, detail="poll must be LSL or LCAA")
 
-    rows = load_polls()
+    rows = _cached_polls()
     if not rows:
         raise HTTPException(status_code=404, detail="No poll data found. Fill Polls tab first.")
 
@@ -1429,7 +1429,7 @@ def rankings_polls(week: int | None = None):
     - LCAA Poll second (Coaches equivalent)
     Returns Top 25 + Next 5 Out for each.
     """
-    rows = load_polls()
+    rows = _cached_polls()
     if not rows:
         raise HTTPException(status_code=404, detail="No poll data found. Fill Polls tab first.")
 
