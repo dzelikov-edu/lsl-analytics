@@ -1,6 +1,6 @@
 import { API_BASE_URL } from '@/lib/api';
 import { getCachedValue, setCachedValue } from '@/lib/apiCache';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 
 type UseCachedApiOptions = {
     cacheKey: string;
@@ -19,59 +19,51 @@ export function useCachedApi<T = any>({
 
     const [data, setData] = useState<T | null>(cached);
     const [loading, setLoading] = useState(enabled && !cached);
+    const [refreshing, setRefreshing] = useState(false); // NEW: for Pull-to-Refresh
     const [error, setError] = useState<string | null>(null);
 
-    useEffect(() => {
+    const load = useCallback(async (isRefresh = false) => {
         if (!enabled) return;
 
-        let cancelled = false;
+        if (isRefresh) {
+            setRefreshing(true);
+        } else if (!data) {
+            setLoading(true);
+        }
 
-        const load = async () => {
-            const freshCached = getCachedValue<T>(cacheKey, maxAgeMs);
-
-            if (freshCached) {
-                setData(freshCached);
-                setLoading(false);
-            } else {
-                setLoading(true);
+        try {
+            setError(null);
+            const response = await fetch(`${API_BASE_URL}${endpoint}`);
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}`);
             }
 
-            try {
-                setError(null);
+            const json = await response.json();
 
-                const response = await fetch(`${API_BASE_URL}${endpoint}`);
-                if (!response.ok) {
-                    throw new Error(`HTTP ${response.status}`);
-                }
+            setCachedValue(cacheKey, json);
+            setData(json);
+        } catch (err: any) {
+            setError(err?.message ?? 'Unknown error');
+        } finally {
+            setLoading(false);
+            setRefreshing(false);
+        }
+    }, [cacheKey, endpoint, enabled]);
 
-                const json = await response.json();
-
-                if (cancelled) return;
-
-                setCachedValue(cacheKey, json);
-                setData(json);
-            } catch (err: any) {
-                if (cancelled) return;
-                if (!freshCached) {
-                    setError(err?.message ?? 'Unknown error');
-                }
-            } finally {
-                if (!cancelled) {
-                    setLoading(false);
-                }
-            }
-        };
-
+    useEffect(() => {
         load();
+    }, [cacheKey, endpoint, enabled]);
 
-        return () => {
-            cancelled = true;
-        };
-    }, [cacheKey, endpoint, maxAgeMs, enabled]);
+    // NEW: Function to manually trigger a refresh
+    const refetch = useCallback(() => {
+        return load(true);
+    }, [load]);
 
     return {
         data,
         loading,
+        refreshing, // NEW
         error,
+        refetch,    // NEW
     };
 }

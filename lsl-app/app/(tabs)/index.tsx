@@ -4,7 +4,7 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useCachedApi } from '@/hooks/useCachedApi';
 import { router } from 'expo-router';
 import { useMemo } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions, RefreshControl } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export default function HomeScreen() {
@@ -249,7 +249,9 @@ export default function HomeScreen() {
   const {
     data: payload,
     loading,
+    refreshing,
     error,
+    refetch,
   } = useCachedApi({
     cacheKey: 'home-data',
     endpoint: '/home',
@@ -297,7 +299,16 @@ export default function HomeScreen() {
   };
 
   return (
-    <ScrollView contentContainerStyle={styles.content}>
+    <ScrollView
+      contentContainerStyle={styles.content}
+      refreshControl={
+        <RefreshControl
+          refreshing={refreshing}
+          onRefresh={refetch}
+          tintColor={theme.text}
+        />
+      }
+    >
       {loading ? (
         <View style={styles.centerBlock}>
           <ActivityIndicator size="large" />
