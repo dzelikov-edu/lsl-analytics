@@ -51,8 +51,18 @@ export function useCachedApi<T = any>({
     }, [cacheKey, endpoint, enabled]);
 
     useEffect(() => {
+        if (!enabled) return;
+
+        // --- THE AGGRESSIVE CLEAN SLATE ---
         const freshCached = getCachedValue<T>(cacheKey, maxAgeMs);
-        setData(freshCached); // Instantly resets data to null if not in cache
+
+        // We set data to the fresh cache (which is null for a new poll)
+        // AND we explicitly set loading to true if there's no cache.
+        setData(freshCached);
+        setLoading(enabled && !freshCached);
+        setError(null);
+        // ----------------------------------
+
         load();
     }, [cacheKey, endpoint, enabled]);
 
@@ -64,8 +74,8 @@ export function useCachedApi<T = any>({
     return {
         data,
         loading,
-        refreshing, // NEW
+        refreshing,
         error,
-        refetch,    // NEW
+        refetch,
     };
 }

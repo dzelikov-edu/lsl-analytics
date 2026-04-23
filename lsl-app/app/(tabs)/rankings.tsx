@@ -189,9 +189,9 @@ export default function RankingsScreen() {
                 </Pressable>
             </View>
 
-            {loading ? (
+            {(loading || !payload) && !error ? (
                 <View style={styles.centerBlock}>
-                    <ActivityIndicator size="large" />
+                    <ActivityIndicator size="large" color={theme.text} />
                     <Text style={styles.helper}>Loading rankings...</Text>
                 </View>
             ) : error ? (
@@ -204,7 +204,7 @@ export default function RankingsScreen() {
                     <View style={styles.section}>
                         <Text style={styles.sectionTitle}>Top 25</Text>
                         <View style={styles.listCard}>
-                            {top25.length === 0 && !loading ? (
+                            {top25.length === 0 ? (
                                 <Text style={styles.emptyText}>No Top 25 rankings available.</Text>
                             ) : (
                                 top25.map((row) => (
@@ -231,7 +231,7 @@ export default function RankingsScreen() {
                     <View style={styles.section}>
                         <Text style={styles.sectionTitle}>Next 5</Text>
                         <View style={styles.listCard}>
-                            {next5.length === 0 && !loading ? (
+                            {next5.length === 0 ? (
                                 <Text style={styles.emptyText}>No Next 5 teams available.</Text>
                             ) : (
                                 next5.map((row) => (

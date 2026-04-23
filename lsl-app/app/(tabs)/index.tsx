@@ -6,6 +6,10 @@ import { router } from 'expo-router';
 import { useMemo } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions, RefreshControl } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useCallback, useState } from 'react';
+import { useFocusEffect } from 'expo-router';
+import { getToken } from '@/lib/auth-storage';
+import { API_BASE_URL } from '@/lib/api';
 
 export default function HomeScreen() {
   const colorScheme = useColorScheme() ?? 'light';
@@ -14,6 +18,29 @@ export default function HomeScreen() {
   const { width } = useWindowDimensions();
   const isCompact = width < 430;
   const topTabPadding = isCompact ? insets.top + 8 : 12;
+
+  const [favorites, setFavorites] = useState<string[]>([]);
+
+  useFocusEffect(
+    useCallback(() => {
+      const loadFavs = async () => {
+        try {
+          const token = await getToken();
+          if (!token) return;
+          const res = await fetch(`${API_BASE_URL}/api/favorites`, {
+            headers: { Authorization: `Bearer ${token}` }
+          });
+          if (res.ok) {
+            const data = await res.json();
+            setFavorites(data);
+          }
+        } catch (e) {
+          console.log("Error loading favs on home", e);
+        }
+      };
+      loadFavs();
+    }, [])
+  );
 
   const featuredCardPadding = isCompact ? 12 : 14;
   const featuredCardRadius = isCompact ? 14 : 16;
@@ -263,6 +290,50 @@ export default function HomeScreen() {
   const analytics = payload?.analytics_preview?.leaders ?? {};
   const calendarDays = payload?.calendar_preview?.days ?? [];
 
+  const myTeamsSnapshot = useMemo(() => {
+    if (favorites.length === 0 || !calendarDays) return [];
+
+    const snapshot: any[] = [];
+
+    favorites.forEach(favId => {
+      const tid = String(favId).toUpperCase();
+      let upcomingGame: any = null;
+      let lastResult: any = null;
+
+      for (const day of calendarDays) {
+        const game = day.games?.find((g: any) =>
+          String(g.home_id).toUpperCase() === tid ||
+          String(g.away_id).toUpperCase() === tid
+        );
+
+        if (game) {
+          // --- BULLETPROOF CHECK ---
+          // A game is ONLY a result if both scores are numbers and NOT null/undefined
+          const hasScoreA = game.a_score !== null && game.a_score !== undefined;
+          const hasScoreB = game.b_score !== null && game.b_score !== undefined;
+          const isPlayed = hasScoreA && hasScoreB;
+
+          if (isPlayed) {
+            lastResult = { ...game, display_date: day.display_date, type: 'RESULT' };
+          } else {
+            upcomingGame = { ...game, display_date: day.display_date, type: 'UPCOMING' };
+            // If we found an actual upcoming game, stop looking
+            break;
+          }
+        }
+      }
+
+      if (upcomingGame) {
+        snapshot.push(upcomingGame);
+      } else if (lastResult) {
+        snapshot.push(lastResult);
+      }
+    });
+
+    return snapshot;
+  }, [favorites, calendarDays]);
+
+
   const getCalendarGamePriority = (game: any) => {
     const homeRank = game?.lsl_rank_home;
     const awayRank = game?.lsl_rank_away;
@@ -325,6 +396,74 @@ export default function HomeScreen() {
           <Text style={styles.screenSubTitle}>
             League snapshot, featured matchups, rankings, and analytics leaders
           </Text>
+
+          {myTeamsSnapshot.length > 0 && (
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>My Teams</Text>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={{ gap: 12, paddingRight: 20 }}
+              >
+                {myTeamsSnapshot.map((game, index) => (
+                  <Pressable
+                    key={index}
+                    onPress={() => router.push({
+                      pathname: '/game/[gameKey]',
+                      params: { gameKey: game.game_key }
+                    })}
+                    style={({ pressed }) => [
+                      styles.card,
+                      { width: 260, marginBottom: 0 },
+                      pressed && styles.cardPressed
+                    ]}
+                  >
+                    <Text style={styles.cardMeta}>
+                      {game.display_date}{game.type === 'RESULT' ? ' • Final' : ''}
+                    </Text>
+
+                    {/* AWAY TEAM ROW */}
+                    <View style={styles.cardTeamRow}>
+                      <TeamLogo teamId={game.away_id} size={20} />
+                      <View style={styles.cardTeamTextWrap}>
+                        <Text style={styles.cardTeamLine} numberOfLines={1}>
+                          {game.lsl_rank_away !== null && game.lsl_rank_away !== undefined
+                            ? `#${game.lsl_rank_away} `
+                            : ''}
+                          {game.away_name}
+                        </Text>
+                      </View>
+                      {/* ONLY RENDER THIS IF IT IS A RESULT */}
+                      {game.type === 'RESULT' && (
+                        <Text style={[styles.cardTeamLine, { marginLeft: 10, fontWeight: '800' }]}>
+                          {game.a_score}
+                        </Text>
+                      )}
+                    </View>
+
+                    {/* HOME TEAM ROW */}
+                    <View style={styles.cardTeamRow}>
+                      <TeamLogo teamId={game.home_id} size={20} />
+                      <View style={styles.cardTeamTextWrap}>
+                        <Text style={styles.cardTeamLine} numberOfLines={1}>
+                          {game.lsl_rank_home !== null && game.lsl_rank_home !== undefined
+                            ? `#${game.lsl_rank_home} `
+                            : ''}
+                          {game.home_name}
+                        </Text>
+                      </View>
+                      {/* ONLY RENDER THIS IF IT IS A RESULT */}
+                      {game.type === 'RESULT' && (
+                        <Text style={[styles.cardTeamLine, { marginLeft: 10, fontWeight: '800' }]}>
+                          {game.b_score}
+                        </Text>
+                      )}
+                    </View>
+                  </Pressable>
+                ))}
+              </ScrollView>
+            </View>
+          )}
 
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Featured Games</Text>
