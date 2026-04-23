@@ -3800,8 +3800,8 @@ def _to_int_or_none(v):
     
 
 @app.get("/games/{game_key}")
-def get_game_by_key(game_key: str):
-    games = _load_games_or_404()
+async def get_game_by_key(game_key: str):
+    games = await _load_games_from_db()
     name_map = _cached_team_name_map_all()
     phase_map = _cached_week_phase_map()
     support = _cached_game_preview_support()
