@@ -2,7 +2,7 @@ import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native
 import { Asset } from 'expo-asset';
 import Constants from 'expo-constants';
 import { getToken } from '../lib/auth-storage';
-import { Stack } from 'expo-router';
+import { Stack, router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
 import 'react-native-reanimated';
@@ -76,6 +76,17 @@ async function registerForPushNotificationsAsync() {
 
 export default function RootLayout() {
   const colorScheme = useColorScheme();
+
+  useEffect(() => {
+    const checkAuth = async () => {
+      const token = await getToken();
+      if (!token) {
+        router.replace('/auth/login');
+      }
+    };
+
+    checkAuth();
+  }, []);
 
   useEffect(() => {
     const preloadAssets = async () => {

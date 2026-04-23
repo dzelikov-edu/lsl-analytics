@@ -5,6 +5,7 @@ export const AppColors = {
         border: '#D9D9DE',
         text: '#111111',
         mutedText: '#666A73',
+        danger: '#d9534f',
     },
     dark: {
         background: '#0F1115',
@@ -12,6 +13,7 @@ export const AppColors = {
         border: '#2A2F3A',
         text: '#F5F7FA',
         mutedText: '#A7AFBD',
+        danger: '#d9534f',
     },
 } as const;
 

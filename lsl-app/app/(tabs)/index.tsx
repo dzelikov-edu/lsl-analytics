@@ -315,22 +315,6 @@ export default function HomeScreen() {
             League snapshot, featured matchups, rankings, and analytics leaders
           </Text>
 
-          {/* TEMPORARY LOGIN BUTTON */}
-          <Pressable
-            onPress={() => router.push('/auth/login')}
-            style={{
-              backgroundColor: '#007AFF',
-              padding: 15,
-              marginHorizontal: 20,
-              marginVertical: 10,
-              borderRadius: 10,
-              alignItems: 'center'
-            }}
-          >
-            <Text style={{ color: 'white', fontWeight: 'bold' }}>DEBUG: GO TO LOGIN</Text>
-          </Pressable>
-
-
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Featured Games</Text>
             {featuredGames.map((game: any, index: number) => (
