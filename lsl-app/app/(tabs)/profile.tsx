@@ -120,23 +120,25 @@ export default function ProfileScreen() {
             <Text style={styles.sectionTitle}>My Favorite Teams</Text>
 
             {favorites.length > 0 ? (
-                favorites.map((teamId) => (
-                    <Pressable
-                        key={teamId}
-                        style={styles.favCard}
-                        onPress={() => router.push({
-                            pathname: '/team/[teamId]',
-                            params: { teamId: teamId }
-                        })}
-                    >
-                        <TeamLogo teamId={teamId} size={30} />
-                        {/* Show Full Name if found, otherwise fallback to ID */}
-                        <Text style={styles.favText}>{teamNames[teamId] || teamId}</Text>
-                    </Pressable>
-                ))
+                [...favorites]
+                    .sort((a, b) => (teamNames[a] || a).localeCompare(teamNames[b] || b))
+                    .map((teamId) => (
+                        <Pressable
+                            key={teamId}
+                            style={styles.favCard}
+                            onPress={() => router.push({
+                                pathname: '/team/[teamId]',
+                                params: { teamId: teamId }
+                            })}
+                        >
+                            <TeamLogo teamId={teamId} size={30} />
+                            <Text style={styles.favText}>{teamNames[teamId] || teamId}</Text>
+                        </Pressable>
+                    ))
             ) : (
                 <Text style={styles.emptyText}>You haven't added any favorites yet.</Text>
             )}
+
 
             <Pressable style={styles.logoutButton} onPress={handleLogout}>
                 <Text style={styles.buttonText}>Log Out</Text>
