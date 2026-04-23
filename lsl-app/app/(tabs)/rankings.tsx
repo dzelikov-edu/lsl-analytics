@@ -3,7 +3,7 @@ import { AppColors } from '@/constants/app-colors';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useCachedApi } from '@/hooks/useCachedApi';
 import { router } from 'expo-router';
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -141,6 +141,7 @@ export default function RankingsScreen() {
     );
 
     const [selectedPoll, setSelectedPoll] = useState<PollKey>('LSL');
+
     const {
         data: payload,
         loading,
@@ -155,12 +156,20 @@ export default function RankingsScreen() {
     const next5: Next5Row[] = payload?.next5 ?? [];
 
     return (
-        <ScrollView contentContainerStyle={styles.content}>
+        <ScrollView
+            key={selectedPoll}
+            contentContainerStyle={styles.content}
+        >
+
             <Text style={styles.screenTitle}>Rankings</Text>
 
             <View style={styles.switcherRow}>
                 <Pressable
-                    onPress={() => setSelectedPoll('LSL')}
+                    onPress={() => {
+                        if (selectedPoll !== 'LSL') {
+                            setSelectedPoll('LSL');
+                        }
+                    }}
                     style={[styles.switchPill, selectedPoll === 'LSL' && styles.switchPillActive]}>
                     <Text style={[styles.switchText, selectedPoll === 'LSL' && styles.switchTextActive]}>
                         LSL Poll
@@ -168,7 +177,11 @@ export default function RankingsScreen() {
                 </Pressable>
 
                 <Pressable
-                    onPress={() => setSelectedPoll('LCAA')}
+                    onPress={() => {
+                        if (selectedPoll !== 'LCAA') {
+                            setSelectedPoll('LCAA');
+                        }
+                    }}
                     style={[styles.switchPill, selectedPoll === 'LCAA' && styles.switchPillActive]}>
                     <Text style={[styles.switchText, selectedPoll === 'LCAA' && styles.switchTextActive]}>
                         LCAA Poll
@@ -196,18 +209,18 @@ export default function RankingsScreen() {
                             ) : (
                                 top25.map((row) => (
                                     <Pressable
-                                        key={row.team_id}
+                                        key={row?.team_id}
                                         onPress={() =>
                                             router.push({
                                                 pathname: '/team/[teamId]',
-                                                params: { teamId: row.team_id },
+                                                params: { teamId: row?.team_id },
                                             })
                                         }
                                         style={({ pressed }) => [styles.listRowWrap, pressed && styles.listRowPressed]}>
-                                        <Text style={styles.rankNumber}>{row.rank}.</Text>
-                                        <TeamLogo teamId={row.team_id} size={24} />
+                                        <Text style={styles.rankNumber}>{row?.rank}.</Text>
+                                        <TeamLogo teamId={row?.team_id} size={24} />
                                         <View style={styles.rowTextWrap}>
-                                            <Text style={styles.listRow}>{row.team_name}</Text>
+                                            <Text style={styles.listRow}>{row?.team_name}</Text>
                                         </View>
                                     </Pressable>
                                 ))
@@ -223,18 +236,18 @@ export default function RankingsScreen() {
                             ) : (
                                 next5.map((row) => (
                                     <Pressable
-                                        key={row.team_id}
+                                        key={row?.team_id}
                                         onPress={() =>
                                             router.push({
                                                 pathname: '/team/[teamId]',
-                                                params: { teamId: row.team_id },
+                                                params: { teamId: row?.team_id },
                                             })
                                         }
                                         style={({ pressed }) => [styles.listRowWrap, pressed && styles.listRowPressed]}>
-                                        <Text style={styles.rankNumber}>{row.order}.</Text>
-                                        <TeamLogo teamId={row.team_id} size={24} />
+                                        <Text style={styles.rankNumber}>{row?.order}.</Text>
+                                        <TeamLogo teamId={row?.team_id} size={24} />
                                         <View style={styles.rowTextWrap}>
-                                            <Text style={styles.listRow}>{row.team_name}</Text>
+                                            <Text style={styles.listRow}>{row?.team_name}</Text>
                                         </View>
                                     </Pressable>
                                 ))
