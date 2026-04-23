@@ -8,6 +8,7 @@ from sqlmodel import select
 from app.auth import create_access_token, hash_password, verify_password
 from app.db import AsyncSessionLocal
 from app.models_devices import User
+from app.deps_auth import get_current_user 
 
 from fastapi_limiter.depends import RateLimiter
 
@@ -73,3 +74,13 @@ async def login_user(payload: LoginRequest):
 
         token = create_access_token(subject=user.id, expires_delta=timedelta(minutes=60 * 24))
         return TokenResponse(access_token=token)
+
+
+@router.get("/me")
+async def get_me(current_user: User = Depends(get_current_user)):
+    return {
+        "id": current_user.id,
+        "email": current_user.email,
+        "is_admin": current_user.is_admin,
+        "created_at": current_user.created_at,
+    }
