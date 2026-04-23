@@ -51,6 +51,8 @@ export function useCachedApi<T = any>({
     }, [cacheKey, endpoint, enabled]);
 
     useEffect(() => {
+        const freshCached = getCachedValue<T>(cacheKey, maxAgeMs);
+        setData(freshCached); // Instantly resets data to null if not in cache
         load();
     }, [cacheKey, endpoint, enabled]);
 

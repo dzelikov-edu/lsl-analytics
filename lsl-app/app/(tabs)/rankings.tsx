@@ -204,7 +204,7 @@ export default function RankingsScreen() {
                     <View style={styles.section}>
                         <Text style={styles.sectionTitle}>Top 25</Text>
                         <View style={styles.listCard}>
-                            {top25.length === 0 ? (
+                            {top25.length === 0 && !loading ? (
                                 <Text style={styles.emptyText}>No Top 25 rankings available.</Text>
                             ) : (
                                 top25.map((row) => (
@@ -231,7 +231,7 @@ export default function RankingsScreen() {
                     <View style={styles.section}>
                         <Text style={styles.sectionTitle}>Next 5</Text>
                         <View style={styles.listCard}>
-                            {next5.length === 0 ? (
+                            {next5.length === 0 && !loading ? (
                                 <Text style={styles.emptyText}>No Next 5 teams available.</Text>
                             ) : (
                                 next5.map((row) => (
