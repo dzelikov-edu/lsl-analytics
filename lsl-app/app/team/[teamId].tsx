@@ -561,6 +561,15 @@ export default function TeamDetailScreen() {
 
                     <View style={styles.section}>
                         <Text style={styles.sectionTitle}>Analytics</Text>
+                        <Text
+                            style={{
+                                fontSize: 12,
+                                color: theme.mutedText,
+                                marginBottom: 12,
+                            }}
+                        >
+                            Power: neutral-court strength • Resume: body of work • Form: recent performance • SOS: schedule difficulty
+                        </Text>
                         <View style={styles.analyticsGrid}>
                             {analyticsCards.map((entry) => {
                                 const { label, color, bg } = getTierMeta(entry.label, entry.item?.tier);

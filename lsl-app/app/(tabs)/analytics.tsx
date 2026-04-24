@@ -3,7 +3,8 @@ import { AppColors } from '@/constants/app-colors';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useCachedApi } from '@/hooks/useCachedApi';
 import { useMemo } from 'react';
-import { ActivityIndicator, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import { router } from 'expo-router';
+import { ActivityIndicator, ScrollView, StyleSheet, Text, View, useWindowDimensions, Pressable } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 type LeaderItem = {
@@ -89,6 +90,9 @@ export default function AnalyticsScreen() {
                     marginBottom: 10,
                     backgroundColor: theme.card,
                     minHeight: 118,
+                },
+                leaderCardPressed: {
+                    opacity: 0.75,
                 },
                 cardLabel: {
                     fontSize: 13,
@@ -219,7 +223,17 @@ export default function AnalyticsScreen() {
     ];
 
     const renderLeaderCard = (label: string, item: LeaderItem) => (
-        <View key={label} style={styles.leaderCard}>
+        <Pressable
+            key={label}
+            style={({ pressed }) => [
+                styles.leaderCard,
+                pressed && styles.leaderCardPressed,
+            ]}
+            onPress={() => {
+                if (!item?.team_id) return;
+                router.push(`/team/${item.team_id}`);
+            }}
+        >
             <Text style={styles.cardLabel}>{label}</Text>
             <View style={styles.leaderRow}>
                 <TeamLogo teamId={item?.team_id} size={28} />
@@ -231,7 +245,7 @@ export default function AnalyticsScreen() {
                     </Text>
                 </View>
             </View>
-        </View>
+        </Pressable>
     );
 
     const renderPreviewTable = (title: string, rows: TableRow[]) => (
