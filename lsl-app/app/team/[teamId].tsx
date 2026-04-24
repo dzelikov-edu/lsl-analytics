@@ -366,24 +366,17 @@ export default function TeamDetailScreen() {
                                 <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                                     <Text style={styles.primaryRecord}>{overallRecord}</Text>
 
-                                    {/* --- SURGERY: Pulse Badge --- */}
                                     {team.conference_rank && (
                                         <View style={{
                                             backgroundColor: theme.text,
                                             paddingHorizontal: 8,
-                                            paddingVertical: 3,
-                                            borderRadius: 6,
-                                            marginLeft: 10,
-                                            // Optional: slight tilt to make it look "Editorial"
-                                            transform: [{ rotate: '-1deg' }]
+                                            paddingVertical: 2,
+                                            borderRadius: 4,
+                                            marginLeft: 10
                                         }}>
-                                            <Text style={{
-                                                color: theme.background,
-                                                fontSize: 12,
-                                                fontWeight: '900',
-                                                textTransform: 'uppercase'
-                                            }}>
-                                                {getOrdinal(team.conference_rank)} in {team.conference_id}
+                                            <Text style={{ color: theme.background, fontSize: 12, fontWeight: '800' }}>
+                                                {/* ADD 'T-' if tied */}
+                                                {team.conference_is_tied ? 'T-' : ''}{getOrdinal(team.conference_rank)} in {team.conference_id}
                                             </Text>
                                         </View>
                                     )}

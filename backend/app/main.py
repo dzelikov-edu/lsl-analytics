@@ -1068,16 +1068,16 @@ def get_team(team_id: str, week: int | None = None):
     except Exception:
         pass
 
-    # ---- conference standing calculation ----
+    # ---- conference standing calculation (Tie-Aware & Full Conference) ----
     conf_rank = None
+    is_tied = False
     if team_conf:
         try:
-            # 1. Get all teams and their records for this week
             all_records = _cached_team_record_map(selected_week)
-            # 2. Get the list of team IDs in this specific conference
+            
+            # 1. Include EVERY team in the conference from the master map
             conf_team_ids = [t_id for t_id, c_id in team_conf_map.items() if c_id == team_conf]
             
-            # 3. Build a list of (team_id, conf_wins, conf_losses) for sorting
             conf_standings = []
             for t_id in conf_team_ids:
                 rec = all_records.get(t_id, {"conference_wins": 0, "conference_losses": 0})
@@ -1087,13 +1087,25 @@ def get_team(team_id: str, week: int | None = None):
                     "l": rec.get("conference_losses", 0)
                 })
             
-            # 4. Sort by wins (descending), then losses (ascending)
+            # 2. Sort: wins desc, losses asc
             conf_standings.sort(key=lambda x: (-x["w"], x["l"]))
             
-            # 5. Find where our current team 'tid' ranks in that list
-            for index, entry in enumerate(conf_standings):
+            # 3. Assign Ranks with Tie Handling
+            current_rank = 1
+            for i, entry in enumerate(conf_standings):
+                # If not the first team, check if record matches the previous team
+                if i > 0:
+                    prev = conf_standings[i-1]
+                    if entry["w"] != prev["w"] or entry["l"] != prev["l"]:
+                        # Records are different, rank becomes current position
+                        current_rank = i + 1
+                
                 if entry["id"] == tid:
-                    conf_rank = index + 1
+                    conf_rank = current_rank
+                    # 4. Check if others share this same rank
+                    # (Simplified: if neighbors have same record, it's a tie)
+                    match_count = sum(1 for x in conf_standings if x["w"] == entry["w"] and x["l"] == entry["l"])
+                    is_tied = match_count > 1
                     break
         except Exception:
             pass
@@ -1105,6 +1117,7 @@ def get_team(team_id: str, week: int | None = None):
         "conference_id": team_conf,
         "conference_name": team_conf_name,
         "conference_rank": conf_rank,
+        "conference_is_tied": is_tied,
 
         # ESPN-style poll badges (LSL primary, LCAA secondary)
         "polls": polls_block,
