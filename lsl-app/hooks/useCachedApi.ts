@@ -34,15 +34,14 @@ export function useCachedApi<T = any>({
         try {
             setError(null);
 
-            const fullUrl = `${API_BASE_URL}${endpoint}`;
-            // If endpoint is "/home", this becomes "https://lsl-analytics.onrender.com/home"
+            // --- BULLETPROOF URL BUILDER ---
+            // This ensures we never have double slashes and always have the leading slash
+            const cleanBase = API_BASE_URL.replace(/\/$/, ''); // Remove trailing slash
+            const cleanEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
+            const fullUrl = `${cleanBase}${cleanEndpoint}`;
+            // --------------------------------
 
-            // 2. LOG IT so we can see it in your terminal
-            console.log('--- DEBUG FETCH ---');
-            console.log('Base:', API_BASE_URL);
-            console.log('End:', endpoint);
-            console.log('Full:', fullUrl);
-
+            console.log('Fetching from:', fullUrl);
             const response = await fetch(fullUrl);
 
             if (!response.ok) {

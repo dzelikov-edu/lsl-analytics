@@ -280,10 +280,11 @@ export default function HomeScreen() {
     error,
     refetch,
   } = useCachedApi({
-    cacheKey: 'home-data',
-    endpoint: '/home',
-    maxAgeMs: 1000 * 60 * 10,
+    cacheKey: 'home-data-beta-v1', // <--- CHANGE THE CACHE KEY
+    endpoint: '/home?v=1',         // <--- ADD A VERSION PARAM
+    maxAgeMs: 0,                   // <--- FORCE 0 FOR THIS TEST
   });
+
 
   const featuredGames = payload?.featured_games?.games ?? [];
   const rankings = payload?.rankings_preview?.rankings ?? [];
