@@ -296,6 +296,90 @@ export default function TeamDetailScreen() {
         return `${rankText}${valueText}`;
     };
 
+    const getTierMeta = (metric: string, tier?: string | null) => {
+        if (!tier) {
+            return {
+                label: '—',
+                color: theme.mutedText,
+                bg: theme.card,
+            };
+        }
+
+        const t = tier.toLowerCase();
+        const m = metric.toLowerCase();
+
+        // POWER: elite / strong / solid / tracked
+        if (m === 'power') {
+            if (t === 'elite') {
+                return { label: 'Elite', color: '#15803d', bg: '#bbf7d0' };
+            }
+            if (t === 'strong') {
+                return { label: 'Strong', color: '#1d4ed8', bg: '#bfdbfe' };
+            }
+            if (t === 'solid') {
+                return { label: 'Solid', color: '#b45309', bg: '#fef3c7' };
+            }
+            if (t === 'tracked') {
+                return { label: 'Tracked', color: '#4b5563', bg: '#e5e7eb' };
+            }
+        }
+
+        // RESUME: reuse same keys, but softer resume language
+        if (m === 'resume') {
+            if (t === 'elite') {
+                return { label: 'Top Shelf', color: '#15803d', bg: '#bbf7d0' };
+            }
+            if (t === 'strong') {
+                return { label: 'Strong Profile', color: '#22c55e', bg: '#dcfce7' };
+            }
+            if (t === 'solid') {
+                return { label: 'Solid Profile', color: '#eab308', bg: '#fef9c3' };
+            }
+            if (t === 'tracked') {
+                return { label: 'Developing', color: '#6b7280', bg: '#e5e7eb' };
+            }
+        }
+
+        // FORM: hot / strong / solid / cool
+        if (m === 'form') {
+            if (t === 'hot') {
+                return { label: 'Red Hot', color: '#b91c1c', bg: '#fee2e2' }; // strong red
+            }
+            if (t === 'strong') {
+                return { label: 'In Form', color: '#ef4444', bg: '#fee2e2' }; // red
+            }
+            if (t === 'solid') {
+                return { label: 'Steady', color: '#ea580c', bg: '#ffedd5' }; // orange
+            }
+            if (t === 'cool') {
+                return { label: 'Cooling Off', color: '#0ea5e9', bg: '#e0f2fe' }; // blue-ish
+            }
+        }
+
+        // SOS: brutal / strong / solid / lighter
+        if (m === 'sos') {
+            if (t === 'brutal') {
+                return { label: 'Elite SOS', color: '#111827', bg: '#e5e7eb' }; // very hard slate
+            }
+            if (t === 'strong') {
+                return { label: 'Tough SOS', color: '#374151', bg: '#e5e7eb' };
+            }
+            if (t === 'solid') {
+                return { label: 'Balanced SOS', color: '#6b7280', bg: '#f3f4f6' };
+            }
+            if (t === 'lighter') {
+                return { label: 'Lighter SOS', color: '#9ca3af', bg: '#f9fafb' };
+            }
+        }
+
+        // Fallback for Form/SOS or any unexpected tiers for now
+        return {
+            label: tier,
+            color: theme.mutedText,
+            bg: theme.card,
+        };
+    };
+
     const formatConferenceName = (name?: string | null) => {
         if (!name) return null;
 
@@ -478,15 +562,38 @@ export default function TeamDetailScreen() {
                     <View style={styles.section}>
                         <Text style={styles.sectionTitle}>Analytics</Text>
                         <View style={styles.analyticsGrid}>
-                            {analyticsCards.map((entry) => (
-                                <View key={entry.label} style={styles.analyticsCard}>
-                                    <Text style={styles.metricLabel}>{entry.label}</Text>
-                                    <Text style={styles.metricValue}>{formatMetricValue(entry.item)}</Text>
-                                    <Text style={styles.metricTier}>
-                                        {entry.item?.tier ? `Tier: ${entry.item.tier}` : 'Tier: —'}
-                                    </Text>
-                                </View>
-                            ))}
+                            {analyticsCards.map((entry) => {
+                                const { label, color, bg } = getTierMeta(entry.label, entry.item?.tier);
+
+                                return (
+                                    <View key={entry.label} style={styles.analyticsCard}>
+                                        <Text style={styles.metricLabel}>{entry.label}</Text>
+                                        <Text style={styles.metricValue}>{formatMetricValue(entry.item)}</Text>
+
+                                        <View
+                                            style={{
+                                                marginTop: 6,
+                                                alignSelf: 'flex-start',
+                                                paddingHorizontal: 8,
+                                                paddingVertical: 3,
+                                                borderRadius: 999,
+                                                backgroundColor: bg,
+                                            }}
+                                        >
+                                            <Text
+                                                style={{
+                                                    fontSize: 12,
+                                                    fontWeight: '700',
+                                                    color,
+                                                    textTransform: 'uppercase',
+                                                }}
+                                            >
+                                                {label}
+                                            </Text>
+                                        </View>
+                                    </View>
+                                );
+                            })}
                         </View>
                     </View>
 
