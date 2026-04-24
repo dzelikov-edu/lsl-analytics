@@ -565,61 +565,72 @@ export default function HomeScreen() {
                 </Text>
                 <Text style={styles.upcomingDayMeta}>{day.games_count ?? 0} games</Text>
 
-                {[...(day.games ?? [])]
-                  .sort((a: any, b: any) => {
-                    const pa = getCalendarGamePriority(a);
-                    const pb = getCalendarGamePriority(b);
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={{ paddingTop: 4, paddingBottom: 2 }}
+                >
+                  {[...(day.games ?? [])]
+                    .sort((a: any, b: any) => {
+                      const pa = getCalendarGamePriority(a);
+                      const pb = getCalendarGamePriority(b);
 
-                    if (pb.rankedTeamsCount !== pa.rankedTeamsCount) {
-                      return pb.rankedTeamsCount - pa.rankedTeamsCount;
-                    }
-
-                    if (pa.bestRankValue !== pb.bestRankValue) {
-                      return pa.bestRankValue - pb.bestRankValue;
-                    }
-
-                    if (pa.combinedRankValue !== pb.combinedRankValue) {
-                      return pa.combinedRankValue - pb.combinedRankValue;
-                    }
-
-                    return 0;
-                  })
-                  .slice(0, 3)
-                  .map((game: any, gameIndex: number) => (
-                    <Pressable
-                      key={game.game_key ?? gameIndex}
-                      onPress={() =>
-                        router.push({
-                          pathname: '/game/[gameKey]',
-                          params: { gameKey: game.game_key },
-                        })
+                      if (pb.rankedTeamsCount !== pa.rankedTeamsCount) {
+                        return pb.rankedTeamsCount - pa.rankedTeamsCount;
                       }
-                      style={({ pressed }) => [styles.upcomingGameBlock, pressed && styles.cardPressed]}>
-                      <View style={styles.upcomingGameRow}>
-                        <TeamLogo teamId={game.away_id} size={upcomingLogoSize} />
-                        <View style={styles.upcomingGameTextWrap}>
-                          <Text style={styles.upcomingGameLine}>
-                            {game.lsl_rank_away !== null && game.lsl_rank_away !== undefined
-                              ? `#${game.lsl_rank_away} `
-                              : ''}
-                            {game.away_name || 'Away'}
-                          </Text>
-                        </View>
-                      </View>
 
-                      <View style={[styles.upcomingGameRow, { marginBottom: 0 }]}>
-                        <TeamLogo teamId={game.home_id} size={upcomingLogoSize} />
-                        <View style={styles.upcomingGameTextWrap}>
-                          <Text style={styles.upcomingGameLine}>
-                            {game.lsl_rank_home !== null && game.lsl_rank_home !== undefined
-                              ? `#${game.lsl_rank_home} `
-                              : ''}
-                            {game.home_name || 'Home'}
-                          </Text>
+                      if (pa.bestRankValue !== pb.bestRankValue) {
+                        return pa.bestRankValue - pb.bestRankValue;
+                      }
+
+                      if (pa.combinedRankValue !== pb.combinedRankValue) {
+                        return pa.combinedRankValue - pb.combinedRankValue;
+                      }
+
+                      return 0;
+                    })
+                    // NOTE: removed .slice(0, 3) so we see all games
+                    .map((game: any, gameIndex: number) => (
+                      <Pressable
+                        key={game.game_key ?? gameIndex}
+                        onPress={() =>
+                          router.push({
+                            pathname: '/game/[gameKey]',
+                            params: { gameKey: game.game_key },
+                          })
+                        }
+                        style={({ pressed }) => [
+                          styles.upcomingGameBlock,
+                          { width: 220, marginRight: 10 }, // fixed card width + spacing
+                          pressed && styles.cardPressed,
+                        ]}
+                      >
+                        <View style={styles.upcomingGameRow}>
+                          <TeamLogo teamId={game.away_id} size={upcomingLogoSize} />
+                          <View style={styles.upcomingGameTextWrap}>
+                            <Text style={styles.upcomingGameLine}>
+                              {game.lsl_rank_away !== null && game.lsl_rank_away !== undefined
+                                ? `#${game.lsl_rank_away} `
+                                : ''}
+                              {game.away_name || 'Away'}
+                            </Text>
+                          </View>
                         </View>
-                      </View>
-                    </Pressable>
-                  ))}
+
+                        <View style={[styles.upcomingGameRow, { marginBottom: 0 }]}>
+                          <TeamLogo teamId={game.home_id} size={upcomingLogoSize} />
+                          <View style={styles.upcomingGameTextWrap}>
+                            <Text style={styles.upcomingGameLine}>
+                              {game.lsl_rank_home !== null && game.lsl_rank_home !== undefined
+                                ? `#${game.lsl_rank_home} `
+                                : ''}
+                              {game.home_name || 'Home'}
+                            </Text>
+                          </View>
+                        </View>
+                      </Pressable>
+                    ))}
+                </ScrollView>
               </View>
             ))}
           </View>
