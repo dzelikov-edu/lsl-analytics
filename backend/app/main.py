@@ -827,11 +827,11 @@ def _format_date_key_mmdd(date_key) -> str | None:
     return f"{s[:2]}/{s[2:]}"
 
 
+@lru_cache(maxsize=1)
 def _load_lsl_polls_grouped_by_week() -> dict[int, list[dict]]:
     grouped: dict[int, list[dict]] = {}
-
     try:
-        poll_rows = load_polls()
+        poll_rows = _cached_polls()
         for r in poll_rows or []:
             if str(r.get("poll", "")).strip().upper() != "LSL":
                 continue
@@ -4238,15 +4238,12 @@ async def team_schedule(
       - week: filter by week number (int)
     """
     tid = team_id.strip().upper()
-    async with AsyncSessionLocal() as session:
-        # This tells the database: "Give me only the games for this specific team"
-        statement = select(Game).where(or_(Game.team_a == tid, Game.team_b == tid))
-        results = await session.exec(statement)
-        # Instead of 1,471 games, this list will now only be ~30 games
-        games = [g.model_dump() for g in results.all()]
+    global GLOBAL_GAMES_LIST
+    # Pull from RAM cache (instant) instead of Postgres network (slow)
+    games = [g for g in GLOBAL_GAMES_LIST if g.get("team_a") == tid or g.get("team_b") == tid]
 
-    phase_map = load_week_phase_map()
-    name_map = _team_name_map(active_only=False)
+    phase_map = _cached_week_phase_map()
+    name_map = _cached_team_name_map_all()
     grouped_lsl_polls = _load_lsl_polls_grouped_by_week()
 
     out = []
