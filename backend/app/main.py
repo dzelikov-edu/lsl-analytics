@@ -1068,12 +1068,43 @@ def get_team(team_id: str, week: int | None = None):
     except Exception:
         pass
 
+    # ---- conference standing calculation ----
+    conf_rank = None
+    if team_conf:
+        try:
+            # 1. Get all teams and their records for this week
+            all_records = _cached_team_record_map(selected_week)
+            # 2. Get the list of team IDs in this specific conference
+            conf_team_ids = [t_id for t_id, c_id in team_conf_map.items() if c_id == team_conf]
+            
+            # 3. Build a list of (team_id, conf_wins, conf_losses) for sorting
+            conf_standings = []
+            for t_id in conf_team_ids:
+                rec = all_records.get(t_id, {"conference_wins": 0, "conference_losses": 0})
+                conf_standings.append({
+                    "id": t_id, 
+                    "w": rec.get("conference_wins", 0), 
+                    "l": rec.get("conference_losses", 0)
+                })
+            
+            # 4. Sort by wins (descending), then losses (ascending)
+            conf_standings.sort(key=lambda x: (-x["w"], x["l"]))
+            
+            # 5. Find where our current team 'tid' ranks in that list
+            for index, entry in enumerate(conf_standings):
+                if entry["id"] == tid:
+                    conf_rank = index + 1
+                    break
+        except Exception:
+            pass
+
     return {
         "team_id": tid,
         "team_name": match.team_name,
         "active": match.active,
         "conference_id": team_conf,
         "conference_name": team_conf_name,
+        "conference_rank": conf_rank,
 
         # ESPN-style poll badges (LSL primary, LCAA secondary)
         "polls": polls_block,

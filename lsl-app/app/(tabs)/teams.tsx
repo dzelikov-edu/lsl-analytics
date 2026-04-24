@@ -3,8 +3,8 @@ import { AppColors } from '@/constants/app-colors';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useCachedApi } from '@/hooks/useCachedApi';
 import { router } from 'expo-router';
-import { useMemo } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import { useMemo, useState } from 'react';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions, TextInput } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 type TeamRow = {
@@ -26,6 +26,7 @@ type TeamRow = {
 };
 
 export default function TeamsScreen() {
+    const [searchQuery, setSearchQuery] = useState('');
     const colorScheme = useColorScheme() ?? 'light';
     const theme = AppColors[colorScheme];
     const insets = useSafeAreaInsets();
@@ -73,6 +74,17 @@ export default function TeamsScreen() {
                 },
                 teamCardPressed: {
                     opacity: 0.75,
+                },
+                searchInput: {
+                    height: 50,
+                    borderWidth: 1,
+                    borderColor: theme.border,
+                    borderRadius: 12,
+                    paddingHorizontal: 16,
+                    fontSize: 16,
+                    color: theme.text,
+                    backgroundColor: theme.card,
+                    marginBottom: 16,
                 },
                 topRow: {
                     flexDirection: 'row',
@@ -147,6 +159,16 @@ export default function TeamsScreen() {
 
     const teams: TeamRow[] = payload?.teams ?? [];
 
+    const filteredTeams = useMemo(() => {
+        if (!searchQuery.trim()) return teams;
+
+        const query = searchQuery.toLowerCase();
+        return teams.filter(t =>
+            t.team_name.toLowerCase().includes(query) ||
+            t.team_id.toLowerCase().includes(query)
+        );
+    }, [teams, searchQuery]);
+
     const formatRankText = (team: TeamRow) => {
         const rank = team?.polls?.LSL?.rank;
         const next5 = team?.polls?.LSL?.next5_order;
@@ -175,6 +197,16 @@ export default function TeamsScreen() {
             <Text style={styles.screenTitle}>Teams</Text>
             <Text style={styles.screenSubTitle}>Browse all tracked teams</Text>
 
+            <TextInput
+                style={styles.searchInput}
+                placeholder="Search teams..."
+                placeholderTextColor={theme.mutedText}
+                value={searchQuery}
+                onChangeText={setSearchQuery}
+                autoCorrect={false}
+                clearButtonMode="while-editing"
+            />
+
             {loading ? (
                 <View style={styles.centerBlock}>
                     <ActivityIndicator size="large" />
@@ -189,8 +221,13 @@ export default function TeamsScreen() {
                 <View style={styles.teamCard}>
                     <Text style={styles.errorText}>No teams available.</Text>
                 </View>
+            ) : filteredTeams.length === 0 ? (
+                // --- NEW: Handle search query with no matches ---
+                <View style={styles.centerBlock}>
+                    <Text style={styles.helper}>No teams found matching "{searchQuery}"</Text>
+                </View>
             ) : (
-                teams.map((team) => (
+                filteredTeams.map((team) => (
                     <Pressable
                         key={team.team_id}
                         onPress={() => router.push(`/team/${team.team_id}`)}

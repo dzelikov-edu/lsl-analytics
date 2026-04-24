@@ -104,6 +104,12 @@ export default function TeamDetailScreen() {
         };
     }, [teamId]);
 
+    const getOrdinal = (n: number | null) => {
+        if (!n) return '';
+        const s = ['th', 'st', 'nd', 'rd'],
+            v = n % 100;
+        return n + (s[(v - 20) % 10] || s[v] || s[0]);
+    };
 
     const styles = useMemo(
         () =>
@@ -356,7 +362,32 @@ export default function TeamDetailScreen() {
 
                             <View style={styles.heroTextWrap}>
                                 <Text style={styles.teamName}>{team.team_name}</Text>
-                                <Text style={styles.primaryRecord}>{overallRecord}</Text>
+
+                                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                    <Text style={styles.primaryRecord}>{overallRecord}</Text>
+
+                                    {/* --- SURGERY: Pulse Badge --- */}
+                                    {team.conference_rank && (
+                                        <View style={{
+                                            backgroundColor: theme.text,
+                                            paddingHorizontal: 8,
+                                            paddingVertical: 3,
+                                            borderRadius: 6,
+                                            marginLeft: 10,
+                                            // Optional: slight tilt to make it look "Editorial"
+                                            transform: [{ rotate: '-1deg' }]
+                                        }}>
+                                            <Text style={{
+                                                color: theme.background,
+                                                fontSize: 12,
+                                                fontWeight: '900',
+                                                textTransform: 'uppercase'
+                                            }}>
+                                                {getOrdinal(team.conference_rank)} in {team.conference_id}
+                                            </Text>
+                                        </View>
+                                    )}
+                                </View>
                             </View>
                         </View>
 
