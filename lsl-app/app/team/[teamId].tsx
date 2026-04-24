@@ -390,6 +390,42 @@ export default function TeamDetailScreen() {
                                 : `Conference record: ${conferenceRecord}`}
                         </Text>
 
+                        {team.form && team.form.length > 0 && (
+                            <View style={{ marginTop: 12, flexDirection: 'row', alignItems: 'center' }}>
+                                <Text
+                                    style={{
+                                        fontSize: 12,
+                                        color: theme.mutedText,
+                                        fontWeight: '700',
+                                        marginRight: 8,
+                                        textTransform: 'uppercase',
+                                    }}
+                                >
+                                    Recent Form:
+                                </Text>
+                                <View style={{ flexDirection: 'row' }}>
+                                    {team.form.map((res: string, i: number) => (
+                                        <View
+                                            key={i}
+                                            style={{
+                                                width: 22,
+                                                height: 22,
+                                                borderRadius: 11,
+                                                backgroundColor: res === 'W' ? '#34C759' : '#FF3B30', // Green for W, Red for L
+                                                alignItems: 'center',
+                                                justifyContent: 'center',
+                                                marginRight: 4,
+                                            }}
+                                        >
+                                            <Text style={{ color: '#fff', fontSize: 11, fontWeight: '900' }}>
+                                                {res}
+                                            </Text>
+                                        </View>
+                                    ))}
+                                </View>
+                            </View>
+                        )}
+
                         <Text style={styles.pollsLine}>
                             LSL: {formatPollValue(lslRank, lslNext5)} • LCAA: {formatPollValue(lcaaRank, lcaaNext5)}
                         </Text>

@@ -1110,6 +1110,36 @@ def get_team(team_id: str, week: int | None = None):
         except Exception:
             pass
 
+    # ---- form calculation (last 5 games, W/L only) ----
+    form_results = []
+    try:
+        # 1. Filter global cache for played games involving this team
+        played_games = [
+            g for g in GLOBAL_GAMES_LIST
+            if (g.get("team_a") == tid or g.get("team_b") == tid)
+            and g.get("a_score") is not None
+            and g.get("b_score") is not None
+        ]
+
+        # 2. Sort by date_key (newest first)
+        played_games.sort(key=lambda x: str(x.get("date_key", "0000")), reverse=True)
+
+        # 3. Take last 5 and assign W/L
+        for g in played_games[:5]:
+            ta = g.get("team_a")
+            ascore = g.get("a_score")
+            bscore = g.get("b_score")
+
+            if tid == ta:
+                res = "W" if ascore > bscore else "L"
+            else:
+                res = "W" if bscore > ascore else "L"
+
+            form_results.append(res)
+
+    except Exception:
+        pass
+
     return {
         "team_id": tid,
         "team_name": match.team_name,
@@ -1118,6 +1148,7 @@ def get_team(team_id: str, week: int | None = None):
         "conference_name": team_conf_name,
         "conference_rank": conf_rank,
         "conference_is_tied": is_tied,
+        "form": form_results,
 
         # ESPN-style poll badges (LSL primary, LCAA secondary)
         "polls": polls_block,
