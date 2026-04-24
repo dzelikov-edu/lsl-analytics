@@ -4741,3 +4741,8 @@ def rankings_sos_lite(min_games: int = 0):
         "min_games": min_games,
         "rankings": rows_sorted
     }
+
+
+@app.get("/inspect-paths")
+def inspect_paths():
+    return sorted([route.path for route in app.routes])

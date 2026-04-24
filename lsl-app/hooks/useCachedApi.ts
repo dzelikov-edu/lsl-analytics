@@ -33,13 +33,25 @@ export function useCachedApi<T = any>({
 
         try {
             setError(null);
-            const response = await fetch(`${API_BASE_URL}${endpoint}`);
+
+            const fullUrl = `${API_BASE_URL}${endpoint}`;
+            // If endpoint is "/home", this becomes "https://lsl-analytics.onrender.com/home"
+
+            // 2. LOG IT so we can see it in your terminal
+            console.log('--- DEBUG FETCH ---');
+            console.log('Base:', API_BASE_URL);
+            console.log('End:', endpoint);
+            console.log('Full:', fullUrl);
+
+            const response = await fetch(fullUrl);
+
             if (!response.ok) {
+                // If it fails, log the status too
+                console.log('Fetch Failed with status:', response.status);
                 throw new Error(`HTTP ${response.status}`);
             }
 
             const json = await response.json();
-
             setCachedValue(cacheKey, json);
             setData(json);
         } catch (err: any) {

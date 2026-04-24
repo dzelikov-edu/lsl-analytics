@@ -5,6 +5,7 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 import { AppColors } from '@/constants/app-colors';
 import Constants from 'expo-constants';
 import { saveToken } from '../../lib/auth-storage';
+import { API_BASE_URL } from '../../lib/api';
 
 export default function LoginScreen() {
     const [email, setEmail] = useState('');
@@ -21,8 +22,8 @@ export default function LoginScreen() {
         }
 
         setLoading(true);
-        // Use the dynamic backend URL from our config
-        const backendUrl = Constants.expoConfig?.extra?.backendUrl || 'http://localhost:8000';
+        // Replace the Constants logic with our forced API URL
+        const backendUrl = API_BASE_URL;
 
         try {
             const response = await fetch(`${backendUrl}/auth/login`, {

@@ -5,11 +5,11 @@ export default ({ config }) => {
         ...config,
         plugins: [
             ...(config.plugins || []), // Keep existing plugins (like expo-router, expo-splash-screen, etc.)
-            "expo-secure-store"        // ADD THIS LINE
+            "expo-secure-store"
         ],
         extra: {
             ...config.extra,
-            backendUrl: process.env.EXPO_PUBLIC_BACKEND_URL || 'http://localhost:8000',
+            backendUrl: process.env.EXPO_PUBLIC_BACKEND_URL || 'https://lsl-analytics.onrender.com',
             eas: {
                 projectId: process.env.EAS_PROJECT_ID || config.extra?.eas?.projectId,
             },

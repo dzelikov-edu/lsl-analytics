@@ -1,4 +1,3 @@
-// This reads from the EXPO_PUBLIC_BACKEND_URL in your .env file
-export const API_BASE_URL = process.env.EXPO_PUBLIC_BACKEND_URL || 'http://localhost:8000';
+export const API_BASE_URL = 'https://lsl-analytics.onrender.com/api';
 
-console.log('App is connecting to API at:', API_BASE_URL);
+console.log('BETA MODE: API Base set to:', API_BASE_URL);
