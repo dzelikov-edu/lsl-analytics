@@ -22,12 +22,12 @@ export function useCachedApi<T = any>({
     const [refreshing, setRefreshing] = useState(false); // NEW: for Pull-to-Refresh
     const [error, setError] = useState<string | null>(null);
 
-    const load = useCallback(async (isRefresh = false) => {
+    const load = useCallback(async (isRefresh = false, skipLoading = false) => {
         if (!enabled) return;
 
         if (isRefresh) {
             setRefreshing(true);
-        } else if (!data) {
+        } else if (!skipLoading) {
             setLoading(true);
         }
 
@@ -43,28 +43,32 @@ export function useCachedApi<T = any>({
             setCachedValue(cacheKey, json);
             setData(json);
         } catch (err: any) {
-            setError(err?.message ?? 'Unknown error');
+            if (!skipLoading) {
+                setError(err?.message ?? 'Unknown error');
+            }
         } finally {
             setLoading(false);
             setRefreshing(false);
         }
     }, [cacheKey, endpoint, enabled]);
 
+
     useEffect(() => {
         if (!enabled) return;
 
-        // --- THE AGGRESSIVE CLEAN SLATE ---
+        // 1. Check for cached data immediately
         const freshCached = getCachedValue<T>(cacheKey, maxAgeMs);
 
-        // We set data to the fresh cache (which is null for a new poll)
-        // AND we explicitly set loading to true if there's no cache.
+        // 2. Set the data and the loading state correctly
         setData(freshCached);
         setLoading(enabled && !freshCached);
         setError(null);
-        // ----------------------------------
 
-        load();
+        // 3. SURGERY: Pass a hint to load() so it knows we have cache
+        const hasCache = !!freshCached;
+        load(false, hasCache);
     }, [cacheKey, endpoint, enabled]);
+
 
     // NEW: Function to manually trigger a refresh
     const refetch = useCallback(() => {
