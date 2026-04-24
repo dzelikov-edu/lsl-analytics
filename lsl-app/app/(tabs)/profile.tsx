@@ -6,6 +6,7 @@ import { deleteToken, getToken } from '@/lib/auth-storage';
 import { useEffect, useState, useMemo, useCallback } from 'react'; // Add useCallback
 import { API_BASE_URL } from '@/lib/api';
 import TeamLogo from '@/components/TeamLogo';
+import { EmptyState } from '@/components/EmptyState';
 
 export default function ProfileScreen() {
     const colorScheme = useColorScheme() ?? 'light';
@@ -136,9 +137,13 @@ export default function ProfileScreen() {
                         </Pressable>
                     ))
             ) : (
-                <Text style={styles.emptyText}>You haven't added any favorites yet.</Text>
+                <EmptyState
+                    title="No Favorites Yet"
+                    description="Follow your favorite programs to see their latest results and upcoming schedules here."
+                    buttonText="Find Teams to Follow"
+                    theme={theme}
+                />
             )}
-
 
             <Pressable style={styles.logoutButton} onPress={handleLogout}>
                 <Text style={styles.buttonText}>Log Out</Text>

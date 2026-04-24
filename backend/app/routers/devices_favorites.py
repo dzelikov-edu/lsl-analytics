@@ -40,7 +40,7 @@ async def get_favorites(current_user = Depends(get_current_user)):
     favs = await list_favorites(user_id)
     return [f.team_id for f in favs]
 
-@router.post("/favorites", status_code=201, dependencies=[Depends(RateLimiter(times=10, minutes=1))])
+@router.post("/favorites", status_code=201, dependencies=[Depends(RateLimiter(times=50, minutes=1))])
 async def post_favorite(req: FavoriteRequest, current_user = Depends(get_current_user)):
     user_id = getattr(current_user, "id")
     fav = await add_favorite(user_id, req.teamId)
@@ -48,7 +48,7 @@ async def post_favorite(req: FavoriteRequest, current_user = Depends(get_current
         raise HTTPException(status_code=409, detail="Already favorited")
     return {"added": True}
 
-@router.delete("/favorites/{team_id}", dependencies=[Depends(RateLimiter(times=5, minutes=1))])
+@router.delete("/favorites/{team_id}", dependencies=[Depends(RateLimiter(times=50, minutes=1))])
 async def delete_favorite(team_id: str, current_user = Depends(get_current_user)):
     user_id = getattr(current_user, "id")
     ok = await remove_favorite(user_id, team_id)

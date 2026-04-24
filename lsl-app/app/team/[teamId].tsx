@@ -34,34 +34,54 @@ export default function TeamDetailScreen() {
     }
 
     async function addFavorite(teamId: string) {
+        if (favoriteLoading) return; // Prevention gate
+        setFavoriteLoading(true);
         try {
-            const token = await getToken(); // Get stored token
+            const token = await getToken();
             const res = await fetch(`${API_BASE_URL}/api/favorites`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}` // Send token
+                    'Authorization': `Bearer ${token}`
                 },
                 body: JSON.stringify({ teamId }),
             });
-            if (!res.ok) console.log('Failed to add favorite', res.status);
+
+            if (res.ok) {
+                setIsFavorite(true); // Update the icon instantly
+            } else {
+                console.log('Failed to add favorite', res.status);
+            }
         } catch (e) {
             console.log('Error adding favorite', e);
+        } finally {
+            setFavoriteLoading(false); // Clear the gate
         }
     }
 
+
     async function removeFavorite(teamId: string) {
+        if (favoriteLoading) return; // Prevention gate
+        setFavoriteLoading(true);
         try {
-            const token = await getToken(); // Get stored token
+            const token = await getToken();
             const res = await fetch(`${API_BASE_URL}/api/favorites/${encodeURIComponent(teamId)}`, {
                 method: 'DELETE',
-                headers: { 'Authorization': `Bearer ${token}` } // Send token
+                headers: { 'Authorization': `Bearer ${token}` }
             });
-            if (!res.ok) console.log('Failed to remove favorite', res.status);
+
+            if (res.ok) {
+                setIsFavorite(false); // Update the icon instantly
+            } else {
+                console.log('Failed to remove favorite', res.status);
+            }
         } catch (e) {
             console.log('Error removing favorite', e);
+        } finally {
+            setFavoriteLoading(false); // Clear the gate
         }
     }
+
 
     useEffect(() => {
         if (!teamId) return;
@@ -363,21 +383,21 @@ export default function TeamDetailScreen() {
                                     borderColor: theme.border,
                                     backgroundColor: pressed ? theme.border : theme.card,
                                     alignSelf: 'flex-start',
+                                    // Dim the button slightly when it's in the 'Updating...' state
+                                    opacity: favoriteLoading ? 0.6 : 1,
                                 },
                             ]}
                             disabled={favoriteLoading}
-                            onPress={async () => {
+                            onPress={() => {
                                 if (!teamId) return;
                                 const tid = String(teamId);
-                                setFavoriteLoading(true);
+
+                                // Let the standalone functions handle the state updates!
                                 if (isFavorite) {
-                                    await removeFavorite(tid);
-                                    setIsFavorite(false);
+                                    removeFavorite(tid);
                                 } else {
-                                    await addFavorite(tid);
-                                    setIsFavorite(true);
+                                    addFavorite(tid);
                                 }
-                                setFavoriteLoading(false);
                             }}
                         >
                             <Text
@@ -393,7 +413,6 @@ export default function TeamDetailScreen() {
                                         : 'Favorite Team'}
                             </Text>
                         </Pressable>
-
                     </View>
 
                     <View style={styles.section}>
