@@ -3,19 +3,21 @@ import 'dotenv/config';
 export default ({ config }) => {
     return {
         ...config,
+        // REMOVE the runtimeVersion block entirely
         plugins: [
-            ...(config.plugins || []), // Keep existing plugins (like expo-router, expo-splash-screen, etc.)
+            ...(config.plugins || []),
             "expo-secure-store"
         ],
         extra: {
             ...config.extra,
+            // HARDCODE this for the beta to ensure it never fails
             backendUrl: 'https://lsl-backend.onrender.com',
             eas: {
-                projectId: process.env.EAS_PROJECT_ID || config.extra?.eas?.projectId,
+                projectId: "1123b7ce-5272-4e3c-a214-fca8911aa554",
             },
         },
         updates: {
-            url: process.env.EAS_UPDATE_URL || config.updates?.url,
+            url: "https://u.expo.dev/1123b7ce-5272-4e3c-a214-fca8911aa554"
         }
     };
 };

@@ -296,21 +296,23 @@ export default function HomeScreen() {
   const calendarDays = payload?.calendar_preview?.days ?? [];
 
   const myTeamsSnapshot = useMemo(() => {
-    // 1. Safety Guard: Check if we have data to work with
-    if (!favorites || favorites.length === 0 || !calendarDays || !Array.isArray(calendarDays)) {
+    // Safety check: ensure everything exists before we start
+    if (!favorites || !Array.isArray(favorites) || !calendarDays || !Array.isArray(calendarDays)) {
       return [];
     }
 
     const snapshot: any[] = [];
 
     favorites.forEach(favId => {
-      const tid = String(favId).toUpperCase();
+      // Ensure favId isn't null before calling toUpperCase
+      const tid = String(favId || "").toUpperCase();
+      if (!tid) return;
+
       let upcomingGame: any = null;
       let lastResult: any = null;
 
       for (const day of calendarDays) {
-        // 2. Safety Guard: Check if day.games exists
-        if (!day || !day.games) continue;
+        if (!day?.games || !Array.isArray(day.games)) continue;
 
         const game = day.games.find((g: any) =>
           String(g?.home_id || "").toUpperCase() === tid ||
@@ -322,7 +324,8 @@ export default function HomeScreen() {
             game.b_score !== null && game.b_score !== undefined;
 
           const gameType = isPlayed ? 'RESULT' : 'UPCOMING';
-          const payload = { ...game, display_date: day.display_date, type: gameType };
+          // Use optional chaining for the display date
+          const payload = { ...game, display_date: day?.display_date || 'TBD', type: gameType };
 
           if (gameType === 'UPCOMING') {
             upcomingGame = payload;
@@ -339,7 +342,6 @@ export default function HomeScreen() {
 
     return snapshot;
   }, [favorites, calendarDays]);
-
 
   const getCalendarGamePriority = (game: any) => {
     const homeRank = game?.lsl_rank_home;
