@@ -147,17 +147,20 @@ export default function RankingsScreen() {
         loading,
         error,
     } = useCachedApi({
-        cacheKey: `poll:${selectedPoll}:week0`,
-        endpoint: `/polls/${selectedPoll}?week=0`,
+        cacheKey: 'rankings-all-polls-v1', // Stable key for both
+        endpoint: '/rankings/polls?week=0', // Bulk endpoint
         maxAgeMs: 1000 * 60 * 30,
     });
 
-    const top25: Top25Row[] = payload?.top25 ?? [];
-    const next5: Next5Row[] = payload?.next5 ?? [];
+    // The backend uses 'primary' for LSL and 'secondary' for LCAA
+    const currentPollData = selectedPoll === 'LSL' ? payload?.primary : payload?.secondary;
+
+    const top25: Top25Row[] = currentPollData?.top25 ?? [];
+    const next5: Next5Row[] = currentPollData?.next5 ?? [];
+
 
     return (
         <ScrollView
-            key={selectedPoll}
             contentContainerStyle={styles.content}
         >
 
@@ -189,10 +192,10 @@ export default function RankingsScreen() {
                 </Pressable>
             </View>
 
-            {(loading || !payload) && !error ? (
+            {loading && !payload ? (
                 <View style={styles.centerBlock}>
                     <ActivityIndicator size="large" color={theme.text} />
-                    <Text style={styles.helper}>Loading rankings...</Text>
+                    <Text style={styles.helper}>Loading all rankings...</Text>
                 </View>
             ) : error ? (
                 <View style={styles.listCard}>

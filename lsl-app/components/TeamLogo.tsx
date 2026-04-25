@@ -1,7 +1,9 @@
 import { AppColors } from '@/constants/app-colors';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { getTeamBranding } from '@/lib/teamBranding';
-import { Image, StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
+import { Image } from 'expo-image'; // Use the high-performance version
+
 
 type TeamLogoProps = {
     teamId?: string | null;
@@ -17,8 +19,12 @@ export default function TeamLogo({ teamId, size = 28 }: TeamLogoProps) {
         return (
             <Image
                 source={branding.logo}
-                style={{ width: size, height: size, resizeMode: 'contain' }}
+                contentFit="contain"
+                // Remove the transition so it's instant, or set it to 0
+                transition={0}
+                style={{ width: size, height: size }}
             />
+
         );
     }
 

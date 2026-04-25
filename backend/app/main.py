@@ -367,7 +367,8 @@ def _cached_game_preview_support():
 
 @lru_cache(maxsize=16)
 def _has_played_games_through_week(week: int | None = None) -> bool:
-    games = _load_games_or_404()
+    global GLOBAL_GAMES_LIST
+    games = GLOBAL_GAMES_LIST
     w = 0 if week is None else week
     
     for g in games:
@@ -482,7 +483,8 @@ def _cached_team_conf_map_merged():
 
 @lru_cache(maxsize=32)
 def _cached_team_record_map(week: int | None = None):
-    games = _load_games_or_404()
+    global GLOBAL_GAMES_LIST
+    games = GLOBAL_GAMES_LIST
     team_conf_map = _cached_team_conf_map_merged()
 
     counts = {}
@@ -1353,6 +1355,15 @@ async def refresh_league(background_tasks: BackgroundTasks):
             
             # Save the results to the permanent Postgres Database
             await save_games_to_db(games_by_key)
+
+            # --- SURGERY: Update the RAM Cache in real-time ---
+            global GLOBAL_GAMES_LIST
+            GLOBAL_GAMES_LIST = await _load_games_from_db()
+
+            # IMPORTANT: Clear the LRU caches so they rebuild with the new RAM data
+            _cached_team_record_map.cache_clear()
+            _has_played_games_through_week.cache_clear()
+            # --------------------------------------------------
             
             print(f"Background ingest complete. {len(games_by_key)} games are now permanent in DB.")
         except Exception as e:
@@ -2282,7 +2293,8 @@ def analytics_resume(week: int | None = None):
             "items": [],
         }
 
-    games = _load_games_or_404()
+    global GLOBAL_GAMES_LIST
+    games = GLOBAL_GAMES_LIST
     name_map = _team_name_map(active_only=True)
 
     # Played games only, optionally filtered through requested week
@@ -2490,7 +2502,8 @@ def analytics_form(week: int | None = None):
             "items": [],
         }
 
-    games = _load_games_or_404()
+    global GLOBAL_GAMES_LIST
+    games = GLOBAL_GAMES_LIST
     name_map = _team_name_map(active_only=True)
 
     # Build played game logs by team
@@ -2686,7 +2699,8 @@ def analytics_sos(week: int | None = None):
             "items": [],
         }
 
-    games = _load_games_or_404()
+    global GLOBAL_GAMES_LIST
+    games = GLOBAL_GAMES_LIST
     name_map = _team_name_map(active_only=True)
 
     # Filter to played games only, optionally through requested week
@@ -3728,7 +3742,8 @@ def get_games(
       - sort: one of [phase_week, week, team, date, none]
       - order: asc|desc
     """
-    games = _load_games_or_404()
+    global GLOBAL_GAMES_LIST
+    games = GLOBAL_GAMES_LIST
 
     # ---- parse/clamp pagination ----
     try:
@@ -4002,7 +4017,8 @@ async def get_game_by_key(game_key: str):
 
 @app.get("/matchup/{team1}/{team2}")
 def matchup(team1: str, team2: str):
-    games = _load_games_or_404()
+    global GLOBAL_GAMES_LIST
+    games = GLOBAL_GAMES_LIST
     name_map = _team_name_map(active_only=False)
     phase_map = load_week_phase_map()
     t1 = team1.strip().upper()
@@ -4068,7 +4084,8 @@ def calendar(
     Filters: team_id, phase, week, played
     Pagination: limit_days, offset_days
     """
-    games = _load_games_or_404()
+    global GLOBAL_GAMES_LIST
+    games = GLOBAL_GAMES_LIST
     name_map = _team_name_map(active_only=False)
     phase_map = load_week_phase_map()
 
@@ -4431,7 +4448,8 @@ def team_upcoming(team_id: str, phase: Optional[str] = None):
     """
     Unplayed games only.
     """
-    games = _load_games_or_404()
+    global GLOBAL_GAMES_LIST
+    games = GLOBAL_GAMES_LIST
     tid = team_id.strip().upper()
     phase_map = load_week_phase_map()
 
@@ -4490,7 +4508,8 @@ def team_summary(team_id: str):
       - next upcoming game (if any)
       - totals by phase
     """
-    games = _load_games_or_404()
+    global GLOBAL_GAMES_LIST
+    games = GLOBAL_GAMES_LIST
     tid = team_id.strip().upper()
 
     # pull this team's games using the same logic as schedule filtering (but internal)
@@ -4576,11 +4595,8 @@ def rankings():
     Simple rankings: win/loss/win_pct from games with scores present.
     """
     _ensure_data_dir()
-    if not os.path.exists(GAMES_JSON_PATH):
-        raise HTTPException(status_code=404, detail="No games.json found. Run POST /refresh first.")
-
-    with open(GAMES_JSON_PATH, "r", encoding="utf-8") as f:
-        games = json.load(f)
+    global GLOBAL_GAMES_LIST
+    games = GLOBAL_GAMES_LIST
 
     name_map = _team_name_map(active_only=True)
 
@@ -4655,7 +4671,8 @@ def rankings_sos_lite(min_games: int = 0):
     Query params:
       - min_games: only include teams with at least this many played games (default 0)
     """
-    games = _load_games_or_404()
+    global GLOBAL_GAMES_LIST
+    games = GLOBAL_GAMES_LIST
     name_map = _team_name_map(active_only=True)
 
     # 1) Build W/L records from played games only
