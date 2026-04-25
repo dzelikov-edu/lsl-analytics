@@ -1,107 +1,60 @@
 import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
-import { Asset } from 'expo-asset';
-import Constants from 'expo-constants';
 import { getToken } from '../lib/auth-storage';
 import { Stack, router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
+import { View, ActivityIndicator, Alert } from 'react-native';
 import 'react-native-reanimated';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-
 import * as Notifications from 'expo-notifications';
 import * as Device from 'expo-device';
-
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import { CONFERENCE_LOGOS } from '@/lib/conferenceLogos';
-import { TEAM_LOGOS } from '@/lib/teamLogos';
 
 export const unstable_settings = {
   anchor: '(tabs)',
 };
 
-async function registerForPushNotificationsAsync() {
-  if (!Device.isDevice) return;
-
-  try {
-    const { status: existingStatus } = await Notifications.getPermissionsAsync();
-    let finalStatus = existingStatus;
-
-    if (existingStatus !== 'granted') {
-      const { status } = await Notifications.requestPermissionsAsync();
-      finalStatus = status;
-    }
-
-    if (finalStatus !== 'granted') return;
-
-    // --- SURGERY: Hardcode the Project ID for the Beta ---
-    const tokenData = await Notifications.getExpoPushTokenAsync({
-      projectId: "1123b7ce-5272-4e3c-a214-fca8911aa554",
-    });
-    const expoPushToken = tokenData.data;
-
-    // --- SURGERY: Hardcode the Backend URL ---
-    const backendUrl = 'https://lsl-backend.onrender.com';
-    const token = await getToken();
-
-    if (!token) return;
-
-    await fetch(`${backendUrl}/api/devices`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`,
-      },
-      body: JSON.stringify({
-        expoPushToken,
-        deviceId: Device.modelName || 'beta-device',
-        platform: Device.osName?.toLowerCase() || 'ios',
-      }),
-    });
-  } catch (e) {
-    console.warn('Push registration failed silently:', e);
-    // We don't throw an error here, so the app doesn't crash
-  }
-}
-
-
 export default function RootLayout() {
   const colorScheme = useColorScheme();
+  const [isReady, setIsReady] = useState(false);
 
   useEffect(() => {
-    const checkAuth = async () => {
-      const token = await getToken();
-      if (!token) {
-        // Delay by 100ms to ensure the navigation tree is mounted
-        setTimeout(() => {
-          router.replace('/auth/login');
-        }, 100);
-      }
-    };
-    checkAuth();
-  }, []);
-
-
-  useEffect(() => {
-    const preloadAssets = async () => {
+    async function bootApp() {
       try {
-        const allLogoModules = [
-          ...Object.values(TEAM_LOGOS),
-          ...Object.values(CONFERENCE_LOGOS),
-        ].filter(Boolean);
+        // --- BYPASS ASSET LOADING FOR RESCUE ---
+        // This ensures a missing logo doesn't kill the app
 
-        await Asset.loadAsync(allLogoModules);
-      } catch (error) {
-        console.warn('Logo preload failed:', error);
+        const token = await getToken();
+
+        // Register notifications in background
+        if (token) {
+          registerNotifications(token).catch(console.warn);
+        }
+
+        // FORCE state to ready
+        setIsReady(true);
+
+        if (!token) {
+          // Small delay to let the navigation stack settle
+          setTimeout(() => {
+            try { router.replace('/auth/login'); } catch (e) { }
+          }, 500);
+        }
+      } catch (e: any) {
+        setIsReady(true);
+        Alert.alert("Beta Boot Error", e.message);
       }
-    };
-
-    preloadAssets();
+    }
+    bootApp();
   }, []);
 
-  useEffect(() => {
-    registerForPushNotificationsAsync();
-  }, []);
-
+  if (!isReady) {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#000' }}>
+        <ActivityIndicator size="large" color="#fff" />
+      </View>
+    );
+  }
 
   return (
     <SafeAreaProvider>
@@ -118,4 +71,27 @@ export default function RootLayout() {
       </ThemeProvider>
     </SafeAreaProvider>
   );
+}
+
+async function registerNotifications(token: string) {
+  if (!Device.isDevice) return;
+  const { status } = await Notifications.requestPermissionsAsync();
+  if (status !== 'granted') return;
+
+  const tokenData = await Notifications.getExpoPushTokenAsync({
+    projectId: "1123b7ce-5272-4e3c-a214-fca8911aa554",
+  });
+
+  await fetch('https://lsl-backend.onrender.com/api/devices', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`,
+    },
+    body: JSON.stringify({
+      expoPushToken: tokenData.data,
+      deviceId: Device.modelName || 'beta-device',
+      platform: Device.osName?.toLowerCase() || 'ios',
+    }),
+  });
 }
