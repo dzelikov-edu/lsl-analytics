@@ -34,19 +34,16 @@ export function useCachedApi<T = any>({
         try {
             setError(null);
 
-            // --- BULLETPROOF URL BUILDER ---
-            // This ensures we never have double slashes and always have the leading slash
-            const cleanBase = API_BASE_URL.replace(/\/$/, ''); // Remove trailing slash
-            const cleanEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
-            const fullUrl = `${cleanBase}${cleanEndpoint}`;
-            // --------------------------------
+            // fixes slashes
+            const base = API_BASE_URL.endsWith('/') ? API_BASE_URL.slice(0, -1) : API_BASE_URL;
+            const end = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
+            const fullUrl = `${base}${end}`;
 
-            console.log('Fetching from:', fullUrl);
             const response = await fetch(fullUrl);
 
             if (!response.ok) {
-                // If it fails, log the status too
-                console.log('Fetch Failed with status:', response.status);
+                // We removed the console.log, but we KEEP the throw.
+                // This tells the hook to set the 'error' state correctly.
                 throw new Error(`HTTP ${response.status}`);
             }
 
@@ -67,18 +64,17 @@ export function useCachedApi<T = any>({
     useEffect(() => {
         if (!enabled) return;
 
-        // 1. Check for cached data immediately
         const freshCached = getCachedValue<T>(cacheKey, maxAgeMs);
 
-        // 2. Set the data and the loading state correctly
         setData(freshCached);
         setLoading(enabled && !freshCached);
         setError(null);
 
-        // 3. SURGERY: Pass a hint to load() so it knows we have cache
-        const hasCache = !!freshCached;
-        load(false, hasCache);
-    }, [cacheKey, endpoint, enabled]);
+        // We call load manually here
+        load(false, !!freshCached);
+
+    }, [cacheKey, endpoint, enabled]); // DO NOT add 'load' here unless it's memoized
+
 
 
     // NEW: Function to manually trigger a refresh

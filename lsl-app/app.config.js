@@ -9,7 +9,7 @@ export default ({ config }) => {
         ],
         extra: {
             ...config.extra,
-            backendUrl: process.env.EXPO_PUBLIC_BACKEND_URL || 'https://lsl-analytics.onrender.com',
+            backendUrl: 'https://lsl-backend.onrender.com',
             eas: {
                 projectId: process.env.EAS_PROJECT_ID || config.extra?.eas?.projectId,
             },

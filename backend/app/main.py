@@ -110,7 +110,7 @@ class LimitUploadSize(BaseHTTPMiddleware):
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
-    allow_credentials=True,
+    allow_credentials=False,
     allow_methods=["GET", "POST", "DELETE", "OPTIONS"],
     allow_headers=["*"],
 )
@@ -2928,13 +2928,21 @@ async def home(
         with open(REFRESH_META_PATH, "r", encoding="utf-8") as f:
             meta = json.load(f)
 
-    games = await _load_games_from_db()
+    global GLOBAL_GAMES_LIST
+    # Use the RAM cache we built at startup. 
+    # This prevents Render from having to load 1,471 games over and over.
+    games = GLOBAL_GAMES_LIST
+    
+    if not games:
+        # Fallback only if the RAM cache is empty
+        games = await _load_games_from_db()
+
     
     # --- MOVE THIS UP ---
     if games is None:
         games = []
     
-    # DEBUG LOG: Now this is safe because games is guaranteed to be a list
+    # This print will now show you that the games are coming from the cache
     print(f"iPad request received. Games type: {type(games)}. Count: {len(games)}")
     
     # if not games:

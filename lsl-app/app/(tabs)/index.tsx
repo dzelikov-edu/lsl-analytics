@@ -21,25 +21,28 @@ export default function HomeScreen() {
 
   const [favorites, setFavorites] = useState<string[]>([]);
 
+  // We wrap the entire logic in useCallback with [] so it only creates ONCE
+  const loadFavs = useCallback(async () => {
+    try {
+      const token = await getToken();
+      if (!token) return;
+      const res = await fetch(`${API_BASE_URL}/api/favorites`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        // ONLY update state if the data is actually different
+        setFavorites(prev => JSON.stringify(prev) === JSON.stringify(data) ? prev : data);
+      }
+    } catch (e) {
+      console.log("Error loading favs on home", e);
+    }
+  }, []); // Empty array is crucial
+
   useFocusEffect(
     useCallback(() => {
-      const loadFavs = async () => {
-        try {
-          const token = await getToken();
-          if (!token) return;
-          const res = await fetch(`${API_BASE_URL}/api/favorites`, {
-            headers: { Authorization: `Bearer ${token}` }
-          });
-          if (res.ok) {
-            const data = await res.json();
-            setFavorites(data);
-          }
-        } catch (e) {
-          console.log("Error loading favs on home", e);
-        }
-      };
       loadFavs();
-    }, [])
+    }, [loadFavs])
   );
 
   const featuredCardPadding = isCompact ? 12 : 14;
@@ -280,10 +283,11 @@ export default function HomeScreen() {
     error,
     refetch,
   } = useCachedApi({
-    cacheKey: 'home-data-beta-v1', // <--- CHANGE THE CACHE KEY
-    endpoint: '/home?v=1',         // <--- ADD A VERSION PARAM
-    maxAgeMs: 0,                   // <--- FORCE 0 FOR THIS TEST
+    cacheKey: 'home-data-v1', // Stable key
+    endpoint: '/home',        // Stable endpoint
+    maxAgeMs: 1000 * 60 * 10,  // 10 minutes cache
   });
+
 
 
   const featuredGames = payload?.featured_games?.games ?? [];
@@ -292,7 +296,10 @@ export default function HomeScreen() {
   const calendarDays = payload?.calendar_preview?.days ?? [];
 
   const myTeamsSnapshot = useMemo(() => {
-    if (favorites.length === 0 || !calendarDays) return [];
+    // 1. Safety Guard: Check if we have data to work with
+    if (!favorites || favorites.length === 0 || !calendarDays || !Array.isArray(calendarDays)) {
+      return [];
+    }
 
     const snapshot: any[] = [];
 
@@ -302,33 +309,32 @@ export default function HomeScreen() {
       let lastResult: any = null;
 
       for (const day of calendarDays) {
-        const game = day.games?.find((g: any) =>
-          String(g.home_id).toUpperCase() === tid ||
-          String(g.away_id).toUpperCase() === tid
+        // 2. Safety Guard: Check if day.games exists
+        if (!day || !day.games) continue;
+
+        const game = day.games.find((g: any) =>
+          String(g?.home_id || "").toUpperCase() === tid ||
+          String(g?.away_id || "").toUpperCase() === tid
         );
 
         if (game) {
-          // --- BULLETPROOF CHECK ---
-          // A game is ONLY a result if both scores are numbers and NOT null/undefined
-          const hasScoreA = game.a_score !== null && game.a_score !== undefined;
-          const hasScoreB = game.b_score !== null && game.b_score !== undefined;
-          const isPlayed = hasScoreA && hasScoreB;
+          const isPlayed = game.a_score !== null && game.a_score !== undefined &&
+            game.b_score !== null && game.b_score !== undefined;
 
-          if (isPlayed) {
-            lastResult = { ...game, display_date: day.display_date, type: 'RESULT' };
-          } else {
-            upcomingGame = { ...game, display_date: day.display_date, type: 'UPCOMING' };
-            // If we found an actual upcoming game, stop looking
+          const gameType = isPlayed ? 'RESULT' : 'UPCOMING';
+          const payload = { ...game, display_date: day.display_date, type: gameType };
+
+          if (gameType === 'UPCOMING') {
+            upcomingGame = payload;
             break;
+          } else {
+            lastResult = payload;
           }
         }
       }
 
-      if (upcomingGame) {
-        snapshot.push(upcomingGame);
-      } else if (lastResult) {
-        snapshot.push(lastResult);
-      }
+      if (upcomingGame) snapshot.push(upcomingGame);
+      else if (lastResult) snapshot.push(lastResult);
     });
 
     return snapshot;
