@@ -20,56 +20,46 @@ export const unstable_settings = {
 };
 
 async function registerForPushNotificationsAsync() {
-  if (!Device.isDevice) {
-    console.log('Push notifications only work on physical devices');
-    return;
-  }
-
-  const { status: existingStatus } = await Notifications.getPermissionsAsync();
-  let finalStatus = existingStatus;
-
-  if (existingStatus !== 'granted') {
-    const { status } = await Notifications.requestPermissionsAsync();
-    finalStatus = status;
-  }
-
-  if (finalStatus !== 'granted') {
-    console.log('Push notification permission not granted');
-    return;
-  }
-
-  // We will fix this line in the next step - make sure Constants is imported
-  const tokenData = await Notifications.getExpoPushTokenAsync({
-    // @ts-ignore: Property 'eas' does not exist on type 'ExpoConfig'. It's there at runtime.
-    projectId: Constants.expoConfig?.eas?.projectId, // Reads from app.json dynamically
-  });
-  const expoPushToken = tokenData.data;
-  console.log('Expo push token:', expoPushToken);
+  if (!Device.isDevice) return;
 
   try {
-    const backendUrl = Constants.expoConfig?.extra?.backendUrl || 'http://localhost:8000';
-    const token = await getToken(); // 1. Get the real token from storage
+    const { status: existingStatus } = await Notifications.getPermissionsAsync();
+    let finalStatus = existingStatus;
 
-    if (!token) {
-      console.log('No auth token found, skipping device registration');
-      return;
+    if (existingStatus !== 'granted') {
+      const { status } = await Notifications.requestPermissionsAsync();
+      finalStatus = status;
     }
+
+    if (finalStatus !== 'granted') return;
+
+    // --- SURGERY: Hardcode the Project ID for the Beta ---
+    const tokenData = await Notifications.getExpoPushTokenAsync({
+      projectId: "1123b7ce-5272-4e3c-a214-fca8911aa554",
+    });
+    const expoPushToken = tokenData.data;
+
+    // --- SURGERY: Hardcode the Backend URL ---
+    const backendUrl = 'https://lsl-backend.onrender.com';
+    const token = await getToken();
+
+    if (!token) return;
 
     await fetch(`${backendUrl}/api/devices`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`, // 2. Attach the real token
+        'Authorization': `Bearer ${token}`,
       },
       body: JSON.stringify({
         expoPushToken,
-        deviceId: 'dev-ipad-1',
-        platform: 'ios',
+        deviceId: Device.modelName || 'beta-device',
+        platform: Device.osName?.toLowerCase() || 'ios',
       }),
     });
-    console.log('Device registered successfully');
   } catch (e) {
-    console.log('Failed to register device on backend:', e);
+    console.warn('Push registration failed silently:', e);
+    // We don't throw an error here, so the app doesn't crash
   }
 }
 
@@ -81,12 +71,15 @@ export default function RootLayout() {
     const checkAuth = async () => {
       const token = await getToken();
       if (!token) {
-        router.replace('/auth/login');
+        // Delay by 100ms to ensure the navigation tree is mounted
+        setTimeout(() => {
+          router.replace('/auth/login');
+        }, 100);
       }
     };
-
     checkAuth();
   }, []);
+
 
   useEffect(() => {
     const preloadAssets = async () => {
