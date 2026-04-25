@@ -1,4 +1,4 @@
-import { View, Text, Pressable, StyleSheet, ScrollView, ActivityIndicator, RefreshControl } from 'react-native';
+import { View, Text, Pressable, StyleSheet, ScrollView, ActivityIndicator, RefreshControl, Alert, Switch } from 'react-native';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { AppColors } from '@/constants/app-colors';
 import { router, useFocusEffect } from 'expo-router'; // Add useFocusEffect
@@ -17,6 +17,7 @@ export default function ProfileScreen() {
     const [teamNames, setTeamNames] = useState<Record<string, string>>({}); // ID -> Name map
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
+    const [notificationsEnabled, setNotificationsEnabled] = useState(true);
 
     // This function fetches all the data
     const loadProfileData = useCallback(async () => {
@@ -66,9 +67,22 @@ export default function ProfileScreen() {
         }, [loadProfileData])
     );
 
-    const handleLogout = async () => {
-        await deleteToken();
-        router.replace('/auth/login');
+    const handleLogout = () => {
+        Alert.alert(
+            "Log Out",
+            "Are you sure you want to log out of Legends CBB?",
+            [
+                { text: "Cancel", style: "cancel" },
+                {
+                    text: "Log Out",
+                    style: "destructive",
+                    onPress: async () => {
+                        await deleteToken();
+                        router.replace('/auth/login');
+                    }
+                }
+            ]
+        );
     };
 
     const styles = useMemo(() => StyleSheet.create({
@@ -86,6 +100,29 @@ export default function ProfileScreen() {
             marginBottom: 10,
             borderWidth: 1,
             borderColor: theme.border,
+        },
+        settingRow: {
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            backgroundColor: theme.card,
+            padding: 16,
+            borderRadius: 12,
+            marginBottom: 20,
+            borderWidth: 1,
+            borderColor: theme.border,
+        },
+        settingLabel: {
+            fontSize: 16,
+            fontWeight: '600',
+            color: theme.text,
+        },
+        versionText: {
+            textAlign: 'center',
+            color: theme.mutedText,
+            fontSize: 12,
+            marginTop: 30,
+            marginBottom: 10,
         },
         favText: { fontSize: 17, fontWeight: '600', color: theme.text, marginLeft: 12 },
         logoutButton: { backgroundColor: theme.danger, paddingVertical: 14, borderRadius: 10, alignItems: 'center', marginTop: 20 },
@@ -145,9 +182,28 @@ export default function ProfileScreen() {
                 />
             )}
 
+            {/* --- NOTIFICATION TOGGLE (Sim-League Style) --- */}
+            <View style={styles.settingRow}>
+                <View style={{ flex: 1, paddingRight: 10 }}>
+                    <Text style={styles.settingLabel}>New Result Alerts</Text>
+                    <Text style={{ color: theme.mutedText, fontSize: 13, marginTop: 2 }}>
+                        Get notified when new sim results and rankings are posted.
+                    </Text>
+                </View>
+                <Switch
+                    value={notificationsEnabled}
+                    onValueChange={setNotificationsEnabled}
+                    trackColor={{ false: theme.border, true: '#34C759' }}
+                />
+            </View>
+
+
             <Pressable style={styles.logoutButton} onPress={handleLogout}>
                 <Text style={styles.buttonText}>Log Out</Text>
             </Pressable>
+
+            {/* --- VERSION NUMBER --- */}
+            <Text style={styles.versionText}>Legends CBB v1.0.0 (Beta)</Text>
         </ScrollView>
     );
 }

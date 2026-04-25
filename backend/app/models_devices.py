@@ -15,11 +15,12 @@ class Device(SQLModel, table=True):
     id: str = Field(default_factory=lambda: str(uuid4()), primary_key=True)
     user_id: Optional[str] = Field(default=None, foreign_key="user.id", index=True)
     expo_push_token: str = Field(index=True)
-    device_id: Optional[str] = None
-    platform: Optional[str] = None
+    device_id: Optional[str] = Field(None, max_length=100)
+    platform: Optional[str] = Field(None, max_length=20)
     created_at: datetime = Field(default_factory=datetime.utcnow)
     last_seen: datetime = Field(default_factory=datetime.utcnow)
     active: bool = True
+    notifications_enabled: bool = Field(default=True)
 
 class Favorite(SQLModel, table=True):
     id: str = Field(default_factory=lambda: str(uuid4()), primary_key=True)
