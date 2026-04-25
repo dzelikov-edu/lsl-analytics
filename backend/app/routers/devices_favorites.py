@@ -5,6 +5,10 @@ from typing import Optional, List
 import re
 from app.deps_auth import get_current_user
 from app.crud_devices import create_or_update_device, remove_device, list_favorites, add_favorite, remove_favorite
+from sqlmodel import select
+from app.db import AsyncSessionLocal
+from app.models_devices import Device, User
+
 
 router = APIRouter(prefix="/api", tags=["devices", "favorites"])
 
@@ -55,3 +59,25 @@ async def delete_favorite(team_id: str, current_user = Depends(get_current_user)
     if not ok:
         raise HTTPException(status_code=404, detail="Favorite not found")
     return {"removed": True}
+
+@router.patch("/devices/settings")
+async def update_device_settings(
+    enabled: bool, 
+    current_user: User = Depends(get_current_user)
+):
+    async with AsyncSessionLocal() as session:
+        # Find the device(s) for this user
+        statement = select(Device).where(Device.user_id == current_user.id)
+        results = await session.exec(statement)
+        devices = results.all()
+        
+        if not devices:
+            raise HTTPException(status_code=404, detail="No registered device found for this user.")
+        
+        # Update all devices for this user (iPad, iPhone, etc.)
+        for device in devices:
+            device.notifications_enabled = enabled
+            session.add(device)
+            
+        await session.commit()
+        return {"ok": True, "notifications_enabled": enabled}
