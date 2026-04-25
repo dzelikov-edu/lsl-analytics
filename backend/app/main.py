@@ -4772,11 +4772,3 @@ def rankings_sos_lite(min_games: int = 0):
 @app.get("/inspect-paths")
 def inspect_paths():
     return sorted([route.path for route in app.routes])
-
-
-@app.get("/run-migration-nudge")
-async def run_migration_nudge():
-    # This manually injects the new column into the Postgres table
-    async with engine.begin() as conn:
-        await conn.execute(text("ALTER TABLE device ADD COLUMN notifications_enabled BOOLEAN DEFAULT TRUE;"))
-    return {"message": "Database nudged! Column 'notifications_enabled' added to 'device' table."}

@@ -67,6 +67,33 @@ export default function ProfileScreen() {
         }, [loadProfileData])
     );
 
+    const toggleNotifications = async (newValue: boolean) => {
+        // 1. Update the UI immediately so it feels snappy
+        setNotificationsEnabled(newValue);
+
+        try {
+            const token = await getToken();
+            if (!token) return;
+
+            // 2. Ping the new PATCH endpoint we just built
+            const res = await fetch(`${API_BASE_URL}/api/devices/settings?enabled=${newValue}`, {
+                method: 'PATCH',
+                headers: {
+                    Authorization: `Bearer ${token}`,
+                    'Content-Type': 'application/json',
+                },
+            });
+
+            if (!res.ok) {
+                console.log('Failed to sync notification settings:', res.status);
+                // Optional: revert the switch if the server fails
+                // setNotificationsEnabled(!newValue);
+            }
+        } catch (e) {
+            console.log('Error syncing notifications:', e);
+        }
+    };
+
     const handleLogout = () => {
         Alert.alert(
             "Log Out",
@@ -192,7 +219,7 @@ export default function ProfileScreen() {
                 </View>
                 <Switch
                     value={notificationsEnabled}
-                    onValueChange={setNotificationsEnabled}
+                    onValueChange={toggleNotifications}
                     trackColor={{ false: theme.border, true: '#34C759' }}
                 />
             </View>
