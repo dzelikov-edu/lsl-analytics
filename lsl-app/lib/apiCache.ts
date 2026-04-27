@@ -19,11 +19,18 @@ export function getCachedValue<T = any>(key: string, maxAgeMs?: number): T | nul
     return entry.data as T;
 }
 
+function debugCacheSize(label: string) {
+    if (__DEV__) {
+        console.log(`[API_CACHE] ${label}: size=${API_CACHE.size}`);
+    }
+}
+
 export function setCachedValue<T = any>(key: string, data: T) {
     API_CACHE.set(key, {
         data,
         fetchedAt: Date.now(),
     });
+    debugCacheSize(`set ${key}`);
 }
 
 export function clearCachedValue(key: string) {

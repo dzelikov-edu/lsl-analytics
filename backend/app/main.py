@@ -4778,3 +4778,9 @@ def rankings_sos_lite(min_games: int = 0):
 @app.get("/inspect-paths")
 def inspect_paths():
     return sorted([route.path for route in app.routes])
+
+
+@app.get("/debug/mem")
+def debug_mem():
+    log_memory("manual-check")
+    return {"ok": True}
