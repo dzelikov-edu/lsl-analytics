@@ -2928,7 +2928,7 @@ async def root():
 @app.get("/home")
 async def home(
     team_id: Optional[str] = None,
-    days: int = 3,
+    days: int = 7,
     top_n: int = 25,
     phase: Optional[str] = None,
 ):
@@ -3641,7 +3641,7 @@ async def home(
             day_ranks = sorted(set(_season_rank_from_date_key(x["date_key"]) for x in upcoming_pool))
             expanded = []
             i = 0
-            while len(expanded) < 25 and i < len(day_ranks):  # expand a few days forward
+            while len(expanded) < 100 and i < len(day_ranks):  # expand a few days forward
                 expanded.extend([x for x in upcoming_pool if _season_rank_from_date_key(x["date_key"]) == day_ranks[i]])
                 i += 1
 
