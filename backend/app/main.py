@@ -3589,6 +3589,9 @@ async def home(
     # Collect upcoming games pool (unplayed only)
     upcoming_pool = []
     for g in games:
+        if _to_int_or_none(g.get("week")) != current_league_week:
+            continue
+        
         a = g.get("a_score")
         b = g.get("b_score")
         if (a is not None) and (b is not None):
