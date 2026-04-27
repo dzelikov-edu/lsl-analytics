@@ -192,7 +192,7 @@ def _cached_polls():
 def _cached_week_phase_map():
     return load_week_phase_map()
 
-@lru_cache(maxsize=256)
+@lru_cache(maxsize=128)
 def _cached_team_analytics_summary(team_id: str, week: int = 0):
     tid = str(team_id).strip().upper()
     return _team_analytics_summary(tid, week)
@@ -371,7 +371,7 @@ def _cached_game_preview_support():
         "leaders_by_team": leaders_by_team,
     }
 
-@lru_cache(maxsize=16)
+@lru_cache(maxsize=24)
 def _has_played_games_through_week(week: int | None = None) -> bool:
     global GLOBAL_GAMES_LIST
     games = GLOBAL_GAMES_LIST
@@ -391,7 +391,7 @@ def _has_played_games_through_week(week: int | None = None) -> bool:
 def _cached_preseason_power():
     return load_preseason_power()
 
-@lru_cache(maxsize=16)
+@lru_cache(maxsize=4)
 def _cached_analytics_power_payload(week: int | None = None):
     w = 0 if week is None else week
 
@@ -487,7 +487,7 @@ def _cached_team_conf_map_merged():
 
     return team_conf_map
 
-@lru_cache(maxsize=32)
+@lru_cache(maxsize=4)
 def _cached_team_record_map(week: int | None = None):
     global GLOBAL_GAMES_LIST
     games = GLOBAL_GAMES_LIST
@@ -921,7 +921,7 @@ def _lsl_rank_context_for_team_at_week(
     }
 
 
-@lru_cache(maxsize=16)
+@lru_cache(maxsize=4)
 def _team_list_analytics_map(week: int | None = None) -> dict[str, dict]:
     w = 0 if week is None else week
 
@@ -1557,7 +1557,7 @@ def _latest_records_week(rows: list[dict]) -> int | None:
     return weeks[-1] if weeks else None
 
 
-@lru_cache(maxsize=32)
+@lru_cache(maxsize=8)
 def _build_poll_maps_for_week(poll: str, week: int | None = None):
     """
     Returns: (poll_week, top25_rank_map, next5_order_map)
@@ -1837,7 +1837,7 @@ def conference_detail(conf_id: str, week: int | None = None, debug: bool = False
     }
 
 
-@lru_cache(maxsize=16)
+@lru_cache(maxsize=4)
 def _analytics_record_map(week: int | None = None) -> dict[str, dict]:
     records = _cached_records_snapshot()
     if not records:
@@ -1859,7 +1859,7 @@ def _analytics_record_map(week: int | None = None) -> dict[str, dict]:
     return out
 
 
-@lru_cache(maxsize=16)
+@lru_cache(maxsize=4)
 def _analytics_polls_map(week: int | None = None) -> dict[str, dict]:
     lsl_week, lsl_top25, lsl_next5 = _build_poll_maps_for_week("LSL", week)
     lcaa_week, lcaa_top25, lcaa_next5 = _build_poll_maps_for_week("LCAA", week)
@@ -2066,7 +2066,7 @@ def _analytics_featured_insights(week: int | None = None) -> list[dict]:
     return insights
 
 
-@lru_cache(maxsize=16)
+@lru_cache(maxsize=4)
 def _cached_analytics_overview(week: int | None = None):
     w = 0 if week is None else week
 
@@ -2860,7 +2860,7 @@ def analytics_sos(week: int | None = None):
     }
 
 
-@lru_cache(maxsize=16)
+@lru_cache(maxsize=4)
 def _home_analytics_preview(week: int | None = None) -> dict:
     w = 0 if week is None else week
 
