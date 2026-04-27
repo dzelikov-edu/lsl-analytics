@@ -2953,6 +2953,16 @@ async def home(
     # Use the RAM cache we built at startup. 
     # This prevents Render from having to load 1,471 games over and over.
     games = GLOBAL_GAMES_LIST
+
+    # Calculate the Current Week based on recorded scores
+    played_weeks = [
+        _to_int_or_none(g.get("week")) 
+        for g in games 
+        if g.get("a_score") is not None and g.get("b_score") is not None
+    ]
+    # If no games played yet, we are in Week 0. 
+    # Otherwise, we are in the week following the last recorded result.
+    current_league_week = max([w for w in played_weeks if w is not None], default=-1) + 1
     
     if not games:
         # Fallback only if the RAM cache is empty
@@ -3018,7 +3028,7 @@ async def home(
     top_n = max(5, min(top_n, 100))
 
     try:
-        analytics_preview = _home_analytics_preview()
+        analytics_preview = _home_analytics_preview(current_league_week)
     except Exception:
         analytics_preview = {}
 
@@ -3053,6 +3063,12 @@ async def home(
 
         if played_flag:
             continue
+        # --- ADD THIS NEW FILTER ---
+        # Only show games for the current league week
+        game_week = _to_int_or_none(g.get("week"))
+        if game_week != current_league_week:
+            continue
+        # ---------------------------
         if not dk:
             continue
         if tid and tid not in (ta, tb):
@@ -3232,7 +3248,7 @@ async def home(
         rankings_preview_type = "sos_lite"
         rankings_preview_week = None
 
-        # ---- team summary preview (only when team_id is provided) ----
+    # ---- team summary preview (only when team_id is provided) ----
     team_summary_preview = None
     if tid:
         team_games = []
