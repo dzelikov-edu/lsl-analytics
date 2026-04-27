@@ -42,6 +42,8 @@ from app.ingest import save_games_to_db
 from app.routers.devices_favorites import router as devices_favorites_router
 from app.routers.auth import router as auth_router
 from app.routers.admin import router as admin_router
+from app.utils_mem import log_memory
+
 
 GLOBAL_GAMES_LIST = []
 
@@ -57,6 +59,7 @@ async def startup():
     except Exception as e:
         print(f"Failed to warm games cache: {e}")
         GLOBAL_GAMES_LIST = []
+
     # 1. Initialize the Cloud Database Tables
     try:
         # This creates your Users, Devices, and Favorites tables in Postgres
@@ -75,6 +78,8 @@ async def startup():
     except Exception as e:
         print(f"Redis init failed: {e}")
 
+    # 3. Log memory at steady state after startup
+    log_memory("startup-complete")
 
 
 @app.on_event("shutdown") 
@@ -1367,6 +1372,7 @@ async def refresh_league(background_tasks: BackgroundTasks):
             # --------------------------------------------------
             
             print(f"Background ingest complete. {len(games_by_key)} games are now permanent in DB.")
+            log_memory("after-ingest")
         except Exception as e:
             print(f"Background ingest failed: {e}")
         finally:
