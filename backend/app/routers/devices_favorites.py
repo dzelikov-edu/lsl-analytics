@@ -81,3 +81,20 @@ async def update_device_settings(
             
         await session.commit()
         return {"ok": True, "notifications_enabled": enabled}
+    
+@router.get("/devices/settings")
+async def get_device_settings(
+    current_user: User = Depends(get_current_user),
+):
+    async with AsyncSessionLocal() as session:
+        statement = select(Device).where(Device.user_id == current_user.id)
+        results = await session.exec(statement)
+        devices = results.all()
+
+        if not devices:
+            # No registered devices yet; default to True on the client
+            return {"ok": True, "notifications_enabled": True}
+
+        # If any device has notifications_enabled=True, consider alerts enabled
+        enabled = any(d.notifications_enabled for d in devices)
+        return {"ok": True, "notifications_enabled": enabled}

@@ -10,6 +10,7 @@ import { API_BASE_URL } from '../../lib/api';
 export default function LoginScreen() {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
+    const [showPassword, setShowPassword] = useState(false);
     const [loading, setLoading] = useState(false);
 
     const colorScheme = useColorScheme() ?? 'light';
@@ -82,7 +83,7 @@ export default function LoginScreen() {
             </View>
 
             <TextInput
-                style={[styles.input, { borderColor: theme.border, color: theme.text }]}
+                style={[styles.input, { borderColor: theme.border, color: theme.text, height: 48 }]}
                 placeholder="Email"
                 placeholderTextColor={theme.mutedText}
                 value={email}
@@ -91,14 +92,47 @@ export default function LoginScreen() {
                 keyboardType="email-address"
             />
 
-            <TextInput
-                style={[styles.input, { borderColor: theme.border, color: theme.text }]}
-                placeholder="Password"
-                placeholderTextColor={theme.mutedText}
-                value={password}
-                onChangeText={setPassword}
-                secureTextEntry
-            />
+            <View style={{ marginBottom: 15 }}>
+                <View
+                    style={{
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        height: 48, // match input height
+                    }}
+                >
+                    <TextInput
+                        style={[
+                            styles.input,
+                            {
+                                flex: 1,
+                                borderColor: theme.border,
+                                color: theme.text,
+                                marginBottom: 0, // avoid extra spacing inside row
+                                height: 48,
+                            },
+                        ]}
+                        placeholder="Password"
+                        placeholderTextColor={theme.mutedText}
+                        value={password}
+                        onChangeText={setPassword}
+                        secureTextEntry={!showPassword}
+                    />
+
+                    <Pressable
+                        onPress={() => setShowPassword((v) => !v)}
+                        style={{
+                            marginLeft: 8,
+                            paddingHorizontal: 6,
+                            height: 48,              // same as input
+                            justifyContent: 'center', // vertical center
+                        }}
+                    >
+                        <Text style={{ color: theme.mutedText, fontSize: 12 }}>
+                            {showPassword ? 'Hide' : 'Show'}
+                        </Text>
+                    </Pressable>
+                </View>
+            </View>
 
             <Pressable
                 style={[styles.button, { backgroundColor: theme.card, opacity: loading ? 0.7 : 1 }]}
@@ -130,9 +164,9 @@ export default function LoginScreen() {
     );
 }
 
-const styles = StyleSheet.create({
+export const styles = StyleSheet.create({
     container: { flex: 1, justifyContent: 'center', padding: 20 },
     title: { fontSize: 24, fontWeight: 'bold', marginBottom: 20, textAlign: 'center' },
-    input: { borderWidth: 1, borderRadius: 8, padding: 12, marginBottom: 15 },
+    input: { borderWidth: 1, borderRadius: 8, padding: 12, paddingVertical: 10, marginBottom: 15 },
     button: { padding: 15, borderRadius: 8, alignItems: 'center', minHeight: 50, justifyContent: 'center' },
 });

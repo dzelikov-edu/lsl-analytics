@@ -12,6 +12,8 @@ export default function ResetPasswordScreen() {
     const [password, setPassword] = useState('');
     const [confirm, setConfirm] = useState('');
     const [loading, setLoading] = useState(false);
+    const [showPassword, setShowPassword] = useState(false);
+    const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
     const colorScheme = useColorScheme() ?? 'light';
     const theme = AppColors[colorScheme];
@@ -71,7 +73,10 @@ export default function ResetPasswordScreen() {
             </Text>
 
             <TextInput
-                style={[styles.input, { borderColor: theme.border, color: theme.text }]}
+                style={[
+                    styles.input,
+                    { borderColor: theme.border, color: theme.text, height: 48 },
+                ]}
                 placeholder="Reset token"
                 placeholderTextColor={theme.mutedText}
                 value={token}
@@ -79,23 +84,91 @@ export default function ResetPasswordScreen() {
                 autoCapitalize="none"
             />
 
-            <TextInput
-                style={[styles.input, { borderColor: theme.border, color: theme.text }]}
-                placeholder="New password"
-                placeholderTextColor={theme.mutedText}
-                value={password}
-                onChangeText={setPassword}
-                secureTextEntry
-            />
+            <View style={{ marginBottom: 15 }}>
+                <View
+                    style={{
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        height: 48,
+                    }}
+                >
+                    <TextInput
+                        style={[
+                            styles.input,
+                            {
+                                flex: 1,
+                                borderColor: theme.border,
+                                color: theme.text,
+                                marginBottom: 0,
+                                height: 48,
+                                paddingVertical: 10,
+                            },
+                        ]}
+                        placeholder="New password"
+                        placeholderTextColor={theme.mutedText}
+                        value={password}
+                        onChangeText={setPassword}
+                        secureTextEntry={!showPassword}
+                    />
 
-            <TextInput
-                style={[styles.input, { borderColor: theme.border, color: theme.text }]}
-                placeholder="Confirm new password"
-                placeholderTextColor={theme.mutedText}
-                value={confirm}
-                onChangeText={setConfirm}
-                secureTextEntry
-            />
+                    <Pressable
+                        onPress={() => setShowPassword((v) => !v)}
+                        style={{
+                            marginLeft: 8,
+                            paddingHorizontal: 6,
+                            height: 48,
+                            justifyContent: 'center',
+                        }}
+                    >
+                        <Text style={{ color: theme.mutedText, fontSize: 12 }}>
+                            {showPassword ? 'Hide' : 'Show'}
+                        </Text>
+                    </Pressable>
+                </View>
+            </View>
+
+            <View style={{ marginBottom: 15 }}>
+                <View
+                    style={{
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        height: 48,
+                    }}
+                >
+                    <TextInput
+                        style={[
+                            styles.input,
+                            {
+                                flex: 1,
+                                borderColor: theme.border,
+                                color: theme.text,
+                                marginBottom: 0,
+                                height: 48,
+                                paddingVertical: 10,
+                            },
+                        ]}
+                        placeholder="Confirm new password"
+                        placeholderTextColor={theme.mutedText}
+                        value={confirm}
+                        onChangeText={setConfirm}
+                        secureTextEntry={!showConfirmPassword}
+                    />
+
+                    <Pressable
+                        onPress={() => setShowConfirmPassword((v) => !v)}
+                        style={{
+                            marginLeft: 8,
+                            paddingHorizontal: 6,
+                            height: 48,
+                            justifyContent: 'center',
+                        }}
+                    >
+                        <Text style={{ color: theme.mutedText, fontSize: 12 }}>
+                            {showConfirmPassword ? 'Hide' : 'Show'}
+                        </Text>
+                    </Pressable>
+                </View>
+            </View>
 
             <Pressable
                 style={[styles.button, { backgroundColor: theme.card, opacity: loading ? 0.7 : 1 }]}
@@ -120,6 +193,6 @@ const styles = StyleSheet.create({
     container: { flexGrow: 1, justifyContent: 'center', padding: 20 },
     title: { fontSize: 24, fontWeight: 'bold', marginBottom: 12, textAlign: 'center' },
     subtitle: { fontSize: 14, textAlign: 'center', marginBottom: 16 },
-    input: { borderWidth: 1, borderRadius: 8, padding: 12, marginBottom: 15 },
+    input: { borderWidth: 1, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 10, marginBottom: 15 },
     button: { padding: 15, borderRadius: 8, alignItems: 'center', minHeight: 50, justifyContent: 'center' },
 });

@@ -19,17 +19,19 @@ async def send_test_push(
     req: TestPushRequest,
     current_user: User = Depends(get_current_user)
 ):
-    # Optional: Add check here if current_user.is_admin is true for real admin endpoint
-    # For now, any authenticated user can trigger this.
+    # Require admin
+    if not current_user.is_admin:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Admin access required.",
+        )
 
-    # Ensure the push notification is sent in the background
-    # so the API call returns immediately.
     asyncio.create_task(
         notify_team(
-            team_id=req.teamId,
+            team_id=req.teamId.upper(),
             title=req.title,
             body=req.body,
-            data={"game_key": req.gameKey, "team": req.teamId}
+            data={"game_key": req.gameKey, "team": req.teamId.upper()},
         )
     )
     return {"status": "success", "message": f"Test push for {req.teamId} enqueued"}

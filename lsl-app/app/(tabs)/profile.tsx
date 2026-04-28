@@ -26,10 +26,11 @@ export default function ProfileScreen() {
             if (!token) return;
 
             // 1. Fetch User & Favorites in parallel
-            const [userRes, favsRes, teamsRes] = await Promise.all([
+            const [userRes, favsRes, teamsRes, deviceSettingsRes] = await Promise.all([
                 fetch(`${API_BASE_URL}/auth/me`, { headers: { Authorization: `Bearer ${token}` } }),
                 fetch(`${API_BASE_URL}/api/favorites`, { headers: { Authorization: `Bearer ${token}` } }),
-                fetch(`${API_BASE_URL}/teams?week=0`, { headers: { Authorization: `Bearer ${token}` } })
+                fetch(`${API_BASE_URL}/teams?week=0`, { headers: { Authorization: `Bearer ${token}` } }),
+                fetch(`${API_BASE_URL}/api/devices/settings`, { headers: { Authorization: `Bearer ${token}` } }),
             ]);
 
             if (userRes.ok) {
@@ -52,6 +53,13 @@ export default function ProfileScreen() {
                     mapping[t.team_id] = t.team_name;
                 });
                 setTeamNames(mapping);
+            }
+
+            if (deviceSettingsRes.ok) {
+                const settings = await deviceSettingsRes.json();
+                if (typeof settings?.notifications_enabled === 'boolean') {
+                    setNotificationsEnabled(settings.notifications_enabled);
+                }
             }
         } catch (e) {
             console.log('Error loading profile data', e);

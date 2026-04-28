@@ -10,7 +10,15 @@ BATCH_SIZE = 100
 
 async def get_tokens_for_team(team_id: str) -> List[str]:
     async with AsyncSessionLocal() as session:
-        q = select(Favorite, Device).join(Device, Favorite.user_id == Device.user_id).where(Favorite.team_id == team_id, Device.active == True)
+        q = (
+            select(Favorite, Device)
+            .join(Device, Favorite.user_id == Device.user_id)
+            .where(
+                Favorite.team_id == team_id,
+                Device.active == True,
+                Device.notifications_enabled == True,
+            )
+        )
         res = await session.exec(q)
         rows = res.all()
         tokens = []
@@ -46,7 +54,7 @@ async def mark_invalid_tokens(invalid_tokens: List[str]):
 async def notify_team(team_id: str, title: str, body: str, data: dict = None):
     tokens = await get_tokens_for_team(team_id)
     if not tokens:
-        print("no tokens for", team_id)
+        print(f"[PUSH] no tokens for team={team_id}")
         return
     for i in range(0, len(tokens), BATCH_SIZE):
         batch = tokens[i : i + BATCH_SIZE]
@@ -62,7 +70,7 @@ async def notify_team(team_id: str, title: str, body: str, data: dict = None):
                             invalid.append(item.get("to"))
             if invalid:
                 await mark_invalid_tokens(invalid)
-            print(f"sent batch {i//BATCH_SIZE + 1} ({len(batch)}) for {team_id}")
+            print(f"[PUSH] sent batch {i//BATCH_SIZE + 1} size={len(batch)} team={team_id}")
         except httpx.HTTPStatusError as e:
             print("http error sending batch:", e, e.response.text if e.response is not None else "")
         except Exception as e:
