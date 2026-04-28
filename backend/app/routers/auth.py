@@ -1,4 +1,4 @@
-from datetime import timedelta, datetime, timezone
+from datetime import timedelta, datetime
 import secrets
 
 from fastapi import APIRouter, HTTPException, status, Depends
@@ -104,7 +104,7 @@ async def request_password_reset(payload: PasswordResetRequest):
         if user:
             # Create a secure random token
             token_value = secrets.token_urlsafe(32)
-            now = datetime.now(timezone.utc)
+            now = datetime.utcnow()
             expires_at = now + timedelta(minutes=30)
 
             reset = PasswordResetToken(
@@ -153,7 +153,7 @@ async def reset_password(payload: PasswordResetConfirm):
                 detail="Invalid or already used reset token.",
             )
 
-        now = datetime.now(timezone.utc)
+        now = datetime.utcnow()
         if reset.expires_at < now:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
