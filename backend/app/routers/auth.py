@@ -124,7 +124,9 @@ async def request_password_reset(payload: PasswordResetRequest):
                 f"expires_at={expires_at.isoformat()}"
             )
 
-            debug_token = token_value  # BETA: expose to client
+            # For beta: only expose token to the client for NON-admin accounts
+            if not user.is_admin:
+                debug_token = token_value
 
     return {
         "ok": True,

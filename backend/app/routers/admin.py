@@ -38,26 +38,3 @@ async def send_test_push(
         )
     )
     return {"status": "success", "message": f"Test push for {req.teamId} enqueued"}
-
-@router.post("/promote-self-to-admin")
-async def promote_self_to_admin(current_user: User = Depends(get_current_user)):
-    """
-    TEMP: Promote the current user to admin for beta.
-    Call this once while logged in as your account, then remove or ignore.
-    """
-    async with AsyncSessionLocal() as session:
-        # Re-load the user in a writeable session
-        stmt = select(User).where(User.id == current_user.id)
-        res = await session.exec(stmt)
-        user = res.one_or_none()
-
-        if not user:
-            raise HTTPException(status_code=404, detail="User not found")
-
-        if user.is_admin:
-            return {"ok": True, "message": "Already an admin."}
-
-        user.is_admin = True
-        session.add(user)
-        await session.commit()
-        return {"ok": True, "message": f"User {user.email} is now an admin."}
