@@ -1,16 +1,17 @@
-from datetime import timedelta
+from datetime import timedelta, datetime, timezone
+import secrets
 
-from fastapi import APIRouter, HTTPException, status
-from fastapi import Depends
+from fastapi import APIRouter, HTTPException, status, Depends
 from pydantic import BaseModel, EmailStr
 from sqlmodel import select
 
 from app.auth import create_access_token, hash_password, verify_password
 from app.db import AsyncSessionLocal
-from app.models_devices import User
-from app.deps_auth import get_current_user 
+from app.models_devices import User, PasswordResetToken
+from app.deps_auth import get_current_user
 
 from fastapi_limiter.depends import RateLimiter
+
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -28,6 +29,15 @@ class LoginRequest(BaseModel):
 class TokenResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"
+
+
+class PasswordResetRequest(BaseModel):
+    email: EmailStr
+
+
+class PasswordResetConfirm(BaseModel):
+    token: str
+    new_password: str
 
 
 @router.post("/register", response_model=TokenResponse, dependencies=[Depends(RateLimiter(times=5, minutes=1))])
@@ -72,6 +82,104 @@ async def login_user(payload: LoginRequest):
                 detail="Invalid credentials",
             )
 
+        token = create_access_token(subject=user.id, expires_delta=timedelta(minutes=60 * 24))
+        return TokenResponse(access_token=token)
+    
+
+@router.post(
+    "/request-password-reset",
+    dependencies=[Depends(RateLimiter(times=5, minutes=1))],
+)
+async def request_password_reset(payload: PasswordResetRequest):
+    """
+    Creates a one-time password reset token if the email exists.
+    Always returns 200 to avoid leaking which emails are registered.
+    For beta, the token is logged to the server logs instead of emailed.
+    """
+    async with AsyncSessionLocal() as session:
+        q = select(User).where(User.email == payload.email)
+        res = await session.exec(q)
+        user = res.one_or_none()
+
+        if user:
+            # Create a secure random token
+            token_value = secrets.token_urlsafe(32)
+            now = datetime.now(timezone.utc)
+            expires_at = now + timedelta(minutes=30)
+
+            reset = PasswordResetToken(
+                user_id=user.id,
+                token=token_value,
+                created_at=now,
+                expires_at=expires_at,
+                used=False,
+            )
+            session.add(reset)
+            await session.commit()
+
+            # For beta: log the token so you can paste it into the app
+            print(
+                f"[PASSWORD-RESET] email={user.email} token={token_value} "
+                f"expires_at={expires_at.isoformat()}"
+            )
+
+            # Later, plug in email send here.
+
+    return {
+        "ok": True,
+        "message": "If this email exists, a password reset link has been created.",
+    }
+
+
+@router.post(
+    "/reset-password",
+    response_model=TokenResponse,
+    dependencies=[Depends(RateLimiter(times=5, minutes=1))],
+)
+async def reset_password(payload: PasswordResetConfirm):
+    """
+    Resets the user's password if the token is valid, not expired, and not used.
+    Returns a fresh access token so the user is logged in immediately.
+    """
+    async with AsyncSessionLocal() as session:
+        # Look up reset token
+        q = select(PasswordResetToken).where(PasswordResetToken.token == payload.token)
+        res = await session.exec(q)
+        reset = res.one_or_none()
+
+        if not reset or reset.used:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid or already used reset token.",
+            )
+
+        now = datetime.now(timezone.utc)
+        if reset.expires_at < now:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Reset token has expired.",
+            )
+
+        # Load the user
+        q_user = select(User).where(User.id == reset.user_id)
+        res_user = await session.exec(q_user)
+        user = res_user.one_or_none()
+
+        if not user:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid reset token.",
+            )
+
+        # Update password
+        user.hashed_password = hash_password(payload.new_password)
+        reset.used = True
+
+        session.add(user)
+        session.add(reset)
+        await session.commit()
+
+        # Issue new access token
         token = create_access_token(subject=user.id, expires_delta=timedelta(minutes=60 * 24))
         return TokenResponse(access_token=token)
 

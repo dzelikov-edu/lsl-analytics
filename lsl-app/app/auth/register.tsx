@@ -17,47 +17,82 @@ export default function RegisterScreen() {
     const theme = AppColors[colorScheme];
 
     const handleRegister = async () => {
-        if (!email || !password || !confirmPassword) {
-            Alert.alert('Error', 'Please fill in all fields');
+        if (loading) return;
+
+        const emailTrimmed = email.trim();
+        const passwordTrimmed = password.trim();
+        const confirmTrimmed = confirmPassword.trim();
+
+        if (!emailTrimmed || !passwordTrimmed || !confirmTrimmed) {
+            Alert.alert('Missing info', 'Please fill in all fields.');
             return;
         }
 
-        if (password !== confirmPassword) {
-            Alert.alert('Error', 'Passwords do not match');
+        if (!emailTrimmed.includes('@') || !emailTrimmed.includes('.')) {
+            Alert.alert('Invalid email', 'Please enter a valid email address.');
+            return;
+        }
+
+        if (passwordTrimmed.length < 8) {
+            Alert.alert('Weak password', 'Password must be at least 8 characters long.');
+            return;
+        }
+
+        if (passwordTrimmed !== confirmTrimmed) {
+            Alert.alert('Password mismatch', 'Passwords do not match.');
             return;
         }
 
         setLoading(true);
-        // Replace the Constants logic with our forced API URL
         const backendUrl = API_BASE_URL;
 
         try {
             const response = await fetch(`${backendUrl}/auth/register`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ email, password }),
+                body: JSON.stringify({ email: emailTrimmed, password: passwordTrimmed }),
             });
 
-            const data = await response.json();
+            let data: any = {};
+            try {
+                data = await response.json();
+            } catch {
+                data = {};
+            }
 
-            if (response.ok) {
+            if (response.ok && data?.access_token) {
                 await saveToken(data.access_token);
-                Alert.alert('Success', 'Account created successfully!');
+                Alert.alert('Account created', 'Welcome to Legends CBB.');
                 router.replace('/(tabs)');
             } else {
-                Alert.alert('Registration Failed', data.detail || 'Could not create account');
+                const detail =
+                    data?.detail ||
+                    'Could not create account. If you already have an account, try logging in instead.';
+                Alert.alert('Registration failed', detail);
             }
         } catch (error) {
             console.error(error);
-            Alert.alert('Error', 'Could not connect to the server');
+            Alert.alert('Network error', 'Could not connect to the server. Please try again.');
         } finally {
             setLoading(false);
         }
     };
 
+
     return (
         <ScrollView contentContainerStyle={[styles.container, { backgroundColor: theme.background }]}>
             <Text style={[styles.title, { color: theme.text }]}>Create Account</Text>
+
+            <View style={{ marginBottom: 16 }}>
+                <Text style={{ color: theme.mutedText, textAlign: 'center', fontSize: 14 }}>
+                    Create a free profile to follow the Official Legends CBB Sim League.
+                </Text>
+                <Pressable onPress={() => router.push('/intro')} style={{ marginTop: 8 }}>
+                    <Text style={{ color: '#007AFF', textAlign: 'center', fontSize: 13 }}>
+                        What is Legends CBB?
+                    </Text>
+                </Pressable>
+            </View>
 
             <TextInput
                 style={[styles.input, { borderColor: theme.border, color: theme.text }]}

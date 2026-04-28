@@ -9,6 +9,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import * as Notifications from 'expo-notifications';
 import * as Device from 'expo-device';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { getHasSeenIntro } from '../lib/firstLaunch';
 
 export const unstable_settings = {
   anchor: '(tabs)',
@@ -21,10 +22,10 @@ export default function RootLayout() {
   useEffect(() => {
     async function bootApp() {
       try {
-        // --- BYPASS ASSET LOADING FOR RESCUE ---
-        // This ensures a missing logo doesn't kill the app
-
-        const token = await getToken();
+        const [hasSeenIntro, token] = await Promise.all([
+          getHasSeenIntro(),
+          getToken(),
+        ]);
 
         // Register notifications in background
         if (token) {
@@ -34,12 +35,16 @@ export default function RootLayout() {
         // FORCE state to ready
         setIsReady(true);
 
-        if (!token) {
-          // Small delay to let the navigation stack settle
-          setTimeout(() => {
-            try { router.replace('/auth/login'); } catch (e) { }
-          }, 500);
-        }
+        setTimeout(() => {
+          try {
+            if (!hasSeenIntro) {
+              router.replace('/intro');
+            } else if (!token) {
+              router.replace('/auth/login');
+            }
+            // if we have a token + intro seen, stay on (tabs)
+          } catch (e) { }
+        }, 300);
       } catch (e: any) {
         setIsReady(true);
         Alert.alert("Beta Boot Error", e.message);

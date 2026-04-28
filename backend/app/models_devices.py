@@ -9,7 +9,14 @@ class User(SQLModel, table=True):
     hashed_password: Optional[str] = None  # NEW
     created_at: datetime = Field(default_factory=datetime.utcnow)
     is_admin: bool = False
-
+    
+class PasswordResetToken(SQLModel, table=True):
+    id: str = Field(default_factory=lambda: str(uuid4()), primary_key=True)
+    user_id: str = Field(foreign_key="user.id", index=True)
+    token: str = Field(index=True, unique=True)
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    expires_at: datetime
+    used: bool = Field(default=False)
 
 class Device(SQLModel, table=True):
     id: str = Field(default_factory=lambda: str(uuid4()), primary_key=True)

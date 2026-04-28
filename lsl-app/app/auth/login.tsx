@@ -16,43 +16,70 @@ export default function LoginScreen() {
     const theme = AppColors[colorScheme];
 
     const handleLogin = async () => {
-        if (!email || !password) {
-            Alert.alert('Error', 'Please fill in all fields');
+        if (loading) return;
+
+        const emailTrimmed = email.trim();
+        const passwordTrimmed = password.trim();
+
+        if (!emailTrimmed || !passwordTrimmed) {
+            Alert.alert('Missing info', 'Please enter both email and password.');
+            return;
+        }
+
+        // Very simple email sanity check
+        if (!emailTrimmed.includes('@') || !emailTrimmed.includes('.')) {
+            Alert.alert('Invalid email', 'Please enter a valid email address.');
             return;
         }
 
         setLoading(true);
-        // Replace the Constants logic with our forced API URL
         const backendUrl = API_BASE_URL;
 
         try {
             const response = await fetch(`${backendUrl}/auth/login`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ email, password }),
+                body: JSON.stringify({ email: emailTrimmed, password: passwordTrimmed }),
             });
 
-            const data = await response.json();
+            let data: any = {};
+            try {
+                data = await response.json();
+            } catch {
+                data = {};
+            }
 
-            if (response.ok) {
+            if (response.ok && data?.access_token) {
                 await saveToken(data.access_token);
-                Alert.alert('Success', 'Logged in successfully!');
-                // replace ensures the user can't just press "back" to go back to the login screen
+                Alert.alert('Welcome back', 'You are now logged in.');
                 router.replace('/(tabs)');
             } else {
-                Alert.alert('Login Failed', data.detail || 'Invalid credentials');
+                const detail = data?.detail || 'Email or password is incorrect.';
+                Alert.alert('Login failed', detail);
             }
         } catch (error) {
             console.error(error);
-            Alert.alert('Error', 'Could not connect to the server');
+            Alert.alert('Network error', 'Could not connect to the server. Please try again.');
         } finally {
             setLoading(false);
         }
     };
 
+
     return (
         <View style={[styles.container, { backgroundColor: theme.background }]}>
             <Text style={[styles.title, { color: theme.text }]}>Legends CBB Login</Text>
+
+            <View style={{ marginBottom: 16 }}>
+                <Text style={{ color: theme.mutedText, textAlign: 'center', fontSize: 14 }}>
+                    Log in to your Legends CBB league profile to sync favorites and alerts.
+                </Text>
+                <Pressable onPress={() => router.push('/intro')} style={{ marginTop: 8 }}>
+                    <Text style={{ color: '#007AFF', textAlign: 'center', fontSize: 13 }}>
+                        What is Legends CBB?
+                    </Text>
+                </Pressable>
+            </View>
 
             <TextInput
                 style={[styles.input, { borderColor: theme.border, color: theme.text }]}
