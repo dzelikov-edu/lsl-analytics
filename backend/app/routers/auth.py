@@ -1,3 +1,4 @@
+from typing import Optional
 from datetime import timedelta, datetime
 import secrets
 
@@ -92,17 +93,18 @@ async def login_user(payload: LoginRequest):
 )
 async def request_password_reset(payload: PasswordResetRequest):
     """
-    Creates a one-time password reset token if the email exists.
-    Always returns 200 to avoid leaking which emails are registered.
-    For beta, the token is logged to the server logs instead of emailed.
+    Beta behavior:
+    - If the email exists, create a reset token and return it in the response.
+    - If not, return ok without a token.
     """
+    debug_token: Optional[str] = None
+
     async with AsyncSessionLocal() as session:
         q = select(User).where(User.email == payload.email)
         res = await session.exec(q)
         user = res.one_or_none()
 
         if user:
-            # Create a secure random token
             token_value = secrets.token_urlsafe(32)
             now = datetime.utcnow()
             expires_at = now + timedelta(minutes=30)
@@ -117,17 +119,17 @@ async def request_password_reset(payload: PasswordResetRequest):
             session.add(reset)
             await session.commit()
 
-            # For beta: log the token so you can paste it into the app
             print(
                 f"[PASSWORD-RESET] email={user.email} token={token_value} "
                 f"expires_at={expires_at.isoformat()}"
             )
 
-            # Later, plug in email send here.
+            debug_token = token_value  # BETA: expose to client
 
     return {
         "ok": True,
         "message": "If this email exists, a password reset link has been created.",
+        "token": debug_token,  # will be null/None if email not found
     }
 
 
