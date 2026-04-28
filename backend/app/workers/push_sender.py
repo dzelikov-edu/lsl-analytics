@@ -85,3 +85,28 @@ if __name__ == "__main__":
     title = sys.argv[2]
     body = sys.argv[3]
     asyncio.run(notify_team(team, title, body, {"team": team}))
+
+async def notify_all_active_devices(title: str, body: str, data: dict = None):
+    """
+    Broadcasts a notification to every user who has 'Live Alerts' enabled.
+    """
+    async with AsyncSessionLocal() as session:
+        # Get every device where alerts are ON
+        q = select(Device).where(Device.active == True, Device.notifications_enabled == True)
+        res = await session.exec(q)
+        devices = res.all()
+        
+        tokens = [d.expo_push_token for d in devices if d.expo_push_token]
+        unique_tokens = list(dict.fromkeys(tokens))
+
+        if not unique_tokens:
+            return
+
+        for i in range(0, len(unique_tokens), BATCH_SIZE):
+            batch = unique_tokens[i : i + BATCH_SIZE]
+            messages = make_messages(batch, title, body, data)
+            try:
+                await send_batch(messages)
+                print(f"[PUSH] Sent league-wide update to {len(batch)} devices")
+            except Exception as e:
+                print(f"[PUSH] League-wide error: {e}")

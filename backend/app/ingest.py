@@ -2,7 +2,7 @@ from dataclasses import dataclass
 from typing import Dict, List, Optional, Tuple
 
 import asyncio
-from app.workers.push_sender import notify_team
+from app.workers.push_sender import notify_team, notify_all_active_devices
 
 from app.settings import settings
 from app.sheets_client import get_sheets_service, read_range
@@ -827,6 +827,9 @@ async def ingest_league(teams: List[TeamIndexRow]) -> dict:
     }
 
     # NEW: Trigger notifications only for games not yet notified
+    # 1. Load team names once so we don't hit the sheet/DB inside the loop
+    name_map = load_team_map_names()
+
     async with AsyncSessionLocal() as session:
         for game_key, game_data in global_unique.items():
             home_id = game_data.get("home_id")
@@ -845,11 +848,23 @@ async def ingest_league(teams: List[TeamIndexRow]) -> dict:
                     session.add(NotificationLog(game_key=game_key))
                     await session.commit()
 
-                    # 3. Trigger the pushes (background tasks)
-                    title = f"Final: {game_data.get('team_a', 'Game')} vs {game_data.get('team_b', 'Opponent')}"
-                    body = f"{home_id}: {home_score}, {away_id}: {away_score}"
-                    
+                    # --- PROFESSIONAL WORDING LOGIC ---
+                    h_name = name_map.get(home_id, home_id)
+                    a_name = name_map.get(away_id, away_id)
+
+                    if home_score > away_score:
+                        title = f"🏀 Final: {h_name} WINS!"
+                    elif away_score > home_score:
+                        title = f"🏀 Final: {a_name} WINS!"
+                    else:
+                        title = "🏀 Final: It's a TIE!"
+
+                    body = f"{a_name} {away_score}, {h_name} {home_score}. Results are live."
+                    # ----------------------------------
+
                     print(f"Triggering auto-push for new result: {game_key}")
+                    
+                    # 3. Trigger the pushes
                     asyncio.create_task(notify_team(
                         team_id=home_id, 
                         title=title, 
@@ -862,6 +877,35 @@ async def ingest_league(teams: List[TeamIndexRow]) -> dict:
                         body=body,
                         data={"game_key": game_key, "team_id": away_id, "score": f"{home_score}-{away_score}"}
                     ))
+
+    # --- POLL UPDATES (Independent of Games) ---
+    polls = load_polls()
+    if polls:
+        # 1. Determine the latest week present in the Polls tab
+        latest_poll_week = max(r["week"] for r in polls)
+        
+        # 2. Only notify starting Week 2 (when rankings first actually change)
+        if latest_poll_week >= 2:
+            poll_log_key = f"POLL_UPDATE_WEEK_{latest_poll_week}"
+            
+            async with AsyncSessionLocal() as session:
+                # 3. Check if we already alerted for this specific week's poll
+                statement = select(NotificationLog).where(NotificationLog.game_key == poll_log_key)
+                already_notified = (await session.exec(statement)).one_or_none()
+
+                if not already_notified:
+                    session.add(NotificationLog(game_key=poll_log_key))
+                    await session.commit()
+
+                    # 4. Identify the current #1 team for the headline
+                    lsl_1 = next((r for r in polls if r["week"] == latest_poll_week and r["poll"] == "LSL" and r["bucket_order"] == 1), None)
+                    top_name = name_map.get(lsl_1["team_id"], lsl_1["team_id"]) if lsl_1 else "A new team"
+
+                    title = f"📊 LSL Poll: Week {latest_poll_week} is OUT!"
+                    body = f"{top_name} is #1. See where your team landed in the updated Top 25."
+
+                    print(f"Triggering league-wide push for Week {latest_poll_week} Polls")
+                    asyncio.create_task(notify_all_active_devices(title, body))
 
     return {"summary": summary, "games_by_key": global_unique}
 
