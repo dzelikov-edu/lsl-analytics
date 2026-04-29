@@ -7,6 +7,9 @@ import { useEffect, useState, useMemo, useCallback } from 'react'; // Add useCal
 import { API_BASE_URL } from '@/lib/api';
 import TeamLogo from '@/components/TeamLogo';
 import { EmptyState } from '@/components/EmptyState';
+import { importLogoPack } from '@/lib/logoManager';
+
+const CONFERENCES = ["AAC", "ACC", "B10", "B12", "BE", "MW", "P12", "SEC", "WCC"];
 
 export default function ProfileScreen() {
     const colorScheme = useColorScheme() ?? 'light';
@@ -114,6 +117,39 @@ export default function ProfileScreen() {
                     onPress: async () => {
                         await deleteToken();
                         router.replace('/auth/login');
+                    }
+                }
+            ]
+        );
+    };
+
+    const handleImportLogos = async () => {
+        // Get all unique team IDs from your teamNames map keys
+        const allTeamIds = Object.keys(teamNames); // Assuming teamNames is loaded
+
+        if (allTeamIds.length === 0) {
+            Alert.alert("Error", "Please wait for team data to load before syncing. Try pulling to refresh.");
+            return;
+        }
+
+        Alert.alert(
+            "Sync Official Logos",
+            `This will download official branding for ${allTeamIds.length} teams and ${CONFERENCES.length} conferences. This might take a few minutes depending on your connection. Continue?`,
+            [
+                { text: "Cancel", style: "cancel" },
+                {
+                    text: "Sync Now",
+                    onPress: async () => {
+                        setLoading(true);
+                        // Make sure CONFERENCES is defined (see next step)
+                        const success = await importLogoPack(allTeamIds);
+                        setLoading(false);
+
+                        if (success) {
+                            Alert.alert("Success", "Logos synced! Please restart the app to see the new logos.");
+                        } else {
+                            Alert.alert("Error", "Sync failed. Please check your connection or try again.");
+                        }
                     }
                 }
             ]
@@ -232,6 +268,17 @@ export default function ProfileScreen() {
                 />
             </View>
 
+            <Pressable
+                style={styles.settingRow}
+                onPress={handleImportLogos}
+            >
+                <View style={{ flex: 1 }}>
+                    <Text style={styles.settingLabel}>⚙️ Import Realism Pack</Text>
+                    <Text style={{ color: theme.mutedText, fontSize: 13, marginTop: 2 }}>
+                        Download official logos and assets from an external source.
+                    </Text>
+                </View>
+            </Pressable>
 
             <Pressable style={styles.logoutButton} onPress={handleLogout}>
                 <Text style={styles.buttonText}>Log Out</Text>

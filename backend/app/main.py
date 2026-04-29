@@ -2,7 +2,7 @@ from dotenv import load_dotenv
 import pathlib, os
 load_dotenv(pathlib.Path(__file__).resolve().parent.parent / ".env")
 
-from fastapi import FastAPI, HTTPException, Request, Response, BackgroundTasks
+from fastapi import FastAPI, HTTPException, Request, Response, BackgroundTasks, Depends
 from starlette.middleware.base import BaseHTTPMiddleware
 from app.ingest import (
     load_teams_index,
@@ -33,7 +33,8 @@ from functools import lru_cache
 
 from app.db import init_db, engine
 from app.db import AsyncSessionLocal
-from app.models_devices import Game
+from app.deps_auth import get_current_user
+from app.models_devices import Game, User
 from sqlmodel import select, or_  # Ensure or_ is here
 from sqlalchemy import text # Add this to your sqlalchemy/sqlmodel imports
 from app.ingest import save_games_to_db
@@ -1317,6 +1318,25 @@ def _release_refresh_lock():
 
 
 from app.ingest import load_team_map_names  # add to your existing ingest imports at top
+
+@lru_cache(maxsize=1) # Cache this heavily, it's a big list that rarely changes
+def _cached_all_team_ids() -> list[str]:
+    """
+    Loads all team IDs from the TeamMap sheet (including non-tracked opponents).
+    Used for bulk operations like logo sync.
+    """
+    all_names_map = load_team_map_names()
+    return list(all_names_map.keys())
+
+
+@app.get("/teams/all-ids")
+async def get_all_team_ids(current_user: User = Depends(get_current_user)): # Require authentication
+    """
+    Returns a list of all known team IDs (tracked and non-tracked).
+    Requires authentication to prevent anonymous scraping.
+    """
+    return _cached_all_team_ids()
+
 
 def _team_name_map(active_only: bool = False) -> dict:
     """
@@ -3591,7 +3611,7 @@ async def home(
     for g in games:
         if _to_int_or_none(g.get("week")) != current_league_week:
             continue
-        
+
         a = g.get("a_score")
         b = g.get("b_score")
         if (a is not None) and (b is not None):

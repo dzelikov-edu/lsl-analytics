@@ -9,9 +9,11 @@
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
+      "bundleIdentifier": "com.legends.cbb",
       "supportsTablet": true
     },
     "android": {
+      "package": "com.legends.cbb",
       "adaptiveIcon": {
         "backgroundColor": "#0B1A30",
         "foregroundImage": "./assets/images/android-icon-foreground.png",

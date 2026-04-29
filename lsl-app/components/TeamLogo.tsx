@@ -3,6 +3,7 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 import { getTeamBranding } from '@/lib/teamBranding';
 import { StyleSheet, View } from 'react-native';
 import { Image } from 'expo-image'; // Use the high-performance version
+import { useTeamLogo } from '@/lib/teamLogos';
 
 
 type TeamLogoProps = {
@@ -15,32 +16,22 @@ export default function TeamLogo({ teamId, size = 28 }: TeamLogoProps) {
     const theme = AppColors[colorScheme];
     const branding = getTeamBranding(teamId);
 
-    if (branding.logo) {
+    // Switch to the hook
+    const resolvedLogo = useTeamLogo(teamId);
+
+    if (resolvedLogo) {
         return (
             <Image
-                source={branding.logo}
+                source={resolvedLogo}
                 contentFit="contain"
-                // Remove the transition so it's instant, or set it to 0
                 transition={0}
                 style={{ width: size, height: size }}
             />
-
         );
     }
 
     return (
-        <View
-            style={[
-                styles.fallback,
-                {
-                    width: size,
-                    height: size,
-                    borderRadius: size / 2,
-                    borderColor: theme.border,
-                    backgroundColor: branding.primary,
-                },
-            ]}
-        />
+        <View style={[styles.fallback, { width: size, height: size, backgroundColor: branding.primary, borderRadius: size / 2 }]} />
     );
 }
 

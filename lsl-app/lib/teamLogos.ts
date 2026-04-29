@@ -1,3 +1,8 @@
+import * as FileSystem from 'expo-file-system/legacy';
+import { useState, useEffect } from 'react';
+
+const docDir = (FileSystem as any).documentDirectory;
+
 export const TEAM_LOGOS: Record<string, any> = {
     // Pilot set — add files here as you create them
     ACU: require('@/assets/images/team-logos/ACU.png'),
@@ -323,6 +328,35 @@ export const TEAM_LOGOS: Record<string, any> = {
     YALE: require('@/assets/images/team-logos/YALE.png'),
     YOUNGSTOWN_STATE: require('@/assets/images/team-logos/YOUNGSTOWN_STATE.png'),
 };
+
+export function useTeamLogo(teamId?: string | null) {
+    const [logoSource, setLogoSource] = useState<any>(null);
+
+    useEffect(() => {
+        async function resolveLogo() {
+            if (!teamId) {
+                setLogoSource(null);
+                return;
+            }
+            const normalized = String(teamId).trim().toUpperCase();
+            const localUri = `${docDir}team-logos/${normalized}.png`;
+
+            try {
+                const fileInfo = await FileSystem.getInfoAsync(localUri);
+                if (fileInfo.exists) {
+                    setLogoSource({ uri: localUri });
+                } else {
+                    setLogoSource(TEAM_LOGOS[normalized] ?? null);
+                }
+            } catch {
+                setLogoSource(TEAM_LOGOS[normalized] ?? null);
+            }
+        }
+        resolveLogo();
+    }, [teamId]);
+
+    return logoSource;
+}
 
 export function getTeamLogo(teamId?: string | null) {
     if (!teamId) return null;
