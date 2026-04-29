@@ -18,6 +18,7 @@ export default function ProfileScreen() {
     const [user, setUser] = useState<{ email?: string; is_admin?: boolean } | null>(null);
     const [favorites, setFavorites] = useState<string[]>([]);
     const [teamNames, setTeamNames] = useState<Record<string, string>>({}); // ID -> Name map
+    const [allTeamIds, setAllTeamIds] = useState<string[]>([]);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
     const [notificationsEnabled, setNotificationsEnabled] = useState(true);
@@ -29,11 +30,12 @@ export default function ProfileScreen() {
             if (!token) return;
 
             // 1. Fetch User & Favorites in parallel
-            const [userRes, favsRes, teamsRes, deviceSettingsRes] = await Promise.all([
+            const [userRes, favsRes, teamsRes, deviceSettingsRes, allTeamIdsRes] = await Promise.all([
                 fetch(`${API_BASE_URL}/auth/me`, { headers: { Authorization: `Bearer ${token}` } }),
                 fetch(`${API_BASE_URL}/api/favorites`, { headers: { Authorization: `Bearer ${token}` } }),
                 fetch(`${API_BASE_URL}/teams?week=0`, { headers: { Authorization: `Bearer ${token}` } }),
                 fetch(`${API_BASE_URL}/api/devices/settings`, { headers: { Authorization: `Bearer ${token}` } }),
+                fetch(`${API_BASE_URL}/teams/all-ids`, { headers: { Authorization: `Bearer ${token}` } }), // NEW FETCH
             ]);
 
             if (userRes.ok) {
@@ -63,6 +65,19 @@ export default function ProfileScreen() {
                 if (typeof settings?.notifications_enabled === 'boolean') {
                     setNotificationsEnabled(settings.notifications_enabled);
                 }
+            }
+
+            // NEW BLOCK: Handle the allTeamIds response
+            if (allTeamIdsRes.ok) {
+                const ids = await allTeamIdsRes.json();
+                if (Array.isArray(ids)) {
+                    setAllTeamIds(ids);
+                    console.log("✅ Fetched allTeamIds:", ids.length, "IDs");
+                } else {
+                    console.log("⚠️ allTeamIdsRes was not an array:", ids);
+                }
+            } else {
+                console.log("❌ Failed to fetch allTeamIds:", allTeamIdsRes.status);
             }
         } catch (e) {
             console.log('Error loading profile data', e);
@@ -124,9 +139,8 @@ export default function ProfileScreen() {
     };
 
     const handleImportLogos = async () => {
-        // Get all unique team IDs from your teamNames map keys
-        const allTeamIds = Object.keys(teamNames); // Assuming teamNames is loaded
-
+        // Use the newly fetched list of ALL team IDs
+        // Check if allTeamIds is populated before starting the sync
         if (allTeamIds.length === 0) {
             Alert.alert("Error", "Please wait for team data to load before syncing. Try pulling to refresh.");
             return;
@@ -141,7 +155,7 @@ export default function ProfileScreen() {
                     text: "Sync Now",
                     onPress: async () => {
                         setLoading(true);
-                        // Make sure CONFERENCES is defined (see next step)
+                        // Pass the full list of ALL team IDs
                         const success = await importLogoPack(allTeamIds);
                         setLoading(false);
 
@@ -271,6 +285,7 @@ export default function ProfileScreen() {
             <Pressable
                 style={styles.settingRow}
                 onPress={handleImportLogos}
+                disabled={allTeamIds.length === 0} // DISABLE HERE
             >
                 <View style={{ flex: 1 }}>
                     <Text style={styles.settingLabel}>⚙️ Import Realism Pack</Text>

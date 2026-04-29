@@ -34,7 +34,8 @@ from functools import lru_cache
 from app.db import init_db, engine
 from app.db import AsyncSessionLocal
 from app.deps_auth import get_current_user
-from app.models_devices import Game, User
+from app.models_devices import Game
+from app.models_devices import User
 from sqlmodel import select, or_  # Ensure or_ is here
 from sqlalchemy import text # Add this to your sqlalchemy/sqlmodel imports
 from app.ingest import save_games_to_db
