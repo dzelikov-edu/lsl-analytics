@@ -672,6 +672,26 @@ def teams(week: int | None = None):
         "teams": out_sorted
     }
 
+
+@lru_cache(maxsize=1) # Cache this heavily, it's a big list that rarely changes
+def _cached_all_team_ids() -> list[str]:
+    """
+    Loads all team IDs from the TeamMap sheet (including non-tracked opponents).
+    Used for bulk operations like logo sync.
+    """
+    all_names_map = load_team_map_names()
+    return list(all_names_map.keys())
+
+
+@app.get("/teams/all-ids")
+async def get_all_team_ids(current_user: User = Depends(get_current_user)): # Require authentication
+    """
+    Returns a list of all known team IDs (tracked and non-tracked).
+    Requires authentication to prevent anonymous scraping.
+    """
+    return _cached_all_team_ids()
+
+
 @app.get("/teams/search")
 def search_teams(q: str, limit: int = 25):
     """
@@ -1319,25 +1339,6 @@ def _release_refresh_lock():
 
 
 from app.ingest import load_team_map_names  # add to your existing ingest imports at top
-
-@lru_cache(maxsize=1) # Cache this heavily, it's a big list that rarely changes
-def _cached_all_team_ids() -> list[str]:
-    """
-    Loads all team IDs from the TeamMap sheet (including non-tracked opponents).
-    Used for bulk operations like logo sync.
-    """
-    all_names_map = load_team_map_names()
-    return list(all_names_map.keys())
-
-
-@app.get("/teams/all-ids")
-async def get_all_team_ids(current_user: User = Depends(get_current_user)): # Require authentication
-    """
-    Returns a list of all known team IDs (tracked and non-tracked).
-    Requires authentication to prevent anonymous scraping.
-    """
-    return _cached_all_team_ids()
-
 
 def _team_name_map(active_only: bool = False) -> dict:
     """
