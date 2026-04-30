@@ -392,6 +392,20 @@ export default function ProfileScreen() {
                 <View style={{ marginTop: 20, borderTopWidth: 1, borderTopColor: theme.border, paddingTop: 20 }}>
                     <Text style={[styles.sectionTitle, { fontSize: 18 }]}>Commissioner Console</Text>
 
+                    {/* --- ADD THIS GREEN BUTTON --- */}
+                    <Pressable
+                        style={[styles.settingRow, { backgroundColor: '#34C759', marginBottom: 10 }]}
+                        onPress={() => router.push('/tournament/map')}
+                    >
+                        <View style={{ flex: 1 }}>
+                            <Text style={[styles.settingLabel, { color: '#fff' }]}>🗺️ View Tournament Map</Text>
+                            <Text style={{ color: 'rgba(255,255,255,0.8)', fontSize: 12, marginTop: 2 }}>
+                                Open the infinite canvas bracket view.
+                            </Text>
+                        </View>
+                    </Pressable>
+                    {/* ----------------------------- */}
+
                     <Pressable
                         style={[styles.settingRow, { backgroundColor: '#007AFF' }]}
                         onPress={handleTournamentSync}

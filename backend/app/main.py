@@ -44,6 +44,7 @@ from app.ingest import save_games_to_db
 from app.routers.devices_favorites import router as devices_favorites_router
 from app.routers.auth import router as auth_router
 from app.routers.admin import router as admin_router
+from app.routers.tournament import router as tournament_router
 from app.utils_mem import log_memory
 
 
@@ -129,6 +130,7 @@ app.add_middleware(LimitUploadSize, max_upload_size=1_000_000) # 1MB limit
 app.include_router(auth_router)
 app.include_router(devices_favorites_router)
 app.include_router(admin_router)
+app.include_router(tournament_router)
 
 
 @app.on_event("startup")

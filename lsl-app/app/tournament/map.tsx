@@ -7,49 +7,47 @@ import { AppColors } from '@/constants/app-colors';
 
 import TournamentMatchup from '@/components/TournamentMatchup';
 import ScoutingReport from '@/components/ScoutingReport';
-import { getGameCoordinates } from '@/lib/bracketLayout';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
+
+// MAP BOUNDARIES: Adjust these based on your total bracket size
+const MAP_WIDTH = 4000;
+const MAP_HEIGHT = 6000;
 
 export default function TournamentMap() {
     const colorScheme = useColorScheme() ?? 'light';
     const theme = AppColors[colorScheme];
 
-    // -- STATE FOR SCOUTING REPORT --
     const [selectedMatchup, setSelectedMatchup] = useState<any>(null);
     const [modalVisible, setModalVisible] = useState(false);
 
     const offset = useSharedValue({ x: 0, y: 0 });
-    const scale = useSharedValue(1);
     const start = useSharedValue({ x: 0, y: 0 });
 
+    // 1. SIMPLIFIED PAN GESTURE (No Zoom, with Boundaries)
     const panGesture = Gesture.Pan()
         .onUpdate((e) => {
+            const nextX = e.translationX + start.value.x;
+            const nextY = e.translationY + start.value.y;
+
+            // Simple "Guardrail" Logic: 
+            // Prevents dragging too far past the edges
             offset.value = {
-                x: e.translationX + start.value.x,
-                y: e.translationY + start.value.y,
+                x: Math.min(0, Math.max(nextX, -(MAP_WIDTH - SCREEN_WIDTH))),
+                y: Math.min(0, Math.max(nextY, -(MAP_HEIGHT - SCREEN_HEIGHT))),
             };
         })
         .onEnd(() => {
-            start.value = {
-                x: offset.value.x,
-                y: offset.value.y,
-            };
+            start.value = { x: offset.value.x, y: offset.value.y };
         });
 
-    const pinchGesture = Gesture.Pinch().onUpdate((e) => { scale.value = e.scale; });
     const animatedStyle = useAnimatedStyle(() => ({
         transform: [
             { translateX: offset.value.x },
             { translateY: offset.value.y },
-            { scale: scale.value },
         ],
     }));
 
-    // Composing the gestures
-    const composed = Gesture.Simultaneous(panGesture, pinchGesture);
-
-    // -- HANDLER TO OPEN REPORT --
     const openScoutingReport = (matchup: any) => {
         setSelectedMatchup(matchup);
         setModalVisible(true);
@@ -58,11 +56,17 @@ export default function TournamentMap() {
     return (
         <GestureHandlerRootView style={{ flex: 1 }}>
             <View style={[styles.container, { backgroundColor: theme.background }]}>
-                <GestureDetector gesture={Gesture.Simultaneous(panGesture, pinchGesture)}>
+                <GestureDetector gesture={panGesture}>
                     <Animated.View style={[styles.canvas, animatedStyle]}>
 
-                        {/* EXAMPLE: ONE MATCHUP ON THE MAP */}
-                        <View style={{ position: 'absolute', left: 300, top: 200 }}>
+                        {/* REGION LABEL: Lightened for better readability */}
+                        <View style={[styles.regionMarker, { top: 100, left: 300 }]}>
+                            <Text style={[styles.regionText, { color: theme.mutedText, opacity: 0.15 }]}>
+                                MIDWEST
+                            </Text>
+                        </View>
+
+                        <View style={{ position: 'absolute', left: 300, top: 250 }}>
                             <TournamentMatchup
                                 teamA={{ id: 'KU', name: 'Kansas', seed: 1 }}
                                 teamB={{ id: 'MSU', name: 'Michigan State', seed: 8 }}
@@ -74,15 +78,9 @@ export default function TournamentMap() {
                             />
                         </View>
 
-                        {/* REGION LABEL */}
-                        <View style={[styles.regionMarker, { top: 50, left: 300 }]}>
-                            <Text style={{ fontSize: 60, fontWeight: '900', color: theme.border }}>MIDWEST</Text>
-                        </View>
-
                     </Animated.View>
                 </GestureDetector>
 
-                {/* THE BOTTOM SHEET MODAL */}
                 {selectedMatchup && (
                     <ScoutingReport
                         visible={modalVisible}
@@ -98,6 +96,7 @@ export default function TournamentMap() {
 
 const styles = StyleSheet.create({
     container: { flex: 1, overflow: 'hidden' },
-    canvas: { width: 4000, height: 6000 },
-    regionMarker: { position: 'absolute', opacity: 0.3 }
+    canvas: { width: MAP_WIDTH, height: MAP_HEIGHT },
+    regionMarker: { position: 'absolute' },
+    regionText: { fontSize: 80, fontWeight: '900', letterSpacing: -2 }
 });
