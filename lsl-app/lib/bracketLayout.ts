@@ -1,36 +1,44 @@
 // lib/bracketLayout.ts
 
-export const COLUMN_WIDTH = 300;
-export const GAME_HEIGHT = 120;
-export const VERTICAL_SPACING = 40;
+export const COLUMN_WIDTH = 260;
+export const GAME_HEIGHT = 100;
+export const VERTICAL_SPACING = 30;
+export const CENTER_X = 1500;
 
-/**
- * Calculates the X and Y coordinates for a game based on its round and slot.
- * This allows us to place 'Survival 16' games on the outer edges.
- */
-export function getGameCoordinates(region: string, round: string, slot: number) {
+export function getGameCoordinates(region: string, round: string, slot: number, regionOrder: string[]) {
+    const side = (region === regionOrder[0] || region === regionOrder[3]) ? 'LEFT' : 'RIGHT';
+
     let x = 0;
-    let y = slot * (GAME_HEIGHT + VERTICAL_SPACING);
+    let y = (slot - 1) * (GAME_HEIGHT + VERTICAL_SPACING);
 
-    // X-Axis based on Round
-    switch (round) {
-        case 'Survival_16': x = 0; break;
-        case 'Round_64': x = COLUMN_WIDTH; break;
-        case 'Round_32': x = COLUMN_WIDTH * 2; break;
-        case 'Sweet_16': x = COLUMN_WIDTH * 3; break;
-        case 'Elite_8': x = COLUMN_WIDTH * 4; break;
-        case 'National Semifinals': x = COLUMN_WIDTH * 5; break;
-        case 'Championship': x = COLUMN_WIDTH * 6; break;
+    // Round Steps: Survival is now -1 to sit outside R64 (step 0)
+    const roundStep = {
+        'Survival_16': -1,
+        'Round_64': 0,
+        'Round_32': 1,
+        'Sweet_16': 2,
+        'Elite_8': 3,
+    }[round] ?? 4;
+
+    if (side === 'LEFT') {
+        x = (roundStep + 1) * COLUMN_WIDTH;
+    } else {
+        // Right side flows inward
+        x = (CENTER_X * 2) - ((roundStep + 1) * COLUMN_WIDTH) - 220;
     }
 
-    // Y-Axis adjustment based on Region to stack them vertically
+    if (region === "Final Four" || round === "National Semifinals" || round === "Championship") {
+        x = CENTER_X - 110;
+        y = (round === "Championship") ? 800 : (slot === 1 ? 400 : 1200);
+        return { x, y };
+    }
+
     const regionOffset = {
-        'East': 0,
-        'Midwest': 2000,
-        'South': 4000,
-        'West': 6000,
-        'Final Four': 3000
+        [regionOrder[0]]: 0,
+        [regionOrder[1]]: 0,
+        [regionOrder[3]]: 1200,
+        [regionOrder[2]]: 1200,
     }[region] || 0;
 
-    return { x, y: y + regionOffset };
+    return { x: x + 150, y: y + regionOffset + 250 };
 }
