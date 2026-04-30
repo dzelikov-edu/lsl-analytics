@@ -23,29 +23,44 @@ async def sync_official_tournament(season: int, region_order: list[str]):
         })
 
     async with AsyncSessionLocal() as session:
-        # 1. Surgical Wipe of this season ONLY
-        # (We skip UserBracketPick for now to avoid the crash if the table doesn't exist)
+        # 1. Wipe old data
         await session.execute(delete(TournamentBracket).where(TournamentBracket.season == season))
         await session.execute(delete(TournamentSeedList).where(TournamentSeedList.season == season))
         
-        # 2. Assign Regions
+        # 2. Assign Regions and SAVE SEEDS
         regional_data = {region: [] for region in region_order}
         for team in field:
             seed_num = ((team['overall_rank'] - 1) // 4) + 1
             region_idx = get_snake_region_index(team['overall_rank'])
             region_name = region_order[region_idx]
             
+            # --- SURGICAL FIX START ---
             session.add(TournamentSeedList(
-                season=season, team_id=team['team_id'], 
-                overall_rank=team['overall_rank'], seed=seed_num,
-                is_autobid=team['is_autobid']
+                season=season, 
+                team_id=team['team_id'], 
+                overall_rank=team['overall_rank'], 
+                seed=seed_num,
+                is_autobid=team['is_autobid'],
+                # FIX: Providing the required default values
+                resume_score=0.0,
+                power_value=0.0,
+                ppg=0.0,
+                rpg=0.0,
+                apg=0.0,
+                fg_pct=0.0,
+                three_pct=0.0,
+                oppg=0.0,
+                topg=0.0,
+                fpg=0.0,
+                games_played=0
             ))
+            # --- SURGICAL FIX END ---
             
             team['seed'] = seed_num
             team['region'] = region_name
             regional_data[region_name].append(team)
 
-        # 3. Create the Minimal Structure
+        # 3. Create the Minimal Structure (TBD games)
         champ_id = str(uuid.uuid4())
         semi_1_id = str(uuid.uuid4())
         semi_2_id = str(uuid.uuid4())

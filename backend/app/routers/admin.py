@@ -54,19 +54,27 @@ async def admin_sync_tournament(
         raise HTTPException(status_code=403, detail="Admin only.")
 
     try:
-        # Trigger the sync logic
+        # 1. Trigger the sync
         regional_data = await sync_official_tournament(season, region_mapping)
+        
+        # 2. Re-enable Rematch Check
+        from app.main import GLOBAL_GAMES_LIST
+        from app.logic_tournament import check_pod_rematches
+        
+        all_warnings = []
+        for region_name in region_mapping:
+            teams = regional_data.get(region_name, [])
+            all_warnings.extend(check_pod_rematches(teams, GLOBAL_GAMES_LIST))
         
         return {
             "status": "success",
-            "teams_synced": 16, # Temporary hardcode for testing
+            "teams_synced": sum(len(teams) for teams in regional_data.values()),
             "consultant_report": {
-                "rematch_count": 0,
-                "rematch_alerts": [],
-                "message": "Sync Success! Circular import resolved."
+                "rematch_count": len(all_warnings),
+                "rematch_alerts": all_warnings,
+                "message": "Sync Success! 16 teams placed."
             }
         }
     except Exception as e:
-        # THIS WILL NOW SHOW THE ERROR IN THE RENDER LOGS
         print(f"CRITICAL SYNC ERROR: {e}")
         raise HTTPException(status_code=500, detail=str(e))
