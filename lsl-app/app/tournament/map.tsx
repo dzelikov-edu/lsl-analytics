@@ -1,16 +1,18 @@
-import React, { useState } from 'react';
-import { StyleSheet, View, Dimensions, Text } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { StyleSheet, View, Dimensions, Text, ActivityIndicator } from 'react-native';
 import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
 import Animated, { useSharedValue, useAnimatedStyle } from 'react-native-reanimated';
+import { Svg, Line } from 'react-native-svg';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { AppColors } from '@/constants/app-colors';
 
+import { API_BASE_URL } from '@/lib/api';
+import { getToken } from '@/lib/auth-storage';
 import TournamentMatchup from '@/components/TournamentMatchup';
 import ScoutingReport from '@/components/ScoutingReport';
+import { getGameCoordinates, COLUMN_WIDTH, GAME_HEIGHT } from '@/lib/bracketLayout';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
-
-// MAP BOUNDARIES: Adjust these based on your total bracket size
 const MAP_WIDTH = 4000;
 const MAP_HEIGHT = 6000;
 
@@ -18,20 +20,19 @@ export default function TournamentMap() {
     const colorScheme = useColorScheme() ?? 'light';
     const theme = AppColors[colorScheme];
 
+    const [loading, setLoading] = useState(true);
+    const [bracketGames, setBracketGames] = useState<any[]>([]);
     const [selectedMatchup, setSelectedMatchup] = useState<any>(null);
     const [modalVisible, setModalVisible] = useState(false);
 
+    // Map Gestures
     const offset = useSharedValue({ x: 0, y: 0 });
     const start = useSharedValue({ x: 0, y: 0 });
 
-    // 1. SIMPLIFIED PAN GESTURE (No Zoom, with Boundaries)
     const panGesture = Gesture.Pan()
         .onUpdate((e) => {
             const nextX = e.translationX + start.value.x;
             const nextY = e.translationY + start.value.y;
-
-            // Simple "Guardrail" Logic: 
-            // Prevents dragging too far past the edges
             offset.value = {
                 x: Math.min(0, Math.max(nextX, -(MAP_WIDTH - SCREEN_WIDTH))),
                 y: Math.min(0, Math.max(nextY, -(MAP_HEIGHT - SCREEN_HEIGHT))),
@@ -42,16 +43,39 @@ export default function TournamentMap() {
         });
 
     const animatedStyle = useAnimatedStyle(() => ({
-        transform: [
-            { translateX: offset.value.x },
-            { translateY: offset.value.y },
-        ],
+        transform: [{ translateX: offset.value.x }, { translateY: offset.value.y }],
     }));
 
-    const openScoutingReport = (matchup: any) => {
-        setSelectedMatchup(matchup);
+    // 1. FETCH REAL DATA FROM POSTGRES
+    useEffect(() => {
+        async function loadBracket() {
+            try {
+                const token = await getToken();
+                const res = await fetch(`${API_BASE_URL}/api/tournament/bracket?season=2036`, {
+                    headers: { Authorization: `Bearer ${token}` }
+                });
+                const data = await res.json();
+                setBracketGames(data);
+            } catch (e) {
+                console.error("Failed to load bracket:", e);
+            } finally {
+                setLoading(false);
+            }
+        }
+        loadBracket();
+    }, []);
+
+    const openScoutingReport = (game: any) => {
+        // Prepare stat snapshot (Mocking stats for now, real averages later)
+        const stats = {
+            teamA: { id: game.team_a_id, name: game.team_a_name || 'Team A', record: '0-0', ppg: 0, rpg: 0, fg_pct: 0, three_pct: 0 },
+            teamB: { id: game.team_b_id, name: game.team_b_name || 'Team B', record: '0-0', ppg: 0, rpg: 0, fg_pct: 0, three_pct: 0 }
+        };
+        setSelectedMatchup(stats);
         setModalVisible(true);
     };
+
+    if (loading) return <ActivityIndicator style={{ flex: 1 }} color={theme.text} />;
 
     return (
         <GestureHandlerRootView style={{ flex: 1 }}>
@@ -59,24 +83,47 @@ export default function TournamentMap() {
                 <GestureDetector gesture={panGesture}>
                     <Animated.View style={[styles.canvas, animatedStyle]}>
 
-                        {/* REGION LABEL: Lightened for better readability */}
-                        <View style={[styles.regionMarker, { top: 100, left: 300 }]}>
-                            <Text style={[styles.regionText, { color: theme.mutedText, opacity: 0.15 }]}>
-                                MIDWEST
-                            </Text>
-                        </View>
+                        {/* 2. DRAW BRACKET LINES (SVG LAYER) */}
+                        {/* <Svg style={StyleSheet.absoluteFill}>
+                            {bracketGames.map((game) => {
+                                if (!game.next_game_id) return null;
+                                const startCoords = getGameCoordinates(game.region, game.round, game.game_slot);
+                                // Find where the winner goes
+                                const nextGame = bracketGames.find(g => g.id === game.next_game_id);
+                                if (!nextGame) return null;
+                                const endCoords = getGameCoordinates(nextGame.region, nextGame.round, nextGame.game_slot);
 
-                        <View style={{ position: 'absolute', left: 300, top: 250 }}>
-                            <TournamentMatchup
-                                teamA={{ id: 'KU', name: 'Kansas', seed: 1 }}
-                                teamB={{ id: 'MSU', name: 'Michigan State', seed: 8 }}
-                                status="PREDICTION"
-                                onPress={() => openScoutingReport({
-                                    teamA: { id: 'KU', name: 'Kansas', record: '28-4', ppg: 78.5, rpg: 38.2, fg_pct: 48, three_pct: 36, apg: 15, spg: 7, bpg: 5, oppg: 65, topg: 11, fpg: 14 },
-                                    teamB: { id: 'MSU', name: 'Michigan State', record: '22-11', ppg: 72.1, rpg: 35.5, fg_pct: 44, three_pct: 34, apg: 12, spg: 6, bpg: 4, oppg: 68, topg: 13, fpg: 16 }
-                                })}
-                            />
-                        </View>
+                                return (
+                                    <Line
+                                        key={`line-${game.id}`}
+                                        x1={startCoords.x + 220} // End of the card
+                                        y1={startCoords.y + (GAME_HEIGHT / 2)}
+                                        x2={endCoords.x}
+                                        y2={endCoords.y + (GAME_HEIGHT / 2)}
+                                        stroke={theme.border}
+                                        strokeWidth="2"
+                                    />
+                                );
+                            })}
+                        </Svg> */}
+
+                        {/* 3. DRAW THE CARDS */}
+                        {bracketGames.map((game) => {
+                            const coords = getGameCoordinates(game.region, game.round, game.game_slot);
+                            return (
+                                <View
+                                    key={game.id}
+                                    style={{ position: 'absolute', left: coords.x, top: coords.y }}
+                                >
+                                    <TournamentMatchup
+                                        teamA={{ id: game.team_a_id, name: game.team_a_id, seed: game.seed_a }}
+                                        teamB={{ id: game.team_b_id, name: game.team_b_id, seed: game.seed_b }}
+                                        status="PREDICTION"
+                                        onPress={() => openScoutingReport(game)}
+                                    />
+                                </View>
+                            );
+                        })}
 
                     </Animated.View>
                 </GestureDetector>
@@ -97,6 +144,5 @@ export default function TournamentMap() {
 const styles = StyleSheet.create({
     container: { flex: 1, overflow: 'hidden' },
     canvas: { width: MAP_WIDTH, height: MAP_HEIGHT },
-    regionMarker: { position: 'absolute' },
-    regionText: { fontSize: 80, fontWeight: '900', letterSpacing: -2 }
+    regionMarker: { position: 'absolute', opacity: 0.15 }
 });
