@@ -8,6 +8,9 @@ import { API_BASE_URL } from '@/lib/api';
 import TeamLogo from '@/components/TeamLogo';
 import { EmptyState } from '@/components/EmptyState';
 import { importLogoPack } from '@/lib/logoManager';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as FileSystem from 'expo-file-system/legacy';
+
 
 const CONFERENCES = ["AAC", "ACC", "B10", "B12", "BE", "MW", "P12", "SEC", "WCC"];
 
@@ -22,6 +25,8 @@ export default function ProfileScreen() {
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
     const [notificationsEnabled, setNotificationsEnabled] = useState(true);
+    const [syncProgress, setSyncProgress] = useState(0); // NEW
+    const [syncTotal, setSyncTotal] = useState(0);     // NEW
 
     // This function fetches all the data
     const loadProfileData = useCallback(async () => {
@@ -141,6 +146,7 @@ export default function ProfileScreen() {
     const handleImportLogos = async () => {
         // Use the newly fetched list of ALL team IDs
         // Check if allTeamIds is populated before starting the sync
+        const idsToSync = allTeamIds; // Use the state variable holding ALL the IDs
         if (allTeamIds.length === 0) {
             Alert.alert("Error", "Please wait for team data to load before syncing. Try pulling to refresh.");
             return;
@@ -155,9 +161,16 @@ export default function ProfileScreen() {
                     text: "Sync Now",
                     onPress: async () => {
                         setLoading(true);
-                        // Pass the full list of ALL team IDs
-                        const success = await importLogoPack(allTeamIds);
+                        setSyncProgress(0); // Reset progress
+                        setSyncTotal(idsToSync.length + CONFERENCES.length); // Set total
+
+                        const success = await importLogoPack(idsToSync, (current, total) => {
+                            setSyncProgress(current); // Update progress
+                            setSyncTotal(total);     // Update total (if it changes)
+                        });
+
                         setLoading(false);
+                        setSyncProgress(0); // Clear progress on finish
 
                         if (success) {
                             Alert.alert("Success", "Logos synced! Please restart the app to see the new logos.");
@@ -220,6 +233,76 @@ export default function ProfileScreen() {
         await loadProfileData(); // This re-fetches user, favorites, and team names
         setRefreshing(false);
     }, [loadProfileData]);
+
+    // Add this inside ProfileScreen in app/(tabs)/profile.tsx
+    const clearImportedLogos = async () => {
+        // Cast to any to access the legacy methods bypass TypeScript errors
+        const fs = (FileSystem as any);
+        const docDir = fs.documentDirectory;
+        const TEAM_LOGO_DIR = `${docDir}team-logos/`;
+        const CONF_LOGO_DIR = `${docDir}conference-logos/`;
+
+        try {
+            // Use the casted object to call deleteAsync
+            await fs.deleteAsync(TEAM_LOGO_DIR, { idempotent: true });
+            await fs.deleteAsync(CONF_LOGO_DIR, { idempotent: true });
+
+            // Also clear the AsyncStorage flag
+            await AsyncStorage.removeItem('has_custom_logos');
+
+            Alert.alert("Success", "Imported logos cleared. Restart the app to see generics.");
+        } catch (e) {
+            console.log("Delete Error:", e);
+            Alert.alert("Error", "Could not clear logos.");
+        }
+    };
+
+    const handleTournamentSync = async () => {
+        Alert.alert(
+            "LCAA Selection Sunday",
+            "This will read the Official Field from Google Sheets and generate the 2036 LCAA Bracket. Continue?",
+            [
+                { text: "Cancel", style: "cancel" },
+                {
+                    text: "Run Sync",
+                    onPress: async () => {
+                        setLoading(true);
+                        try {
+                            const token = await getToken();
+                            const res = await fetch(`${API_BASE_URL}/admin/tournament/sync?season=2036`, {
+                                method: 'POST',
+                                headers: { Authorization: `Bearer ${token}` }
+                            });
+
+                            const data = await res.json();
+                            setLoading(false);
+
+                            if (res.ok) {
+                                // Format the AI Consultant's report
+                                const warningCount = data.consultant_report?.rematch_count || 0;
+                                const alerts = data.consultant_report?.rematch_alerts || [];
+
+                                let alertMsg = `Successfully synced ${data.teams_synced} teams.`;
+                                if (warningCount > 0) {
+                                    alertMsg += `\n\n⚠️ AI CONSULTANT: Found ${warningCount} rematch conflicts:\n`;
+                                    alerts.forEach((a: any) => alertMsg += `\n• ${a.message}`);
+                                } else {
+                                    alertMsg += `\n\n✅ AI CONSULTANT: No pod rematches detected.`;
+                                }
+
+                                Alert.alert("Sync Complete", alertMsg);
+                            } else {
+                                Alert.alert("Sync Failed", data.detail || "Check server logs.");
+                            }
+                        } catch (e) {
+                            setLoading(false);
+                            Alert.alert("Error", "Could not connect to server.");
+                        }
+                    }
+                }
+            ]
+        );
+    };
 
     return (
         <ScrollView
@@ -294,6 +377,41 @@ export default function ProfileScreen() {
                     </Text>
                 </View>
             </Pressable>
+
+            {loading && syncTotal > 0 && ( // Display only when syncing and loading
+                <View style={[styles.settingRow, { justifyContent: 'center', marginBottom: 20 }]}>
+                    <ActivityIndicator size="small" color={theme.text} style={{ marginRight: 10 }} />
+                    <Text style={styles.settingLabel}>
+                        Syncing Logos: {syncProgress}/{syncTotal}
+                    </Text>
+                </View>
+            )}
+
+            {/* --- COMMISSIONER CONSOLE: ADMIN ONLY --- */}
+            {user?.is_admin && (
+                <View style={{ marginTop: 20, borderTopWidth: 1, borderTopColor: theme.border, paddingTop: 20 }}>
+                    <Text style={[styles.sectionTitle, { fontSize: 18 }]}>Commissioner Console</Text>
+
+                    <Pressable
+                        style={[styles.settingRow, { backgroundColor: '#007AFF' }]}
+                        onPress={handleTournamentSync}
+                    >
+                        <View style={{ flex: 1 }}>
+                            <Text style={[styles.settingLabel, { color: '#fff' }]}>🏆 Sync 2036 LCAA Tournament</Text>
+                            <Text style={{ color: 'rgba(255,255,255,0.8)', fontSize: 12, marginTop: 2 }}>
+                                Generate the bracket from the Official Field Google Sheet.
+                            </Text>
+                        </View>
+                    </Pressable>
+
+                    <Pressable
+                        style={[styles.logoutButton, { backgroundColor: theme.mutedText, marginTop: 10 }]}
+                        onPress={clearImportedLogos}
+                    >
+                        <Text style={styles.buttonText}>⚠️ Reset to Generic Logos</Text>
+                    </Pressable>
+                </View>
+            )}
 
             <Pressable style={styles.logoutButton} onPress={handleLogout}>
                 <Text style={styles.buttonText}>Log Out</Text>

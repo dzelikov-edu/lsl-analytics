@@ -14,7 +14,7 @@ const GITHUB_CONFS_BASE = "https://raw.githubusercontent.com/dzelikov-edu/lsl-re
 // Hardcoded list of your 9 conferences to ensure they sync
 const CONFERENCES = ["AAC", "ACC", "B10", "B12", "BE", "MW", "P12", "SEC", "WCC"];
 
-export async function importLogoPack(teamIds: string[]) {
+export async function importLogoPack(teamIds: string[], onProgress?: (current: number, total: number) => void) {
     console.log(`[SYNC] Starting sync for ${teamIds.length} teams and ${CONFERENCES.length} conferences...`);
 
     try {
@@ -24,6 +24,7 @@ export async function importLogoPack(teamIds: string[]) {
 
         let successCount = 0;
         let failCount = 0;
+        const totalFiles = teamIds.length + CONFERENCES.length;
 
         // 2. Sync Team Logos (one by one)
         for (const tid of teamIds) {
@@ -33,7 +34,6 @@ export async function importLogoPack(teamIds: string[]) {
 
             try {
                 const res = await FileSystem.downloadAsync(downloadUrl, fileUri);
-
                 if (res.status === 200) {
                     successCount++;
                 } else {
@@ -42,10 +42,7 @@ export async function importLogoPack(teamIds: string[]) {
             } catch (e) {
                 failCount++;
             }
-
-            if ((successCount + failCount) % 50 === 0) { // Log progress every 50 downloads
-                console.log(`[SYNC] Team Progress: ${successCount + failCount}/${teamIds.length}`);
-            }
+            if (onProgress) onProgress(successCount + failCount, totalFiles);
         }
 
         // 3. Sync Conference Logos (one by one)
@@ -61,6 +58,7 @@ export async function importLogoPack(teamIds: string[]) {
             } catch (e) {
                 failCount++;
             }
+            if (onProgress) onProgress(successCount + failCount, totalFiles);
         }
 
         // 4. Mark that custom logos are now available

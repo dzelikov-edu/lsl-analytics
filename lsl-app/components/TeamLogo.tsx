@@ -1,10 +1,12 @@
 import { AppColors } from '@/constants/app-colors';
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import { getTeamBranding } from '@/lib/teamBranding';
+import { getTeamBranding } from '@/lib/teamBranding'; // Import your existing team branding logic
 import { StyleSheet, View } from 'react-native';
-import { Image } from 'expo-image'; // Use the high-performance version
-import { useTeamLogo } from '@/lib/teamLogos';
+import { Image } from 'expo-image';
+import { useTeamLogo } from '@/lib/teamLogos'; // Import the new hook
 
+// Path to your new transparent generic basketball icon
+const GENERIC_BASKETBALL_ICON = require('@/assets/images/generic_basketball_transparent.png');
 
 type TeamLogoProps = {
     teamId?: string | null;
@@ -14,12 +16,15 @@ type TeamLogoProps = {
 export default function TeamLogo({ teamId, size = 28 }: TeamLogoProps) {
     const colorScheme = useColorScheme() ?? 'light';
     const theme = AppColors[colorScheme];
+
+    // Get team branding for colors using your existing function
     const branding = getTeamBranding(teamId);
 
-    // Switch to the hook
+    // This hook now handles checking local storage. Returns {uri: localPath} or null.
     const resolvedLogo = useTeamLogo(teamId);
 
     if (resolvedLogo) {
+        // If an imported logo is found, render it normally
         return (
             <Image
                 source={resolvedLogo}
@@ -30,13 +35,35 @@ export default function TeamLogo({ teamId, size = 28 }: TeamLogoProps) {
         );
     }
 
+    // Fallback: Dynamically colored generic basketball icon
     return (
-        <View style={[styles.fallback, { width: size, height: size, backgroundColor: branding.primary, borderRadius: size / 2 }]} />
+        <View
+            style={[
+                styles.fallbackContainer, // Use the new style
+                {
+                    width: size,
+                    height: size,
+                    borderRadius: size / 2, // Make it a circle
+                    backgroundColor: branding.primary, // Team's primary color
+                    borderColor: branding.secondary, // Team's secondary color
+                },
+            ]}
+        >
+            {/* The transparent basketball icon */}
+            <Image
+                source={GENERIC_BASKETBALL_ICON}
+                contentFit="contain"
+                transition={0}
+                style={{ width: size * 0.7, height: size * 0.7 }} // Slightly smaller to show background
+            />
+        </View>
     );
 }
 
 const styles = StyleSheet.create({
-    fallback: {
-        borderWidth: 1,
+    fallbackContainer: { // Renamed from fallback to be specific
+        borderWidth: 1.5, // A visible border
+        alignItems: 'center',
+        justifyContent: 'center',
     },
 });

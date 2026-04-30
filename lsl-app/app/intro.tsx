@@ -16,63 +16,49 @@ export default function IntroScreen() {
 
     return (
         <ScrollView contentContainerStyle={[styles.container, { backgroundColor: theme.background }]}>
-            <Text style={[styles.title, { color: theme.text }]}>Welcome to Legends CBB</Text>
+            <Text style={[styles.title, { color: theme.text }]}>Legends CBB</Text>
 
             <Text style={[styles.body, { color: theme.text, marginTop: 8 }]}>
-                Legends CBB is a{' '}
-                <Text style={{ fontWeight: '700' }}>simulated college basketball universe</Text>, not a live NCAA stats app.
+                Welcome to a{' '}
+                <Text style={{ fontWeight: '700' }}>completely simulated basketball universe</Text>.
+                This is a fictional simulation engine designed for league management and analytics.
             </Text>
 
             <Text style={[styles.body, { color: theme.text, marginTop: 12 }]}>
-                Each season advances week‑by‑week. After each simulated week, the league gets updated and you’ll see:
+                The league advances week‑by‑week with its own history and results. Inside, you’ll find:
             </Text>
 
-            <Text style={[styles.bullet, { color: theme.text }]}>
-                • Full schedules, final scores, and individual player stat averages
-            </Text>
-            <Text style={[styles.bullet, { color: theme.text }]}>
-                • Power, Resume, and SOS tiers for 69 exclusively tracked programs
-            </Text>
-            <Text style={[styles.bullet, { color: theme.text }]}>
-                • Tie‑aware conference standings and an evolving LCAA Tournament at‑large picture
+            <View style={styles.bulletContainer}>
+                <Text style={[styles.bullet, { color: theme.text }]}>
+                    • <Text style={{ fontWeight: '600' }}>Dynamic Analytics:</Text> Power, Resume, and SOS tiers for 69 exclusively tracked programs.
+                </Text>
+                <Text style={[styles.bullet, { color: theme.text }]}>
+                    • <Text style={{ fontWeight: '600' }}>Full Simulation:</Text> Detailed box scores and individual player stat averages.
+                </Text>
+                <Text style={[styles.bullet, { color: theme.text }]}>
+                    • <Text style={{ fontWeight: '600' }}>Tournament Mode:</Text> Follow the evolving LCAA Tournament at‑large picture as the season progresses.
+                </Text>
+            </View>
+
+            <Text style={[styles.body, { color: theme.mutedText, marginTop: 16 }]}>
+                <Text style={{ fontStyle: 'italic' }}>Visual Note:</Text> This app uses a "Store-Safe" generic branding system by default. Members can apply custom visual packs via the Profile tab to personalize their simulation experience.
             </Text>
 
             <Text style={[styles.body, { color: theme.mutedText, marginTop: 16 }]}>
-                Think of this as a custom CBB league where you can scout, follow teams, and study the LCAA Tournament landscape as it takes shape week‑by‑week.
+                Join the LSL Community:
             </Text>
 
-            <Text style={[styles.body, { color: theme.mutedText, marginTop: 16 }]}>
-                Want to go deeper? Join the community:
-            </Text>
-
-            <Pressable
-                onPress={() => Linking.openURL('https://instagram.com/legends.cbb')}
-            >
-                <Text style={[styles.bullet, { color: '#007AFF' }]}>
-                    • Instagram: <Text style={{ fontWeight: '700' }}>@legends.cbb</Text>
-                </Text>
-            </Pressable>
-            <Pressable
-                onPress={() => Linking.openURL('https://www.youtube.com/@legendscbb')}
-            >
-                <Text style={[styles.bullet, { color: '#007AFF' }]}>
-                    • YouTube: <Text style={{ fontWeight: '700' }}>Legends CBB</Text>
-                </Text>
-            </Pressable>
-            <Pressable
-                onPress={() => Linking.openURL('https://www.twitch.tv/legendscbb')}
-            >
-                <Text style={[styles.bullet, { color: '#007AFF' }]}>
-                    • Twitch: <Text style={{ fontWeight: '700' }}>LegendsCBB</Text>
-                </Text>
-            </Pressable>
-            <Pressable
-                onPress={() => Linking.openURL('https://discord.gg/4TwpUgqvA')}
-            >
-                <Text style={[styles.bullet, { color: '#007AFF' }]}>
-                    • Discord: <Text style={{ fontWeight: '700' }}>LSL League Server</Text>
-                </Text>
-            </Pressable>
+            <View style={styles.socialContainer}>
+                <Pressable onPress={() => Linking.openURL('https://instagram.com/legends.cbb')}>
+                    <Text style={[styles.link, { color: '#007AFF' }]}>• Instagram</Text>
+                </Pressable>
+                <Pressable onPress={() => Linking.openURL('https://www.youtube.com/@legendscbb')}>
+                    <Text style={[styles.link, { color: '#007AFF' }]}>• YouTube</Text>
+                </Pressable>
+                <Pressable onPress={() => Linking.openURL('https://discord.gg/4TwpUgqvA')}>
+                    <Text style={[styles.link, { color: '#007AFF' }]}>• Discord Server</Text>
+                </Pressable>
+            </View>
 
             <Pressable
                 onPress={handleContinue}
@@ -81,21 +67,29 @@ export default function IntroScreen() {
                     { backgroundColor: theme.card, opacity: pressed ? 0.8 : 1 },
                 ]}
             >
-                <Text style={{ color: theme.text, fontWeight: '700', fontSize: 16 }}>Get Started</Text>
+                <Text style={{ color: theme.text, fontWeight: '700', fontSize: 16 }}>Enter Simulation</Text>
             </Pressable>
         </ScrollView>
     );
 }
 
 const styles = StyleSheet.create({
-    container: { flexGrow: 1, justifyContent: 'center', padding: 20 },
-    title: { fontSize: 28, fontWeight: '800', marginBottom: 18, textAlign: 'center' },
+    container: { flexGrow: 1, justifyContent: 'center', padding: 24 },
+    title: { fontSize: 32, fontWeight: '900', marginBottom: 12, textAlign: 'center' },
     body: { fontSize: 15, lineHeight: 22 },
-    bullet: { fontSize: 15, lineHeight: 22, marginTop: 6 },
+    bulletContainer: { marginTop: 10 },
+    bullet: { fontSize: 14, lineHeight: 20, marginBottom: 8 },
+    socialContainer: { marginTop: 8 },
+    link: { fontSize: 15, lineHeight: 28, fontWeight: '600' },
     button: {
-        marginTop: 28,
-        paddingVertical: 14,
-        borderRadius: 10,
+        marginTop: 32,
+        paddingVertical: 16,
+        borderRadius: 12,
         alignItems: 'center',
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+        elevation: 3,
     },
 });

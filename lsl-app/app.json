@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "lsl-app",
+    "name": "Legends CBB",
     "slug": "lsl-app",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -10,10 +10,12 @@
     "newArchEnabled": true,
     "ios": {
       "bundleIdentifier": "com.legends.cbb",
+      "buildNumber": "1",
       "supportsTablet": true
     },
     "android": {
       "package": "com.legends.cbb",
+      "versionCode": 1,
       "adaptiveIcon": {
         "backgroundColor": "#0B1A30",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
