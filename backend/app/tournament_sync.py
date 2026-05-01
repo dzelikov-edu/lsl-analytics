@@ -54,13 +54,16 @@ async def sync_official_tournament(season: int, region_order: list[str]):
                     r32_slot = ((s16-1)*2)+r32
                     session.add(TournamentBracket(id=r32_id, season=season, region=region_name, round="Round_32", game_slot=r32_slot, next_game_id=s16_id, **tbd))
                     
+                    # Round of 64 (8 games total per region)
                     for r64 in range(1, 3):
                         r64_id = str(uuid.uuid4())
                         r64_slot = ((r32_slot-1)*2)+r64
                         session.add(TournamentBracket(id=r64_id, season=season, region=region_name, round="Round_64", game_slot=r64_slot, next_game_id=r32_id, **tbd))
                         
-                        # Add Survival 16 slots on the far edges
-                        if r64_slot in [1, 8]: # Placeholder: Add more logic later
+                        # SURVIVAL 16 logic (Simplified for test)
+                        # In the real version, we will map this to seeds 10, 11, 16
+                        # For now, let's just create 4 play-ins per region so you see the full edges.
+                        if r64_slot in [1, 3, 5, 8]: 
                             session.add(TournamentBracket(id=str(uuid.uuid4()), season=season, region=region_name, round="Survival_16", game_slot=r64_slot, next_game_id=r64_id, **tbd))
 
         await session.commit()
