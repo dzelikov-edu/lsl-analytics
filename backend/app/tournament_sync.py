@@ -60,11 +60,70 @@ async def sync_official_tournament(season: int, region_order: list[str]):
                         r64_slot = ((r32_slot-1)*2)+r64
                         session.add(TournamentBracket(id=r64_id, season=season, region=region_name, round="Round_64", game_slot=r64_slot, next_game_id=r32_id, **tbd))
                         
-                        # SURVIVAL 16 logic (Simplified for test)
-                        # In the real version, we will map this to seeds 10, 11, 16
-                        # For now, let's just create 4 play-ins per region so you see the full edges.
-                        if r64_slot in [1, 3, 5, 8]: 
-                            session.add(TournamentBracket(id=str(uuid.uuid4()), season=season, region=region_name, round="Survival_16", game_slot=r64_slot, next_game_id=r64_id, **tbd))
+                        # --- SURVIVAL 16: seed-based play-ins ---
+                        
+                        # 16-seed play-ins → slot 1 only (1 vs 16)
+                        if r64_slot == 1:
+                            session.add(TournamentBracket(
+                                id=str(uuid.uuid4()),
+                                season=season,
+                                region=region_name,
+                                round="Survival_16",
+                                game_slot=r64_slot,
+                                next_game_id=r64_id,
+                                **tbd,
+                            ))
+
+                        # 11-seed play-ins → slot 5 (6 vs 11)
+                        if r64_slot == 5:
+                            session.add(TournamentBracket(
+                                id=str(uuid.uuid4()),
+                                season=season,
+                                region=region_name,
+                                round="Survival_16",
+                                game_slot=r64_slot,
+                                next_game_id=r64_id,
+                                **tbd,
+                            ))
+
+                        # 10-seed play-ins → slot 7 (7 vs 10)
+                        if r64_slot == 7:
+                            session.add(TournamentBracket(
+                                id=str(uuid.uuid4()),
+                                season=season,
+                                region=region_name,
+                                round="Survival_16",
+                                game_slot=r64_slot,
+                                next_game_id=r64_id,
+                                **tbd,
+                            ))
+
+                        # Extra 9/12 play-ins only for 3rd and 4th overall #1 regions (bottom two)
+                        is_extra_playin_region = (region_name == region_order[2] or region_name == region_order[3])
+
+                        if is_extra_playin_region:
+                            # 9-seed play-ins → slot 2 (8 vs 9)
+                            if r64_slot == 2:
+                                session.add(TournamentBracket(
+                                    id=str(uuid.uuid4()),
+                                    season=season,
+                                    region=region_name,
+                                    round="Survival_16",
+                                    game_slot=r64_slot,
+                                    next_game_id=r64_id,
+                                    **tbd,
+                                ))
+                            # 12-seed play-ins → slot 3 (5 vs 12)
+                            if r64_slot == 3:
+                                session.add(TournamentBracket(
+                                    id=str(uuid.uuid4()),
+                                    season=season,
+                                    region=region_name,
+                                    round="Survival_16",
+                                    game_slot=r64_slot,
+                                    next_game_id=r64_id,
+                                    **tbd,
+                                ))
 
         await session.commit()
     return {"status": "Complete Structure Generated"}

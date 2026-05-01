@@ -1,61 +1,38 @@
 // lib/bracketLayout.ts
 
-export const COLUMN_WIDTH = 300;
+export const COLUMN_WIDTH = 300; // Narrowed for tighter horizontal flow
 export const GAME_HEIGHT = 80;
-export const CENTER_X = 1800; // Pushed center further right for more breathing room
+export const CENTER_X = 1818; // Recalculated horizontal center
+export const CENTER_Y = 1000; // Pulled equator up to tighten spacing
 
 export function getGameCoordinates(region: string, round: string, slot: number, regionOrder: string[]) {
-    // 1. Identify Side
     const isLeft = (region === regionOrder[0] || region === regionOrder[3]);
-
-    // 2. Identify Vertical Block (Top vs Bottom)
     const isBottom = (region === regionOrder[2] || region === regionOrder[3]);
 
-    // 3. Fixed Round Steps
-    const roundStep = {
-        'Survival_16': 0,
-        'Round_64': 1,
-        'Round_32': 2,
-        'Sweet_16': 3,
-        'Elite_8': 4,
-        'National Semifinals': 5,
-        'Championship': 6
-    }[round] ?? 0;
-
-    // 4. Horizontal (X) Positioning
-    let x = 0;
+    // 1. FINAL FOUR - TIGHTER BRIDGE
     if (region === "Final Four" || round === "National Semifinals" || round === "Championship") {
-        x = CENTER_X - 110;
-    } else if (isLeft) {
-        x = roundStep * COLUMN_WIDTH + 100;
-    } else {
-        x = (CENTER_X * 2) - (roundStep * COLUMN_WIDTH) - 320;
+        if (round === "Championship") return { x: CENTER_X - 110, y: CENTER_Y };
+        // Pulled Semis significantly closer to Championship
+        const semiX = (slot === 1) ? CENTER_X - 350 : CENTER_X + 130;
+        return { x: semiX, y: CENTER_Y };
     }
 
-    // 5. Vertical (Y) Positioning (The "Tree" Math)
-    // We use a fixed multiplier so the slots never move, even if empty.
-    const baselineY = (slot - 1) * 150;
-
-    // Adjust vertical center based on round to create the "Tree" look
-    const roundYOffsets = {
-        'Survival_16': 0,
-        'Round_64': 0,
-        'Round_32': 75,
-        'Sweet_16': 225,
-        'Elite_8': 525
+    const roundYConfigs = {
+        'Survival_16': { step: 0.8, gap: 120 },
+        'Round_64': { step: 1.6, gap: 120 },
+        'Round_32': { step: 2.4, gap: 240 },
+        'Sweet_16': { step: 3.2, gap: 480 },
+        'Elite_8': { step: 4, gap: 960 },
     };
-    const yAdjustment = roundYOffsets[round as keyof typeof roundYOffsets] || 0;
+    const config = roundYConfigs[round as keyof typeof roundYConfigs] || { step: 5, gap: 120 };
+    let y = (slot - 1) * config.gap + (config.gap / 2) - (GAME_HEIGHT / 2);
 
-    let y = baselineY + yAdjustment;
+    // 2. VERTICAL GRAVITY - PULLING REGIONS IN
+    const verticalOffset = isBottom ? CENTER_Y + 100 : CENTER_Y - 950;
 
-    // Fixed Regional Offsets (The "Planet" fix)
-    const verticalOffset = isBottom ? 1500 : 200;
+    // 3. HORIZONTAL SYMMETRY
+    const horizontalPadding = isLeft ? 100 : CENTER_X + 300;
+    let x = isLeft ? (config.step * COLUMN_WIDTH) : ((COLUMN_WIDTH * 4) - (config.step * COLUMN_WIDTH));
 
-    // Final Four Specific Y
-    if (region === "Final Four") {
-        if (round === "Championship") return { x, y: 850 };
-        return { x, y: slot === 1 ? 600 : 1100 };
-    }
-
-    return { x, y: y + verticalOffset };
+    return { x: x + horizontalPadding, y: y + verticalOffset };
 }
