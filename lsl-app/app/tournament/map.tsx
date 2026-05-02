@@ -20,9 +20,12 @@ export default function TournamentMap() {
     const [regionOrder, setRegionOrder] = useState<string[]>([]);
     const [teamNames, setTeamNames] = useState<Record<string, string>>({});
     const [teamSeeds, setTeamSeeds] = useState<Record<string, number>>({});
+    const [teamStats, setTeamStats] = useState<Record<string, any>>({});
     const [picks, setPicks] = useState<{ [gameId: string]: string }>({});
     const [selectedMatchup, setSelectedMatchup] = useState<any>(null);
     const [modalVisible, setModalVisible] = useState(false);
+    const [bracketId, setBracketId] = useState<string | null>(null); // NEW
+    const [locking, setLocking] = useState(false);
 
     const offset = useSharedValue({ x: -1000, y: -1000 });
     const start = useSharedValue({ x: -1000, y: -1000 });
@@ -41,6 +44,46 @@ export default function TournamentMap() {
         async function loadData() {
             try {
                 const token = await getToken();
+                if (!token) {
+                    setLoading(false);
+                    return;
+                }
+
+                // 1) Get or create a UserBracket for this user/season
+                let activeBracketId: string | null = null;
+                try {
+                    const bracketsRes = await fetch(`${API_BASE_URL}/api/tournament/brackets?season=2036`, {
+                        headers: { Authorization: `Bearer ${token}` },
+                    });
+                    if (bracketsRes.ok) {
+                        const brackets = await bracketsRes.json();
+                        if (Array.isArray(brackets) && brackets.length > 0) {
+                            const unlocked = brackets.filter((b: any) => !b.is_locked);
+                            const chosen = unlocked[0] || brackets[0];
+                            activeBracketId = chosen.id;
+                        }
+                    }
+
+                    if (!activeBracketId) {
+                        const createRes = await fetch(`${API_BASE_URL}/api/tournament/brackets`, {
+                            method: 'POST',
+                            headers: {
+                                Authorization: `Bearer ${token}`,
+                                'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify({ name: 'My 2036 Bracket', season: 2036 }),
+                        });
+                        if (createRes.ok) {
+                            const created = await createRes.json();
+                            activeBracketId = created.id;
+                        }
+                    }
+                } catch (e) {
+                    console.log('Error initializing bracket', e);
+                }
+                setBracketId(activeBracketId);
+
+                // 2) Fetch bracket structure, seeds, and names
                 const [bracketRes, seedsRes, namesRes] = await Promise.all([
                     fetch(`${API_BASE_URL}/api/tournament/bracket?season=2036`, { headers: { Authorization: `Bearer ${token}` } }),
                     fetch(`${API_BASE_URL}/api/tournament/seeds?season=2036`, { headers: { Authorization: `Bearer ${token}` } }),
@@ -52,6 +95,23 @@ export default function TournamentMap() {
                 const namesData = await namesRes.json();
 
                 setTeamNames(namesData);
+
+                const statsMap: Record<string, any> = {};
+                (seedListData || []).forEach((row: any) => {
+                    statsMap[row.team_id] = {
+                        ppg: row.ppg,
+                        rpg: row.rpg,
+                        apg: row.apg,
+                        fg_pct: row.fg_pct,
+                        three_pct: row.three_pct,
+                        oppg: row.oppg,
+                        topg: row.topg,
+                        fpg: row.fpg,
+                        record: row.games_played > 0 ? `~${row.games_played} gp` : "—",
+                    };
+                });
+                setTeamStats(statsMap);
+
                 const seedMap: Record<string, number> = {};
                 bracketData.forEach((g: any) => {
                     if (g.round === "Round_64" || g.round === "Survival_16") {
@@ -64,7 +124,28 @@ export default function TournamentMap() {
                 const uniqueRegions = [...new Set(bracketData.filter((g: any) => g.region !== "Final Four" && g.region !== "National Semifinals").map((g: any) => g.region))];
                 setRegionOrder(uniqueRegions as string[]);
                 setBracketGames(bracketData);
-            } catch (e) { console.error(e); } finally { setLoading(false); }
+
+                // 3) Hydrate picks for this bracket, if we have one
+                if (activeBracketId) {
+                    try {
+                        const picksRes = await fetch(`${API_BASE_URL}/api/tournament/brackets/${activeBracketId}/picks`, {
+                            headers: { Authorization: `Bearer ${token}` },
+                        });
+                        if (picksRes.ok) {
+                            const picksData = await picksRes.json();
+                            if (picksData && picksData.picks) {
+                                setPicks(picksData.picks);
+                            }
+                        }
+                    } catch (e) {
+                        console.log('Error loading bracket picks', e);
+                    }
+                }
+            } catch (e) {
+                console.error(e);
+            } finally {
+                setLoading(false);
+            }
         }
         loadData();
     }, []);
@@ -110,6 +191,74 @@ export default function TournamentMap() {
             }
             return updated;
         });
+    };
+
+    const openScoutingReport = (game: any) => {
+        const teamAId = game.team_a_id;
+        const teamBId = game.team_b_id;
+        if (!teamAId || !teamBId || teamAId === "TBD" || teamBId === "TBD") return;
+
+        const aStats = teamStats[teamAId] || {};
+        const bStats = teamStats[teamBId] || {};
+
+        setSelectedMatchup({
+            teamA: {
+                id: teamAId,
+                name: teamNames[teamAId] || teamAId,
+                ...aStats,
+            },
+            teamB: {
+                id: teamBId,
+                name: teamNames[teamBId] || teamBId,
+                ...bStats,
+            },
+        });
+        setModalVisible(true);
+    };
+
+    const handleLockBracket = async () => {
+        if (!bracketId) {
+            console.log("No bracketId; cannot lock bracket.");
+            return;
+        }
+        setLocking(true);
+        try {
+            const token = await getToken();
+            if (!token) {
+                console.log("No auth token, cannot lock bracket.");
+                return;
+            }
+
+            const nonEmptyPicks: { [k: string]: string } = {};
+            Object.entries(picks).forEach(([gameId, winnerId]) => {
+                if (winnerId && winnerId !== "TBD") {
+                    nonEmptyPicks[gameId] = winnerId;
+                }
+            });
+
+            const res = await fetch(
+                `${API_BASE_URL}/api/tournament/brackets/${bracketId}/picks?season=2036&lock=true`,
+                {
+                    method: 'POST',
+                    headers: {
+                        Authorization: `Bearer ${token}`,
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ picks: nonEmptyPicks }),
+                }
+            );
+
+            const data = await res.json();
+            if (!res.ok) {
+                console.log("Failed to lock bracket:", data);
+            } else {
+                console.log("Bracket saved/locked:", data);
+            }
+        } catch (e) {
+            console.log("Error locking bracket:", e);
+        } finally {
+            setLocking(false);
+        }
     };
 
     const renderElbowLine = (game: any) => {
@@ -161,9 +310,11 @@ export default function TournamentMap() {
                                     <TournamentMatchup
                                         teamA={{ id: game.team_a_id, name: teamNames[game.team_a_id] || game.team_a_id, seed: teamSeeds[game.team_a_id] || 0 }}
                                         teamB={{ id: game.team_b_id, name: teamNames[game.team_b_id] || game.team_b_id, seed: teamSeeds[game.team_b_id] || 0 }}
-                                        status="PREDICTION" pickedWinnerId={picks[game.id]}
+                                        status="PREDICTION"
+                                        pickedWinnerId={picks[game.id]}
                                         onPressTeamA={() => handlePick(game.id, game.team_a_id)}
                                         onPressTeamB={() => handlePick(game.id, game.team_b_id)}
+                                        onLongPress={() => openScoutingReport(game)} // ADD
                                     />
                                 </View>
                             );
@@ -176,9 +327,17 @@ export default function TournamentMap() {
                 </View>
 
                 <View style={[styles.bottomBar, { backgroundColor: theme.card }]}>
-                    <Text style={{ color: theme.text, fontSize: 10, fontWeight: '600' }}>
+                    <Text style={{ color: theme.text, fontSize: 10, fontWeight: '600', flex: 1 }}>
                         Picks: S16 {getPickCount("Survival_16")}/16 • R64 {getPickCount("Round_64")}/32 • R32 {getPickCount("Round_32")}/16 • S16 {getPickCount("Sweet_16")}/8 • E8 {getPickCount("Elite_8")}/4 • FF {getPickCount("National Semifinals")}/2 • Champ {getPickCount("Championship")}/1
                     </Text>
+                    <Pressable
+                        onPress={handleLockBracket}
+                        style={{ paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8, backgroundColor: locking ? theme.border : '#34C759', marginLeft: 8 }}
+                    >
+                        <Text style={{ color: '#fff', fontSize: 10, fontWeight: '700' }}>
+                            {locking ? 'Locking…' : 'Lock Bracket'}
+                        </Text>
+                    </Pressable>
                 </View>
 
                 {selectedMatchup && <ScoutingReport visible={modalVisible} onClose={() => setModalVisible(false)} teamA={{ ...selectedMatchup.teamA, name: teamNames[selectedMatchup.teamA.id] || selectedMatchup.teamA.id }} teamB={{ ...selectedMatchup.teamB, name: teamNames[selectedMatchup.teamB.id] || selectedMatchup.teamB.id }} />}
@@ -192,5 +351,5 @@ const styles = StyleSheet.create({
     canvas: { width: MAP_SIZE, height: MAP_SIZE },
     watermark: { position: 'absolute', fontSize: 24, fontWeight: '900', letterSpacing: 1.5 },
     topBar: { position: 'absolute', top: 0, left: 0, right: 0, height: 40, alignItems: 'center', justifyContent: 'center', borderBottomWidth: 1, borderBottomColor: '#333' },
-    bottomBar: { position: 'absolute', left: 0, right: 0, bottom: 0, height: 50, alignItems: 'center', justifyContent: 'center', borderTopWidth: 1, borderTopColor: '#333' }
+    bottomBar: { position: 'absolute', left: 0, right: 0, bottom: 0, height: 50, alignItems: 'center', justifyContent: 'center', borderTopWidth: 1, borderTopColor: '#333', flexDirection: 'row', paddingHorizontal: 10 }
 });

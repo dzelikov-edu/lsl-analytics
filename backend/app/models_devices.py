@@ -86,15 +86,29 @@ class TournamentBracket(SQLModel, table=True):
 
 class UserBracketPick(SQLModel, table=True):
     """
-    Stores the 'Pick'em' choices made by the users.
+    Stores the 'Pick'em' choices made by the users, tied to a specific bracket.
     """
     id: str = Field(default_factory=lambda: str(uuid4()), primary_key=True)
     user_id: str = Field(foreign_key="user.id", index=True)
+    user_bracket_id: str = Field(foreign_key="userbracket.id", index=True)  # NEW
     tournament_game_id: str = Field(foreign_key="tournamentbracket.id")
     picked_winner_id: str
-    is_correct: Optional[bool] = None # Calculated after the sim runs
+    is_correct: Optional[bool] = None  # Calculated after the sim runs
     points_awarded: int = Field(default=0)
     created_at: datetime = Field(default_factory=datetime.utcnow)
+
+class UserBracket(SQLModel, table=True):
+    """
+    A named bracket a user owns for a given season.
+    Users can have up to 10 per season.
+    """
+    id: str = Field(default_factory=lambda: str(uuid4()), primary_key=True)
+    user_id: str = Field(foreign_key="user.id", index=True)
+    season: int = Field(index=True)
+    name: str = Field(max_length=100)
+    is_locked: bool = Field(default=False)
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    locked_at: Optional[datetime] = None
 
 class TournamentSeedList(SQLModel, table=True):
     """
@@ -124,3 +138,35 @@ class TournamentSeedList(SQLModel, table=True):
     
     # Tracking
     games_played: int = Field(default=0)
+
+class BracketGroup(SQLModel, table=True):
+    """
+    A group/league for comparing brackets.
+    """
+    id: str = Field(default_factory=lambda: str(uuid4()), primary_key=True)
+    name: str = Field(max_length=100)
+    season: int = Field(index=True)
+    owner_user_id: str = Field(foreign_key="user.id", index=True)
+    join_code: Optional[str] = Field(default=None, index=True)
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+class GroupMembership(SQLModel, table=True):
+    """
+    Which users are members of which groups.
+    """
+    id: str = Field(default_factory=lambda: str(uuid4()), primary_key=True)
+    group_id: str = Field(foreign_key="bracketgroup.id", index=True)
+    user_id: str = Field(foreign_key="user.id", index=True)
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+class GroupBracket(SQLModel, table=True):
+    """
+    A specific bracket entered into a specific group.
+    - Enforces: one bracket per user per group.
+    - Enforces: a UserBracket can be used in at most one group.
+    """
+    id: str = Field(default_factory=lambda: str(uuid4()), primary_key=True)
+    group_id: str = Field(foreign_key="bracketgroup.id", index=True)
+    user_bracket_id: str = Field(foreign_key="userbracket.id", index=True)
+    user_id: str = Field(foreign_key="user.id", index=True)
+    created_at: datetime = Field(default_factory=datetime.utcnow)

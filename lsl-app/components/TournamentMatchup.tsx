@@ -19,9 +19,10 @@ type MatchupProps = {
     pickedWinnerId?: string | null;
     onPressTeamA?: () => void;
     onPressTeamB?: () => void;
+    onLongPress?: () => void; // ADD
 };
 
-export default function TournamentMatchup({ teamA, teamB, status, pickedWinnerId, onPressTeamA, onPressTeamB }: MatchupProps) {
+export default function TournamentMatchup({ teamA, teamB, status, pickedWinnerId, onPressTeamA, onPressTeamB, onLongPress }: MatchupProps) {
     const colorScheme = useColorScheme() ?? 'light';
     const theme = AppColors[colorScheme];
     // Only mark as picked if the ID matches AND it's a real team (not TBD)
@@ -31,7 +32,7 @@ export default function TournamentMatchup({ teamA, teamB, status, pickedWinnerId
     return (
         <View style={[styles.container, { backgroundColor: theme.card, borderColor: theme.border }]}>
             {/* Team A Row */}
-            <Pressable style={styles.teamRow} onPress={onPressTeamA}>
+            <Pressable style={styles.teamRow} onPress={onPressTeamA} onLongPress={onLongPress}>
                 <Text style={[styles.seed, { color: theme.mutedText }]}>{teamA.seed}</Text>
                 <TeamLogo teamId={teamA.id} size={22} />
                 <Text
@@ -54,7 +55,7 @@ export default function TournamentMatchup({ teamA, teamB, status, pickedWinnerId
             <View style={[styles.divider, { backgroundColor: theme.border }]} />
 
             {/* Team B Row */}
-            <Pressable style={styles.teamRow} onPress={onPressTeamB}>
+            <Pressable style={styles.teamRow} onPress={onPressTeamB} onLongPress={onLongPress}>
                 <Text style={[styles.seed, { color: theme.mutedText }]}>{teamB.seed}</Text>
                 <TeamLogo teamId={teamB.id} size={22} />
                 <Text
