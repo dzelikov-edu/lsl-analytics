@@ -47,7 +47,7 @@ from app.tournament_sync import sync_official_tournament
 @router.post("/tournament/sync")
 async def admin_sync_tournament(
     season: int = 2036,
-    region_mapping: list[str] = ["East", "Midwest", "South", "West"], 
+    region_mapping: list[str] = ["West", "Midwest", "East", "South"], 
     current_user: User = Depends(get_current_user)
 ):
     if not current_user.is_admin:

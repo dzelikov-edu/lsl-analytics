@@ -18,17 +18,17 @@ export function getGameCoordinates(region: string, round: string, slot: number, 
     }
 
     const roundYConfigs = {
-        'Survival_16': { step: 0.8, gap: 120 },
-        'Round_64': { step: 1.6, gap: 120 },
-        'Round_32': { step: 2.4, gap: 240 },
-        'Sweet_16': { step: 3.2, gap: 480 },
-        'Elite_8': { step: 4, gap: 960 },
+        'Survival_16': { step: 0.8, gap: 105 },
+        'Round_64': { step: 1.6, gap: 105 },
+        'Round_32': { step: 2.4, gap: 210 },
+        'Sweet_16': { step: 3.2, gap: 420 },
+        'Elite_8': { step: 4, gap: 840 },
     };
     const config = roundYConfigs[round as keyof typeof roundYConfigs] || { step: 5, gap: 120 };
     let y = (slot - 1) * config.gap + (config.gap / 2) - (GAME_HEIGHT / 2);
 
     // 2. VERTICAL GRAVITY - PULLING REGIONS IN
-    const verticalOffset = isBottom ? CENTER_Y + 100 : CENTER_Y - 950;
+    const verticalOffset = isBottom ? CENTER_Y + 100 : CENTER_Y - 850;
 
     // 3. HORIZONTAL SYMMETRY
     const horizontalPadding = isLeft ? 100 : CENTER_X + 300;

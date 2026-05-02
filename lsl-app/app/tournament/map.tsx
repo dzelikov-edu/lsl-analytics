@@ -30,7 +30,7 @@ export default function TournamentMap() {
     const panGesture = Gesture.Pan().onUpdate((e) => {
         const nextX = e.translationX + start.value.x;
         const nextY = e.translationY + start.value.y;
-        offset.value = { x: Math.min(-300, Math.max(nextX, -2570)), y: Math.min(0, Math.max(nextY, -1200)) };
+        offset.value = { x: Math.min(-320, Math.max(nextX, -2550)), y: Math.min(-100, Math.max(nextY, -1075)) };
     }).onEnd(() => {
         start.value = { x: offset.value.x, y: offset.value.y };
     });
@@ -61,7 +61,7 @@ export default function TournamentMap() {
                 });
                 setTeamSeeds(seedMap);
 
-                const uniqueRegions = [...new Set(bracketData.filter((g: any) => g.region !== "Final Four").map((g: any) => g.region))];
+                const uniqueRegions = [...new Set(bracketData.filter((g: any) => g.region !== "Final Four" && g.region !== "National Semifinals").map((g: any) => g.region))];
                 setRegionOrder(uniqueRegions as string[]);
                 setBracketGames(bracketData);
             } catch (e) { console.error(e); } finally { setLoading(false); }
@@ -69,7 +69,6 @@ export default function TournamentMap() {
         loadData();
     }, []);
 
-    // Helper for the Bottom Pick Tracker
     const getPickCount = (roundName: string) => {
         return bracketGames.filter(g => g.round === roundName && picks[g.id]).length;
     };
@@ -89,7 +88,21 @@ export default function TournamentMap() {
                 const nextIdx = updated.findIndex(g => g.id === currentGame.next_game_id);
                 if (nextIdx !== -1) {
                     const nextGame = { ...updated[nextIdx] };
-                    const isTop = currentGame.round === "Survival_16" ? false : (currentGame.game_slot % 2 !== 0);
+                    // 1. Identify region verticality (Top regions are index 0 and 1)
+                    const regionIdx = regionOrder.indexOf(currentGame.region);
+                    const isTopRegion = regionIdx === 0 || regionIdx === 1;
+
+                    // 2. Exact slot placement logic
+                    let isTop = false;
+                    if (currentGame.round === "Survival_16") {
+                        isTop = false; // Survival winners always take the bottom slot of Round of 64
+                    } else if (currentGame.round === "Elite_8") {
+                        isTop = isTopRegion; // Top regions feed Team A, Bottom regions feed Team B of Semis
+                    } else if (currentGame.round === "National Semifinals") {
+                        isTop = currentGame.game_slot === 1; // Left Semi feeds Team A, Right Semi feeds Team B of Champ
+                    } else {
+                        isTop = currentGame.game_slot % 2 !== 0; // Standard Round of 64, 32, and 16 logic
+                    }
                     if (isTop) nextGame.team_a_id = newWinnerId || "TBD";
                     else nextGame.team_b_id = newWinnerId || "TBD";
                     updated[nextIdx] = nextGame;
@@ -97,6 +110,30 @@ export default function TournamentMap() {
             }
             return updated;
         });
+    };
+
+    const renderElbowLine = (game: any) => {
+        if (!game.next_game_id) return null;
+        const startCoords = getGameCoordinates(game.region, game.round, game.game_slot, regionOrder);
+        const nextGame = bracketGames.find(g => g.id === game.next_game_id);
+        if (!nextGame) return null;
+        const endCoords = getGameCoordinates(nextGame.region, nextGame.round, nextGame.game_slot, regionOrder);
+        const isLeftFlow = (startCoords.x < endCoords.x);
+
+        const startX = isLeftFlow ? startCoords.x + 220 : startCoords.x;
+        const startY = startCoords.y + (GAME_HEIGHT / 2) + 12.75;
+        const endX = isLeftFlow ? endCoords.x : endCoords.x + 220;
+        const endY = endCoords.y + (GAME_HEIGHT / 2) + 12.75;
+        const semiCenterX = endCoords.x + 110;
+        const midX = (game.round === "Elite_8") ? semiCenterX : startX + (isLeftFlow ? 130 : -130);
+
+        return (
+            <React.Fragment key={`line-${game.id}`}>
+                <View style={{ position: 'absolute', left: Math.min(startX, midX), top: startY, width: Math.abs(midX - startX), height: 1, backgroundColor: theme.border, opacity: 1 }} />
+                <View style={{ position: 'absolute', left: midX, top: Math.min(startY, endY), width: 1, height: Math.abs(endY - startY) + 1, backgroundColor: theme.border, opacity: 1 }} />
+                <View style={{ position: 'absolute', left: Math.min(midX, endX), top: endY, width: Math.abs(endX - midX), height: 1, backgroundColor: theme.border, opacity: 1 }} />
+            </React.Fragment>
+        );
     };
 
     if (loading) return <ActivityIndicator style={{ flex: 1 }} color={theme.text} />;
@@ -115,6 +152,8 @@ export default function TournamentMap() {
                         })}
                         <Text style={[styles.watermark, { top: CENTER_Y - 100, left: CENTER_X - 160, fontSize: 40, color: theme.text }]}>FOREVER FOUR</Text>
 
+                        {bracketGames.map(renderElbowLine)}
+
                         {bracketGames.map((game) => {
                             const coords = getGameCoordinates(game.region, game.round, game.game_slot, regionOrder);
                             return (
@@ -132,19 +171,17 @@ export default function TournamentMap() {
                     </Animated.View>
                 </GestureDetector>
 
-                {/* TOP BAR */}
                 <View style={[styles.topBar, { backgroundColor: theme.background }]}>
                     <Text style={{ color: theme.text, fontWeight: '700' }}>LCAA Bracket • 2036</Text>
                 </View>
 
-                {/* BOTTOM TRACKER */}
                 <View style={[styles.bottomBar, { backgroundColor: theme.card }]}>
                     <Text style={{ color: theme.text, fontSize: 10, fontWeight: '600' }}>
                         Picks: S16 {getPickCount("Survival_16")}/16 • R64 {getPickCount("Round_64")}/32 • R32 {getPickCount("Round_32")}/16 • S16 {getPickCount("Sweet_16")}/8 • E8 {getPickCount("Elite_8")}/4 • FF {getPickCount("National Semifinals")}/2 • Champ {getPickCount("Championship")}/1
                     </Text>
                 </View>
 
-                {selectedMatchup && <ScoutingReport visible={modalVisible} onClose={() => setModalVisible(false)} teamA={selectedMatchup.teamA} teamB={selectedMatchup.teamB} />}
+                {selectedMatchup && <ScoutingReport visible={modalVisible} onClose={() => setModalVisible(false)} teamA={{ ...selectedMatchup.teamA, name: teamNames[selectedMatchup.teamA.id] || selectedMatchup.teamA.id }} teamB={{ ...selectedMatchup.teamB, name: teamNames[selectedMatchup.teamB.id] || selectedMatchup.teamB.id }} />}
             </View>
         </GestureHandlerRootView>
     );
