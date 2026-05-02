@@ -1,8 +1,8 @@
 from app.sheets_client import get_sheets_service, read_range
 from app.settings import settings
-from app.models_devices import TournamentBracket, TournamentSeedList
+from app.models_devices import TournamentBracket, TournamentSeedList, UserBracketPick  # ADD UserBracketPick
 from app.db import AsyncSessionLocal
-from sqlmodel import delete
+from sqlmodel import delete, select  # ADD select
 import uuid
 
 # THE SEEDING ENGINE MAP (Rank to Slot)
@@ -59,6 +59,17 @@ async def sync_official_tournament(season: int, region_order: list[str]):
     rank_map = {f['rank']: f['tid'] for f in field}
 
     async with AsyncSessionLocal() as session:
+        # First, delete any user picks that reference this season's games
+        result = await session.exec(
+            select(TournamentBracket.id).where(TournamentBracket.season == season)
+        )
+        game_ids = result.all()
+        if game_ids:
+            await session.execute(
+                delete(UserBracketPick).where(UserBracketPick.tournament_game_id.in_(game_ids))
+            )
+
+        # Then clear out the bracket + seed list for this season
         await session.execute(delete(TournamentBracket).where(TournamentBracket.season == season))
         await session.execute(delete(TournamentSeedList).where(TournamentSeedList.season == season))
 
