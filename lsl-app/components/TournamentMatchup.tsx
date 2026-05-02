@@ -16,45 +16,63 @@ type MatchupProps = {
     teamA: MatchupTeam;
     teamB: MatchupTeam;
     status: 'PREDICTION' | 'LIVE' | 'FINAL';
-    onPress?: () => void;
+    pickedWinnerId?: string | null;
+    onPressTeamA?: () => void;
+    onPressTeamB?: () => void;
 };
 
-export default function TournamentMatchup({ teamA, teamB, status, onPress }: MatchupProps) {
+export default function TournamentMatchup({ teamA, teamB, status, pickedWinnerId, onPressTeamA, onPressTeamB }: MatchupProps) {
     const colorScheme = useColorScheme() ?? 'light';
     const theme = AppColors[colorScheme];
-
-    const renderTeamRow = (team: MatchupTeam) => (
-        <View style={styles.teamRow}>
-            <Text style={[styles.seed, { color: theme.mutedText }]}>{team.seed}</Text>
-            <TeamLogo teamId={team.id} size={22} />
-            <Text
-                style={[
-                    styles.teamName,
-                    { color: theme.text },
-                    team.isWinner && { fontWeight: '800' }
-                ]}
-                numberOfLines={1}
-            >
-                {team.name}
-            </Text>
-            {team.score !== null && team.score !== undefined && (
-                <Text style={[styles.score, { color: theme.text }]}>{team.score}</Text>
-            )}
-        </View>
-    );
+    const isPickedA = pickedWinnerId === teamA.id;
+    const isPickedB = pickedWinnerId === teamB.id;
 
     return (
-        <Pressable
-            style={({ pressed }) => [
-                styles.container,
-                { backgroundColor: theme.card, borderColor: theme.border, opacity: pressed ? 0.9 : 1 }
-            ]}
-            onPress={onPress}
-        >
-            {renderTeamRow(teamA)}
+        <View style={[styles.container, { backgroundColor: theme.card, borderColor: theme.border }]}>
+            {/* Team A Row */}
+            <Pressable style={styles.teamRow} onPress={onPressTeamA}>
+                <Text style={[styles.seed, { color: theme.mutedText }]}>{teamA.seed}</Text>
+                <TeamLogo teamId={teamA.id} size={22} />
+                <Text
+                    style={[
+                        styles.teamName,
+                        { color: theme.text, fontWeight: isPickedA ? '900' : '400' }
+                    ]}
+                    numberOfLines={1}
+                >
+                    {teamA.name}
+                </Text>
+                {/* THE RADIO CIRCLE */}
+                <View style={[
+                    styles.radioCircle,
+                    { borderColor: theme.border },
+                    isPickedA && { backgroundColor: '#34C759', borderColor: '#34C759' } // Green when picked
+                ]} />
+            </Pressable>
+
             <View style={[styles.divider, { backgroundColor: theme.border }]} />
-            {renderTeamRow(teamB)}
-        </Pressable>
+
+            {/* Team B Row */}
+            <Pressable style={styles.teamRow} onPress={onPressTeamB}>
+                <Text style={[styles.seed, { color: theme.mutedText }]}>{teamB.seed}</Text>
+                <TeamLogo teamId={teamB.id} size={22} />
+                <Text
+                    style={[
+                        styles.teamName,
+                        { color: theme.text, fontWeight: isPickedB ? '900' : '400' }
+                    ]}
+                    numberOfLines={1}
+                >
+                    {teamB.name}
+                </Text>
+                {/* THE RADIO CIRCLE */}
+                <View style={[
+                    styles.radioCircle,
+                    { borderColor: theme.border },
+                    isPickedB && { backgroundColor: '#34C759', borderColor: '#34C759' }
+                ]} />
+            </Pressable>
+        </View>
     );
 }
 
@@ -75,6 +93,13 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         paddingHorizontal: 10,
         height: 44,
+    },
+    radioCircle: {
+        width: 14,
+        height: 14,
+        borderRadius: 7,
+        borderWidth: 1,
+        marginLeft: 10,
     },
     seed: { fontSize: 11, width: 22, fontWeight: 'bold' },
     teamName: { fontSize: 14, flex: 1, marginLeft: 6 },
