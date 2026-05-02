@@ -8,6 +8,7 @@ from app.workers.push_sender import notify_team
 
 from sqlmodel import select
 from app.db import AsyncSessionLocal
+from sqlalchemy import text  # ADD
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
@@ -78,3 +79,24 @@ async def admin_sync_tournament(
     except Exception as e:
         print(f"CRITICAL SYNC ERROR: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/db/upgrade-userbracketpick")
+async def upgrade_userbracketpick(
+    current_user: User = Depends(get_current_user),
+):
+    """
+    One-time migration: add user_bracket_id column to userbracketpick.
+    Safe to call multiple times (IF NOT EXISTS).
+    """
+    if not current_user.is_admin:
+        raise HTTPException(status_code=403, detail="Admin only.")
+
+    async with AsyncSessionLocal() as session:
+        # IF NOT EXISTS makes this idempotent
+        await session.exec(text(
+            "ALTER TABLE userbracketpick "
+            "ADD COLUMN IF NOT EXISTS user_bracket_id VARCHAR"
+        ))
+        await session.commit()
+
+    return {"status": "ok", "message": "user_bracket_id column ensured on userbracketpick"}
