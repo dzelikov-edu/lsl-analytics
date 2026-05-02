@@ -24,8 +24,9 @@ type MatchupProps = {
 export default function TournamentMatchup({ teamA, teamB, status, pickedWinnerId, onPressTeamA, onPressTeamB }: MatchupProps) {
     const colorScheme = useColorScheme() ?? 'light';
     const theme = AppColors[colorScheme];
-    const isPickedA = pickedWinnerId === teamA.id;
-    const isPickedB = pickedWinnerId === teamB.id;
+    // Only mark as picked if the ID matches AND it's a real team (not TBD)
+    const isPickedA = pickedWinnerId === teamA.id && teamA.id !== 'TBD';
+    const isPickedB = pickedWinnerId === teamB.id && teamB.id !== 'TBD';
 
     return (
         <View style={[styles.container, { backgroundColor: theme.card, borderColor: theme.border }]}>

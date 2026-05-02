@@ -6,6 +6,13 @@ from typing import List
 
 router = APIRouter(prefix="/api/tournament", tags=["tournament"])
 
+from app.ingest import load_team_map_names # Add to imports
+
+@router.get("/team-names")
+async def get_all_team_names():
+    """Returns {TEAM_ID: display_name} for all 322+ teams."""
+    return load_team_map_names()
+
 @router.get("/bracket")
 async def get_bracket(season: int = 2036):
     """
