@@ -73,6 +73,19 @@ async def sync_official_tournament(season: int, region_order: list[str]):
         await session.execute(delete(TournamentBracket).where(TournamentBracket.season == season))
         await session.execute(delete(TournamentSeedList).where(TournamentSeedList.season == season))
 
+        # --- ADD THIS LOOP ---
+        for f in field:
+            session.add(TournamentSeedList(
+                season=season,
+                team_id=f['tid'],
+                overall_rank=f['rank'],
+                seed=((f['rank']-1)//5)+1,
+                is_autobid=f['auto'],
+                resume_score=0.0,
+                power_value=0.0
+            ))
+        # ---------------------
+
         # 1. FINAL FOUR SKELETON
         champ_id = str(uuid.uuid4())
         semi_1_id = str(uuid.uuid4()); semi_2_id = str(uuid.uuid4())

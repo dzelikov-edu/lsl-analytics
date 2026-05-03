@@ -176,7 +176,9 @@ async def admin_sync_bracketology(
                 team_id=f['tid'],
                 overall_rank=f['rank'],
                 seed=((f['rank']-1)//5)+1,
-                is_autobid=f['auto']
+                is_autobid=f['auto'],
+                resume_score=0.0, # EXPLICITLY SET
+                power_value=0.0   # EXPLICITLY SET
             )
             session.add(seed_entry)
         
