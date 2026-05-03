@@ -12,7 +12,7 @@ import { getGameCoordinates, GAME_HEIGHT, CENTER_X, CENTER_Y } from '@/lib/brack
 
 const MAP_SIZE = 5000;
 
-export default function TournamentMap() {
+export default function TournamentMap({ isMock = false }: { isMock?: boolean }) {
     const colorScheme = useColorScheme() ?? 'light';
     const theme = AppColors[colorScheme];
     const [loading, setLoading] = useState(true);
@@ -84,8 +84,9 @@ export default function TournamentMap() {
                 setBracketId(activeBracketId);
 
                 // 2) Fetch bracket structure, seeds, and names
+                const bracketEndpoint = isMock ? 'mock-bracket' : 'bracket';
                 const [bracketRes, seedsRes, namesRes] = await Promise.all([
-                    fetch(`${API_BASE_URL}/api/tournament/bracket?season=2036`, { headers: { Authorization: `Bearer ${token}` } }),
+                    fetch(`${API_BASE_URL}/api/tournament/${bracketEndpoint}?season=2036`, { headers: { Authorization: `Bearer ${token}` } }),
                     fetch(`${API_BASE_URL}/api/tournament/seeds?season=2036`, { headers: { Authorization: `Bearer ${token}` } }),
                     fetch(`${API_BASE_URL}/api/tournament/team-names`, { headers: { Authorization: `Bearer ${token}` } })
                 ]);
@@ -376,7 +377,9 @@ export default function TournamentMap() {
                 </GestureDetector>
 
                 <View style={[styles.topBar, { backgroundColor: theme.background }]}>
-                    <Text style={{ color: theme.text, fontWeight: '700' }}>LCAA Bracket • 2036</Text>
+                    <Text style={{ color: theme.text, fontWeight: '700' }}>
+                        {isMock ? 'LCAA BRACKETOLOGY • 2036' : 'OFFICIAL LCAA BRACKET • 2036'}
+                    </Text>
                 </View>
 
                 <View style={[styles.bottomBar, { backgroundColor: theme.card }]}>

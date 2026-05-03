@@ -29,15 +29,11 @@ export default function BracketTab() {
     if (loading) return <ActivityIndicator style={{ flex: 1 }} color={theme.text} />;
 
     if (phase === 'BRACKETOLOGY') {
-        return (
-            <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: theme.background }}>
-                <Text style={{ color: theme.text, fontSize: 24, fontWeight: 'bold' }}>Mock Bracket View</Text>
-                <Text style={{ color: theme.mutedText, marginTop: 10 }}>The projected Top 80 will appear here.</Text>
-                {/* We will build the Mock View next */}
-            </View>
-        );
+        // Mode 1: Show the Mock Bracket (Projections)
+        return <TournamentMap isMock={true} />;
     }
 
-    // If Phase is LIVE or SELECTION_SUNDAY, show the real map
-    return <TournamentMap />;
+    // Mode 2: Show the Real Bracket (Official)
+    return <TournamentMap isMock={false} />;
 }
+
