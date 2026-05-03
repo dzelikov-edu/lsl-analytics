@@ -256,7 +256,7 @@ async def get_mock_bracket(season: int = 2036):
                     "round": "Round_64",
                     "game_slot": slot_num,
                     "team_a_id": rank_to_id.get(cfg['a'], "TBD"),
-                    "team_b_id": rank_to_id.get(cfg['b'], "TBD"),
+                    "team_b_id": rank_to_id.get(cfg.get('b'), "TBD"),
                     "seed_a": cfg['seed_a'],
                     "seed_b": cfg['seed_b'],
                     "next_game_id": f"mock_r32_{reg_num}_{((slot_num-1)//2)+1}"
@@ -273,7 +273,7 @@ async def get_mock_bracket(season: int = 2036):
                         "team_b_id": rank_to_id.get(cfg['p_b'], "TBD"),
                         "seed_a": cfg['seed_b'],
                         "seed_b": cfg['seed_b'],
-                        "next_game_id": game["id"]
+                        "next_game_id": f"mock_{reg_num}_{slot_num}"
                     })
                 
                 mock_games.append(game)
