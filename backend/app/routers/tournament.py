@@ -11,6 +11,7 @@ from app.models_devices import (
 )
 from typing import List
 
+from app.bracket_constants import REGION_MAP
 from app.deps_auth import get_current_user
 from app.ingest import load_team_map_names  # existing
 from datetime import datetime
@@ -242,9 +243,6 @@ async def get_mock_bracket(season: int = 2036):
             return []
 
         rank_to_id = {s.overall_rank: s.team_id for s in seeds}
-        
-        # Import REGION_MAP locally to avoid circular dependencies
-        from app.tournament_sync import REGION_MAP
         
         mock_games = []
         for reg_num in range(1, 5):
