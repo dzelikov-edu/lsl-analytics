@@ -232,34 +232,26 @@ async def get_tournament_state(season: int = 2036):
     
 @router.get("/mock-bracket")
 async def get_mock_bracket(season: int = 2036):
-    """
-    Generates a chalk-bracket based on the current 1-80 Seed List.
-    This is used for Bracketology mode.
-    """
     async with AsyncSessionLocal() as session:
-        # 1. Get the current rankings
         stmt = select(TournamentSeedList).where(TournamentSeedList.season == season).order_by(TournamentSeedList.overall_rank)
         res = await session.exec(stmt)
         seeds = res.all()
         
+        # If no seeds exist yet, return an empty list so the frontend doesn't crash
         if not seeds:
-            raise HTTPException(status_code=404, detail="No seeds found to generate mock.")
+            return []
 
-        # Map Rank -> Team ID
         rank_to_id = {s.overall_rank: s.team_id for s in seeds}
         
-        # 2. Reuse your REGION_MAP logic from tournament_sync.py
+        # Import REGION_MAP locally to avoid circular dependencies
         from app.tournament_sync import REGION_MAP
         
         mock_games = []
-        # We only generate the Round of 64 and Survival 16 for the Mock
-        # The frontend will handle the "Visual" chalk advancement
         for reg_num in range(1, 5):
             region_name = ["West", "Midwest", "East", "South"][reg_num-1]
             for slot_num in range(1, 9):
                 cfg = REGION_MAP[reg_num][slot_num]
                 
-                # Standard Round 64
                 game = {
                     "id": f"mock_{reg_num}_{slot_num}",
                     "region": region_name,
@@ -272,7 +264,6 @@ async def get_mock_bracket(season: int = 2036):
                     "next_game_id": f"mock_r32_{reg_num}_{((slot_num-1)//2)+1}"
                 }
                 
-                # Handle Play-ins in Mock
                 if cfg.get("b_is_playin"):
                     game["team_b_id"] = "TBD"
                     mock_games.append({

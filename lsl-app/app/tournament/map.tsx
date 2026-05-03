@@ -377,9 +377,16 @@ export default function TournamentMap({ isMock = false }: { isMock?: boolean }) 
                 </GestureDetector>
 
                 <View style={[styles.topBar, { backgroundColor: theme.background }]}>
-                    <Text style={{ color: theme.text, fontWeight: '700' }}>
-                        {isMock ? 'LCAA BRACKETOLOGY • 2036' : 'OFFICIAL LCAA BRACKET • 2036'}
-                    </Text>
+                    <View style={{ alignItems: 'center' }}>
+                        <Text style={{ color: theme.text, fontWeight: '800', fontSize: 13 }}>
+                            {isMock ? 'LCAA BRACKETOLOGY • 2036' : 'OFFICIAL LCAA BRACKET • 2036'}
+                        </Text>
+                        {isMock && (
+                            <Text style={{ color: '#FF9500', fontWeight: '900', fontSize: 9, letterSpacing: 1 }}>
+                                PRESEASON • V1.0
+                            </Text>
+                        )}
+                    </View>
                 </View>
 
                 <View style={[styles.bottomBar, { backgroundColor: theme.card }]}>
@@ -406,6 +413,16 @@ const styles = StyleSheet.create({
     container: { flex: 1, overflow: 'hidden' },
     canvas: { width: MAP_SIZE, height: MAP_SIZE },
     watermark: { position: 'absolute', fontSize: 24, fontWeight: '900', letterSpacing: 1.5 },
-    topBar: { position: 'absolute', top: 0, left: 0, right: 0, height: 40, alignItems: 'center', justifyContent: 'center', borderBottomWidth: 1, borderBottomColor: '#333' },
+    topBar: {
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        height: 48, // Increased from 40 to 48
+        alignItems: 'center',
+        justifyContent: 'center',
+        borderBottomWidth: 1,
+        borderBottomColor: '#333'
+    },
     bottomBar: { position: 'absolute', left: 0, right: 0, bottom: 0, height: 50, alignItems: 'center', justifyContent: 'center', borderTopWidth: 1, borderTopColor: '#333', flexDirection: 'row', paddingHorizontal: 10 }
 });
