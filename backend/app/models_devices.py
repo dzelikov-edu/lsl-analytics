@@ -180,3 +180,13 @@ class TournamentState(SQLModel, table=True):
     season: int = Field(default=2036)
     phase: str = Field(default="BRACKETOLOGY") # BRACKETOLOGY, SELECTION_SUNDAY, LIVE, FINISHED
     updated_at: datetime = Field(default_factory=datetime.utcnow)
+
+class MockBracketResult(SQLModel, table=True):
+    """
+    Stores the results of the LATEST simulation run.
+    """
+    id: str = Field(default_factory=lambda: str(uuid4()), primary_key=True)
+    season: int = Field(index=True)
+    game_id: str = Field(index=True) # e.g. mock_r64_1_1
+    winner_id: str
+    created_at: datetime = Field(default_factory=datetime.utcnow)

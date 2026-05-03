@@ -257,6 +257,38 @@ export default function ProfileScreen() {
         }
     };
 
+    const handleRunBracketSim = async () => {
+        Alert.alert(
+            "Run Tournament Simulation",
+            "This will execute the LSL AI Engine to generate a new projected bracket based on power and trends. This will overwrite the current public projection. Continue?",
+            [
+                { text: "Cancel", style: "cancel" },
+                {
+                    text: "Run Sim",
+                    onPress: async () => {
+                        setLoading(true);
+                        try {
+                            const token = await getToken();
+                            const res = await fetch(`${API_BASE_URL}/admin/tournament/run-sim?season=2036`, {
+                                method: 'POST',
+                                headers: { Authorization: `Bearer ${token}` }
+                            });
+                            setLoading(false);
+                            if (res.ok) {
+                                Alert.alert("Success", "New AI Simulation Published!");
+                            } else {
+                                Alert.alert("Error", "Simulation failed.");
+                            }
+                        } catch (e) {
+                            setLoading(false);
+                            Alert.alert("Error", "Could not connect to server.");
+                        }
+                    }
+                }
+            ]
+        );
+    };
+
     const handleBracketologySync = async () => {
         Alert.alert(
             "Sync Bracketology",
@@ -438,6 +470,19 @@ export default function ProfileScreen() {
                         </View>
                     </Pressable>
                     {/* ----------------------------- */}
+
+                    {/* --- RUN SIM (CYAN) --- */}
+                    <Pressable
+                        style={[styles.settingRow, { backgroundColor: '#5AC8FA', marginBottom: 10 }]}
+                        onPress={handleRunBracketSim}
+                    >
+                        <View style={{ flex: 1 }}>
+                            <Text style={[styles.settingLabel, { color: '#fff' }]}>🤖 Run LCAA AI Simulation</Text>
+                            <Text style={{ color: 'rgba(255,255,255,0.8)', fontSize: 12, marginTop: 2 }}>
+                                Generate fresh projected outcomes for every game.
+                            </Text>
+                        </View>
+                    </Pressable>
 
                     {/* --- BRACKETOLOGY SYNC (PURPLE) --- */}
                     <Pressable

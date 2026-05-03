@@ -122,19 +122,17 @@ export default function TournamentMap({ isMock = false }: { isMock?: boolean }) 
                 });
                 setTeamSeeds(seedMap);
 
-                const uniqueRegions = [...new Set(
-                    bracketData
-                        .filter((g: any) => g.region !== "Final Four" && g.region !== "National Semifinals")
-                        .map((g: any) => g.region)
-                )];
-                setRegionOrder(uniqueRegions as string[]);
+                // Force order for layout consistency: West, Midwest, East, South
+                const foundRegions = [...new Set(bracketData.map((g: any) => g.region))];
+                const finalRegions = ["West", "Midwest", "East", "South"].filter(r => foundRegions.includes(r));
+                setRegionOrder(finalRegions);
 
                 // Start from raw bracketData and then apply any saved picks
                 let updatedGames: any[] = [...bracketData];
                 let initialPicks: { [k: string]: string } = {};
 
-                // 3) Hydrate picks for this bracket, if we have one
-                if (activeBracketId) {
+                // 3) Hydrate picks for this bracket (only if NOT in mock mode)
+                if (activeBracketId && !isMock) {
                     try {
                         const picksRes = await fetch(
                             `${API_BASE_URL}/api/tournament/brackets/${activeBracketId}/picks`,
@@ -160,7 +158,8 @@ export default function TournamentMap({ isMock = false }: { isMock?: boolean }) 
                                         if (nextIdx === -1) return;
                                         const nextGame = { ...updatedGames[nextIdx] };
 
-                                        const regionIdx = uniqueRegions.indexOf(currentGame.region);
+                                        // ... inside the if (activeBracketId && !isMock) block ...
+                                        const regionIdx = finalRegions.indexOf(currentGame.region); // Changed from uniqueRegions
                                         const isTopRegion = regionIdx === 0 || regionIdx === 1;
 
                                         let isTop = false;
@@ -192,8 +191,10 @@ export default function TournamentMap({ isMock = false }: { isMock?: boolean }) 
                 }
                 // Save final bracket state plus picks
                 setBracketGames(updatedGames);
-                if (Object.keys(initialPicks).length > 0) {
+                if (!isMock && Object.keys(initialPicks).length > 0) {
                     setPicks(initialPicks);
+                } else if (isMock) {
+                    setPicks({}); // Clear picks if switching to mock
                 }
             } catch (e) {
                 console.error(e);
