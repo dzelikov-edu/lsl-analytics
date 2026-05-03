@@ -27,7 +27,7 @@ REGION_MAP = {
         3: {"a": 19, "b_is_playin": True, "p_a": 57, "p_b": 58, "seed_a": 5, "seed_b": 12},
         4: {"a": 14, "b": 63, "seed_a": 4, "seed_b": 13},
         5: {"a": 22, "b_is_playin": True, "p_a": 51, "p_b": 52, "seed_a": 6, "seed_b": 11},
-        6: {"a": 11, "b6": 66, "seed_a": 3, "seed_b": 14},
+        6: {"a": 11, "b": 66, "seed_a": 3, "seed_b": 14},
         7: {"a": 27, "b_is_playin": True, "p_a": 41, "p_b": 42, "seed_a": 7, "seed_b": 10},
         8: {"a": 6, "b": 71, "seed_a": 2, "seed_b": 15},
     },
