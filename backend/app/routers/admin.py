@@ -1,9 +1,10 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
 import asyncio
+from datetime import datetime
 
 from app.deps_auth import get_current_user
-from app.models_devices import User
+from app.models_devices import User, TournamentState
 from app.workers.push_sender import notify_team
 
 from sqlmodel import select
@@ -100,3 +101,44 @@ async def upgrade_userbracketpick(
         await session.commit()
 
     return {"status": "ok", "message": "user_bracket_id column ensured on userbracketpick"}
+
+@router.post("/tournament/set-phase")
+async def set_tournament_phase(
+    phase: str, 
+    season: int = 2036,
+    current_user: User = Depends(get_current_user)
+):
+    if not current_user.is_admin:
+        raise HTTPException(status_code=403, detail="Admin only.")
+    
+    async with AsyncSessionLocal() as session:
+        stmt = select(TournamentState).where(TournamentState.season == season)
+        res = await session.exec(stmt)
+        state = res.one_or_none()
+        
+        if not state:
+            state = TournamentState(season=season, phase=phase)
+            session.add(state)
+        else:
+            state.phase = phase
+            state.updated_at = datetime.utcnow()
+            
+        await session.commit()
+    return {"status": "success", "new_phase": phase}
+
+@router.post("/db/create-state-table")
+async def create_state_table(current_user: User = Depends(get_current_user)):
+    # 1. Authority Check
+    if not current_user.is_admin:
+        raise HTTPException(status_code=403, detail="Admin only.")
+    
+    # 2. Localized Imports (Prevents circular import issues)
+    from app.db import engine
+    from app.models_devices import SQLModel 
+    
+    # 3. Execution
+    async with engine.begin() as conn:
+        # This tells the DB: "Look at my models, if a table is missing, make it."
+        await conn.run_sync(SQLModel.metadata.create_all)
+        
+    return {"status": "ok", "message": "Database schema synced successfully."}

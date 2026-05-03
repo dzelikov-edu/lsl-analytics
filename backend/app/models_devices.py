@@ -170,3 +170,13 @@ class GroupBracket(SQLModel, table=True):
     user_bracket_id: str = Field(foreign_key="userbracket.id", index=True)
     user_id: str = Field(foreign_key="user.id", index=True)
     created_at: datetime = Field(default_factory=datetime.utcnow)
+
+class TournamentState(SQLModel, table=True):
+    """
+    Global toggle for the LCAA Tournament tab.
+    phase: 'BRACKETOLOGY' (Mock) or 'LIVE' (Official)
+    """
+    id: int = Field(default=1, primary_key=True)
+    season: int = Field(default=2036)
+    phase: str = Field(default="BRACKETOLOGY") # BRACKETOLOGY, SELECTION_SUNDAY, LIVE, FINISHED
+    updated_at: datetime = Field(default_factory=datetime.utcnow)

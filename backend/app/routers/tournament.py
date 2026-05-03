@@ -4,6 +4,7 @@ from app.db import AsyncSessionLocal
 from app.models_devices import (
     TournamentBracket,
     TournamentSeedList,
+    TournamentState,
     UserBracket,
     UserBracketPick,
     User,
@@ -217,3 +218,14 @@ async def get_bracket_picks(
         "is_locked": bracket.is_locked,
         "picks": out,
     }
+
+@router.get("/state")
+async def get_tournament_state(season: int = 2036):
+    async with AsyncSessionLocal() as session:
+        stmt = select(TournamentState).where(TournamentState.season == season)
+        res = await session.exec(stmt)
+        state = res.one_or_none()
+        if not state:
+            # Default to Bracketology if not set
+            return {"season": season, "phase": "BRACKETOLOGY"}
+        return state

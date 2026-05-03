@@ -121,25 +121,78 @@ export default function TournamentMap() {
                 });
                 setTeamSeeds(seedMap);
 
-                const uniqueRegions = [...new Set(bracketData.filter((g: any) => g.region !== "Final Four" && g.region !== "National Semifinals").map((g: any) => g.region))];
+                const uniqueRegions = [...new Set(
+                    bracketData
+                        .filter((g: any) => g.region !== "Final Four" && g.region !== "National Semifinals")
+                        .map((g: any) => g.region)
+                )];
                 setRegionOrder(uniqueRegions as string[]);
-                setBracketGames(bracketData);
+
+                // Start from raw bracketData and then apply any saved picks
+                let updatedGames: any[] = [...bracketData];
+                let initialPicks: { [k: string]: string } = {};
 
                 // 3) Hydrate picks for this bracket, if we have one
                 if (activeBracketId) {
                     try {
-                        const picksRes = await fetch(`${API_BASE_URL}/api/tournament/brackets/${activeBracketId}/picks`, {
-                            headers: { Authorization: `Bearer ${token}` },
-                        });
+                        const picksRes = await fetch(
+                            `${API_BASE_URL}/api/tournament/brackets/${activeBracketId}/picks`,
+                            { headers: { Authorization: `Bearer ${token}` } }
+                        );
                         if (picksRes.ok) {
                             const picksData = await picksRes.json();
                             if (picksData && picksData.picks) {
-                                setPicks(picksData.picks);
+                                initialPicks = picksData.picks as { [k: string]: string };
+
+                                // Replay each pick into the bracket tree to fill downstream slots
+                                Object.entries(initialPicks).forEach(([gameId, winnerId]) => {
+                                    if (!winnerId || winnerId === "TBD") return;
+
+                                    const gameIdx = updatedGames.findIndex((g: any) => g.id === gameId);
+                                    if (gameIdx === -1) return;
+                                    const currentGame = updatedGames[gameIdx];
+
+                                    if (currentGame && currentGame.next_game_id) {
+                                        const nextIdx = updatedGames.findIndex(
+                                            (g: any) => g.id === currentGame.next_game_id
+                                        );
+                                        if (nextIdx === -1) return;
+                                        const nextGame = { ...updatedGames[nextIdx] };
+
+                                        const regionIdx = uniqueRegions.indexOf(currentGame.region);
+                                        const isTopRegion = regionIdx === 0 || regionIdx === 1;
+
+                                        let isTop = false;
+                                        if (currentGame.round === "Survival_16") {
+                                            // Survival winners always take the bottom slot of Round of 64
+                                            isTop = false;
+                                        } else if (currentGame.round === "Elite_8") {
+                                            // Top regions feed Team A, bottom regions feed Team B of Semis
+                                            isTop = isTopRegion;
+                                        } else if (currentGame.round === "National Semifinals") {
+                                            // Left Semi feeds Team A, Right Semi feeds Team B of Champ
+                                            isTop = currentGame.game_slot === 1;
+                                        } else {
+                                            // Standard Round of 64, 32, and 16 logic
+                                            isTop = currentGame.game_slot % 2 !== 0;
+                                        }
+
+                                        if (isTop) nextGame.team_a_id = winnerId;
+                                        else nextGame.team_b_id = winnerId;
+
+                                        updatedGames[nextIdx] = nextGame;
+                                    }
+                                });
                             }
                         }
                     } catch (e) {
                         console.log('Error loading bracket picks', e);
                     }
+                }
+                // Save final bracket state plus picks
+                setBracketGames(updatedGames);
+                if (Object.keys(initialPicks).length > 0) {
+                    setPicks(initialPicks);
                 }
             } catch (e) {
                 console.error(e);
