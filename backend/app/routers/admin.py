@@ -142,3 +142,44 @@ async def create_state_table(current_user: User = Depends(get_current_user)):
         await conn.run_sync(SQLModel.metadata.create_all)
         
     return {"status": "ok", "message": "Database schema synced successfully."}
+
+@router.post("/tournament/sync-bracketology")
+async def admin_sync_bracketology(
+    season: int = 2036,
+    current_user: User = Depends(get_current_user)
+):
+    if not current_user.is_admin:
+        raise HTTPException(status_code=403, detail="Admin only.")
+
+    from app.sheets_client import get_sheets_service, read_range
+    from app.settings import settings
+    from app.models_devices import TournamentSeedList
+    from app.db import AsyncSessionLocal
+    from sqlmodel import delete
+
+    service = get_sheets_service(settings.GOOGLE_SERVICE_ACCOUNT_JSON)
+    # Target your SPECIFIC Bracketology tab
+    values = read_range(service, settings.MASTER_SHEET_ID, "LCAA_Bracketology!A2:C81")
+    
+    if not values:
+        raise HTTPException(status_code=404, detail="No data found in LCAA_Bracketology sheet.")
+
+    field = [{"tid": str(row[0]).strip().upper(), "rank": int(row[1]), "auto": str(row[2]).strip().upper() == "TRUE"} for row in values if len(row) >= 3]
+
+    async with AsyncSessionLocal() as session:
+        # Only clear the Seeds for this season, don't touch the Official Bracket tables
+        await session.execute(delete(TournamentSeedList).where(TournamentSeedList.season == season))
+
+        for f in field:
+            seed_entry = TournamentSeedList(
+                season=season,
+                team_id=f['tid'],
+                overall_rank=f['rank'],
+                seed=((f['rank']-1)//5)+1,
+                is_autobid=f['auto']
+            )
+            session.add(seed_entry)
+        
+        await session.commit()
+
+    return {"status": "success", "teams_synced": len(field), "message": "Bracketology Rank List Updated."}

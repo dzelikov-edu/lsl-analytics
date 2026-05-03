@@ -257,6 +257,39 @@ export default function ProfileScreen() {
         }
     };
 
+    const handleBracketologySync = async () => {
+        Alert.alert(
+            "Sync Bracketology",
+            "This will pull the current rankings from the LCAA_Bracketology sheet to update the mock bracket. Continue?",
+            [
+                { text: "Cancel", style: "cancel" },
+                {
+                    text: "Run Sync",
+                    onPress: async () => {
+                        setLoading(true);
+                        try {
+                            const token = await getToken();
+                            const res = await fetch(`${API_BASE_URL}/admin/tournament/sync-bracketology?season=2036`, {
+                                method: 'POST',
+                                headers: { Authorization: `Bearer ${token}` }
+                            });
+                            const data = await res.json();
+                            setLoading(false);
+                            if (res.ok) {
+                                Alert.alert("Success", `Synced ${data.teams_synced} teams to the Seed List.`);
+                            } else {
+                                Alert.alert("Error", data.detail || "Sync failed.");
+                            }
+                        } catch (e) {
+                            setLoading(false);
+                            Alert.alert("Error", "Could not connect to server.");
+                        }
+                    }
+                }
+            ]
+        );
+    };
+
     const handleTournamentSync = async () => {
         Alert.alert(
             "LCAA Selection Sunday",
@@ -406,6 +439,20 @@ export default function ProfileScreen() {
                     </Pressable>
                     {/* ----------------------------- */}
 
+                    {/* --- BRACKETOLOGY SYNC (PURPLE) --- */}
+                    <Pressable
+                        style={[styles.settingRow, { backgroundColor: '#5856D6', marginBottom: 10 }]}
+                        onPress={handleBracketologySync}
+                    >
+                        <View style={{ flex: 1 }}>
+                            <Text style={[styles.settingLabel, { color: '#fff' }]}>📊 Sync LCAA Bracketology</Text>
+                            <Text style={{ color: 'rgba(255,255,255,0.8)', fontSize: 12, marginTop: 2 }}>
+                                Update the projected rankings from Google Sheets.
+                            </Text>
+                        </View>
+                    </Pressable>
+
+                    {/* --- OFFICIAL TOURNAMENT SYNC (BLUE) --- */}
                     <Pressable
                         style={[styles.settingRow, { backgroundColor: '#007AFF' }]}
                         onPress={handleTournamentSync}
