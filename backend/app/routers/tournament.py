@@ -313,8 +313,9 @@ async def simulate_personal_bracket(
     current_user: User = Depends(get_current_user),
 ):
     """
-    Runs the LSL AI simulation once and returns a full mock bracket
-    WITHOUT persisting it. Used for personal Bracketology "My Sim" views.
+    Runs the LSL AI simulation with the same macro EvanMiya constraints used
+    by the Commissioner sim, but DOES NOT write to the DB.
+    Returns a full mock bracket for this user only.
     """
     async with AsyncSessionLocal() as session:
         # 1. Fetch current Seeds
@@ -328,7 +329,7 @@ async def simulate_personal_bracket(
         from app.bracket_constants import REGION_MAP
         import random
 
-        # --- LOCAL SIM ENGINE (same behavior as run_bracket_sim, no DB writes) ---
+        # --- SAME SIM ENGINE AS run_bracket_sim (micro logic) ---
         def simulate_game(id_a, id_b, round_name):
             if id_a == "TBD": return id_b
             if id_b == "TBD": return id_a
@@ -347,14 +348,14 @@ async def simulate_personal_bracket(
                 else:
                     fav_id, dog_id, fav_s, dog_s, fav_p, dog_p = id_b, id_a, s_b, s_a, p_b, p_a
 
-            # A. Base probabilities
+            # A. Base probabilities (historical trends)
             matchup_probs = {
                 (1,16): 0.99, (2,15): 0.94, (3,14): 0.85, (4,13): 0.79,
                 (5,12): 0.64, (6,11): 0.62, (7,10): 0.60, (8,9): 0.51,
             }
             win_prob = matchup_probs.get((fav_s, dog_s), 0.50 + ((dog_s - fav_s) * 0.04))
 
-            # B. Analytics Edge (power + resume/SOS/form, if present)
+            # B. Analytics Edge (power + resume/SOS/form)
             if fav_p > 0 and dog_p > 0:
                 win_prob += ((fav_p - dog_p) * 0.025)
             elif fav_p > 0:
@@ -374,66 +375,75 @@ async def simulate_personal_bracket(
             # D. Strict 10% Gate
             underdog_prob = 1.0 - win_prob
             if underdog_prob < 0.10:
-                return fav_id
+                return fav_id  # favorite auto‑wins if upset is < 10% plausible
 
             return fav_id if random.random() < win_prob else dog_id
 
         regions = ["West", "Midwest", "East", "South"]
         final_picks: dict[str, str] = {}
 
-        # Simple single-run sim (no EvanMiya macro loop here; we just run once)
-        sim_results: dict[str, str] = {}
-        bracket_tree: dict[str, str] = {}
+        # --- MACRO CONTROLLER (EvanMiya constraints) ---
+        for attempt in range(25):
+            sim_results: dict[str, str] = {}
+            bracket_tree: dict[str, str] = {}
 
-        # Round of 64 + Survival
-        for idx, r_name in enumerate(regions):
-            reg_num = idx + 1
-            for s_num in range(1, 9):
-                cfg = REGION_MAP[reg_num][s_num]
-                # Survival 16
-                team_b = "TBD"
-                if cfg.get("b_is_playin"):
-                    p1 = next(s.team_id for s in seeds_list if s.overall_rank == cfg['p_a'])
-                    p2 = next(s.team_id for s in seeds_list if s.overall_rank == cfg['p_b'])
-                    surv_win = simulate_game(p1, p2, "Survival_16")
-                    sim_results[f"mock_p_{reg_num}_{s_num}"] = surv_win
-                    team_b = surv_win
-                else:
-                    team_b = next(s.team_id for s in seeds_list if s.overall_rank == cfg['b'])
+            # Round of 64 + Survival
+            for idx, r_name in enumerate(regions):
+                reg_num = idx + 1
+                for s_num in range(1, 9):
+                    cfg = REGION_MAP[reg_num][s_num]
 
-                team_a = next(s.team_id for s in seeds_list if s.overall_rank == cfg['a'])
-                r64_win = simulate_game(team_a, team_b, "Round_64")
-                gid = f"mock_r64_{reg_num}_{s_num}"
-                sim_results[gid] = r64_win
-                bracket_tree[gid] = r64_win
+                    # Survival 16
+                    team_b = "TBD"
+                    if cfg.get("b_is_playin"):
+                        p1 = next(s.team_id for s in seeds_list if s.overall_rank == cfg['p_a'])
+                        p2 = next(s.team_id for s in seeds_list if s.overall_rank == cfg['p_b'])
+                        surv_win = simulate_game(p1, p2, "Survival_16")
+                        sim_results[f"mock_p_{reg_num}_{s_num}"] = surv_win
+                        team_b = surv_win
+                    else:
+                        team_b = next(s.team_id for s in seeds_list if s.overall_rank == cfg['b'])
 
-        # R32 -> S16 -> E8
-        for curr, nxt, slots in [("r64", "r32", 4), ("r32", "s16", 2), ("s16", "e8", 1)]:
-            for reg_num in range(1, 5):
-                for s in range(1, slots + 1):
-                    t_a = bracket_tree[f"mock_{curr}_{reg_num}_{s*2-1}"]
-                    t_b = bracket_tree[f"mock_{curr}_{reg_num}_{s*2}"]
-                    win = simulate_game(t_a, t_b, nxt)
-                    n_id = f"mock_{nxt}_{reg_num}_{s}" if nxt != "e8" else f"mock_e8_{reg_num}"
-                    sim_results[n_id] = win
-                    bracket_tree[n_id] = win
+                    team_a = next(s.team_id for s in seeds_list if s.overall_rank == cfg['a'])
+                    r64_win = simulate_game(team_a, team_b, "Round_64")
+                    gid = f"mock_r64_{reg_num}_{s_num}"
+                    sim_results[gid] = r64_win
+                    bracket_tree[gid] = r64_win
 
-        # Final Four & Champ
-        ff1 = simulate_game(bracket_tree["mock_e8_1"], bracket_tree["mock_e8_4"], "National Semifinals")
-        ff2 = simulate_game(bracket_tree["mock_e8_2"], bracket_tree["mock_e8_3"], "National Semifinals")
-        sim_results["mock_ff_1"], sim_results["mock_ff_2"] = ff1, ff2
-        sim_results["mock_champ"] = simulate_game(ff1, ff2, "Championship")
+            # R32 -> S16 -> E8
+            for curr, nxt, slots in [("r64", "r32", 4), ("r32", "s16", 2), ("s16", "e8", 1)]:
+                for reg_num in range(1, 5):
+                    for s in range(1, slots + 1):
+                        t_a = bracket_tree[f"mock_{curr}_{reg_num}_{s*2-1}"]
+                        t_b = bracket_tree[f"mock_{curr}_{reg_num}_{s*2}"]
+                        win = simulate_game(t_a, t_b, nxt)
+                        n_id = f"mock_{nxt}_{reg_num}_{s}" if nxt != "e8" else f"mock_e8_{reg_num}"
+                        sim_results[n_id] = win
+                        bracket_tree[n_id] = win
 
-        final_picks = sim_results
+            # Final Four & Champ
+            ff1 = simulate_game(bracket_tree["mock_e8_1"], bracket_tree["mock_e8_4"], "National Semifinals")
+            ff2 = simulate_game(bracket_tree["mock_e8_2"], bracket_tree["mock_e8_3"], "National Semifinals")
+            sim_results["mock_ff_1"], sim_results["mock_ff_2"] = ff1, ff2
+            sim_results["mock_champ"] = simulate_game(ff1, ff2, "Championship")
 
-        # 2. Build full game objects (same shape as /mock-bracket)
+            one_seeds_in_ff = len([t for r, t in sim_results.items() if r.startswith("mock_ff") and team_seed_val.get(t) == 1])
+            one_seeds_in_e8 = len([t for r, t in sim_results.items() if r.startswith("mock_e8") and team_seed_val.get(t) == 1])
+
+            # Target: Exactly 2 one‑seeds in FF and exactly 3 in E8
+            final_picks = sim_results
+            if one_seeds_in_ff == 2 and one_seeds_in_e8 == 3:
+                break
+
+        # --- BUILD FULL GAME OBJECTS (same shape as /mock-bracket) ---
         mock_games: list[dict] = []
         regions_map = ["West", "Midwest", "East", "South"]
 
-        # Final Four skeleton
         champ_id = "mock_champ"
         semi_1_id = "mock_ff_1"
         semi_2_id = "mock_ff_2"
+
+        # Championship
         mock_games.append({
             "id": champ_id,
             "region": "Final Four",
@@ -446,6 +456,7 @@ async def simulate_personal_bracket(
             "winner_id": final_picks.get(champ_id),
             "next_game_id": None,
         })
+        # Semis
         mock_games.append({
             "id": semi_1_id,
             "region": "Final Four",
@@ -471,7 +482,7 @@ async def simulate_personal_bracket(
             "next_game_id": champ_id,
         })
 
-        # Regionals
+        # Regionals (E8, S16, R32, R64 + Survivals)
         for idx, region_name in enumerate(regions_map):
             reg_num = idx + 1
             target_semi = semi_1_id if idx in [0, 3] else semi_2_id
@@ -526,7 +537,6 @@ async def simulate_personal_bracket(
                         cfg = REGION_MAP[reg_num][slot_num]
 
                         team_a = next(s.team_id for s in seeds_list if s.overall_rank == cfg['a'])
-                        team_b = "TBD"
                         if cfg.get("b_is_playin"):
                             p_id = f"mock_p_{reg_num}_{slot_num}"
                             mock_games.append({

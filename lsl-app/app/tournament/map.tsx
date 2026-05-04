@@ -17,10 +17,11 @@ const MAP_SIZE = 5000;
 
 type TournamentMapProps = {
     isMock?: boolean;
-    overrideBracketData?: any[]; // personal sim results, optional
+    overrideBracketData?: any[];         // personal sim
+    onRunPersonalSim?: () => void;       // handler for bottom-bar button
 };
 
-export default function TournamentMap({ isMock = false, overrideBracketData }: TournamentMapProps) {
+export default function TournamentMap({ isMock = false, overrideBracketData, onRunPersonalSim }: TournamentMapProps) {
     const colorScheme = useColorScheme() ?? 'light';
     const theme = AppColors[colorScheme];
     const [loading, setLoading] = useState(true);
@@ -95,11 +96,10 @@ export default function TournamentMap({ isMock = false, overrideBracketData }: T
             if (!token) { setLoading(false); return; }
             const cb = Date.now();
 
-            // 1. Parallel Launch: Trigger all 4 major data fetches simultaneously
-            const bracketEndpoint = isMock ? 'mock-bracket' : 'bracket';
+            // 1. Parallel Launch: always use /bracket for base structure
             const [bracketsRes, mainDataRes, seedsRes, namesRes] = await Promise.all([
                 fetch(`${API_BASE_URL}/api/tournament/brackets?season=2036&cb=${cb}`, { headers: { Authorization: `Bearer ${token}` } }),
-                fetch(`${API_BASE_URL}/api/tournament/${bracketEndpoint}?season=2036&cb=${cb}`, { headers: { Authorization: `Bearer ${token}` } }),
+                fetch(`${API_BASE_URL}/api/tournament/bracket?season=2036&cb=${cb}`, { headers: { Authorization: `Bearer ${token}` } }),
                 fetch(`${API_BASE_URL}/api/tournament/seeds?season=2036&cb=${cb}`, { headers: { Authorization: `Bearer ${token}` } }),
                 fetch(`${API_BASE_URL}/api/tournament/team-names?cb=${cb}`, { headers: { Authorization: `Bearer ${token}` } })
             ]);
@@ -204,13 +204,12 @@ export default function TournamentMap({ isMock = false, overrideBracketData }: T
 
     useEffect(() => {
         loadData();
-    }, [isMock]); // ADD isMock to the dependency array
+    }, [isMock, overrideBracketData]);
 
     useFocusEffect(
         React.useCallback(() => {
-            // Re-run the data loading whenever the user navigates to this tab
             loadData();
-        }, [isMock])
+        }, [isMock, overrideBracketData])
     );
 
     const getPickCount = (roundName: string) => {
@@ -517,22 +516,30 @@ export default function TournamentMap({ isMock = false, overrideBracketData }: T
 
                 <View style={[styles.bottomBar, { backgroundColor: theme.card }]}>
                     {isMock ? (
-                        <Text style={{ color: theme.text, fontSize: 10, fontWeight: '600', flex: 1 }}>
-                            LCAA Bracketology Projection • AI Sim based on seeds & power. Re-run from Profile → 🤖 Run LCAA AI Simulation.
-                        </Text>
-                    ) : (
                         <>
                             <Text style={{ color: theme.text, fontSize: 10, fontWeight: '600', flex: 1 }}>
-                                Picks: S16 {getPickCount("Survival_16")}/16 • R64 {getPickCount("Round_64")}/32 • R32 {getPickCount("Round_32")}/16 • S16 {getPickCount("Sweet_16")}/8 • E8 {getPickCount("Elite_8")}/4 • FF {getPickCount("National Semifinals")}/2 • Champ {getPickCount("Championship")}/1
+                                Bracketology: seeded field. Run an AI sim to see one possible tournament outcome.
                             </Text>
-                            <Pressable
-                                onPress={handleLockBracket}
-                                style={{ paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8, backgroundColor: locking ? theme.border : '#34C759', marginLeft: 8 }}
-                            >
-                                <Text style={{ color: '#fff', fontSize: 10, fontWeight: '700' }}>
-                                    {locking ? 'Locking…' : 'Lock Bracket'}
-                                </Text>
-                            </Pressable>
+                            {onRunPersonalSim && (
+                                <Pressable
+                                    onPress={onRunPersonalSim}
+                                    style={{
+                                        paddingHorizontal: 12,
+                                        paddingVertical: 6,
+                                        borderRadius: 8,
+                                        backgroundColor: '#5856D6',
+                                        marginLeft: 8,
+                                    }}
+                                >
+                                    <Text style={{ color: '#fff', fontSize: 10, fontWeight: '700' }}>
+                                        Run AI Sim
+                                    </Text>
+                                </Pressable>
+                            )}
+                        </>
+                    ) : (
+                        <>
+                            {/* existing picks + Lock Bracket UI */}
                         </>
                     )}
                 </View>
