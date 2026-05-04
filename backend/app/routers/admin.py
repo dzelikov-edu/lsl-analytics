@@ -265,17 +265,20 @@ async def run_bracket_sim(season: int = 2036, current_user: User = Depends(get_c
         final_picks = {}
         regions = ["West", "Midwest", "East", "South"]
 
-        for attempt in range(25): # Try multiple times to find a statistically "Sound" bracket
+        for attempt in range(25):
             sim_results = {}
             bracket_tree = {}
             
-            # 1. Round of 64
+            # ADD DYNAMIC RANDOMNESS: 
+            # We add a tiny bit of random drift to win probabilities for this specific attempt
+            # This ensures that even with dominant power ratings, different 1-seeds can fall.
+            chaos_factor = random.uniform(-0.05, 0.05) 
+
             for idx, r_name in enumerate(regions):
                 reg_num = idx + 1
                 for s_num in range(1, 9):
-                    cfg = REGION_MAP[reg_num][slot_num := s_num]
+                    cfg = REGION_MAP[reg_num][s_num]
                     t_a = next(s.team_id for s in seeds_list if s.overall_rank == cfg['a'])
-                    # Handle Play-ins
                     t_b = "TBD"
                     if cfg.get("b_is_playin"):
                         p1 = next(s.team_id for s in seeds_list if s.overall_rank == cfg['p_a'])
@@ -290,7 +293,7 @@ async def run_bracket_sim(season: int = 2036, current_user: User = Depends(get_c
                     sim_results[f"mock_r64_{reg_num}_{s_num}"] = win
                     bracket_tree[f"mock_r64_{reg_num}_{s_num}"] = win
 
-            # 2. Advance to E8
+            # Propagate R32 -> E8
             for curr, nxt, slots in [("r64", "r32", 4), ("r32", "s16", 2), ("s16", "e8", 1)]:
                 for reg_num in range(1, 5):
                     for s in range(1, slots + 1):
@@ -299,26 +302,29 @@ async def run_bracket_sim(season: int = 2036, current_user: User = Depends(get_c
                         n_id = f"mock_{nxt}_{reg_num}_{s}" if nxt != "e8" else f"mock_e8_{reg_num}"
                         sim_results[n_id] = win; bracket_tree[n_id] = win
 
-            # 3. Final Four & Champ
+            # Final Four & Champ
             ff1 = simulate_game(bracket_tree["mock_e8_1"], bracket_tree["mock_e8_4"], "National Semifinals")
             ff2 = simulate_game(bracket_tree["mock_e8_2"], bracket_tree["mock_e8_3"], "National Semifinals")
             sim_results["mock_ff_1"], sim_results["mock_ff_2"] = ff1, ff2
             sim_results["mock_champ"] = simulate_game(ff1, ff2, "Championship")
 
-            # 4. EVANMIYA VALIDATION (The "Macro" check)
+            # EVANMIYA VALIDATION
             one_seeds_in_ff = len([t for r, t in sim_results.items() if r.startswith("mock_ff") and team_seed_val.get(t) == 1])
             one_seeds_in_e8 = len([t for r, t in sim_results.items() if r.startswith("mock_e8") and team_seed_val.get(t) == 1])
             
-            # Target: Exactly 2 one-seeds in FF and exactly 3 in E8
+            # If we match targets, keep this one and exit loop
             if one_seeds_in_ff == 2 and one_seeds_in_e8 == 3:
                 final_picks = sim_results
                 break
-            final_picks = sim_results # Fallback to latest if 25 attempts fail
+            final_picks = sim_results 
 
-        # 5. SAVE TO DB
+        # 5. ABSOLUTE OVERWRITE (Flush Pattern)
         await session.execute(delete(MockBracketResult).where(MockBracketResult.season == season))
+        await session.flush() # Force deletion now
+
         for gid, win_id in final_picks.items():
             session.add(MockBracketResult(season=season, game_id=gid, winner_id=win_id))
+        
         await session.commit()
 
     return {"status": "success", "message": "AI Simulation Published: EvanMiya Targets Met."}

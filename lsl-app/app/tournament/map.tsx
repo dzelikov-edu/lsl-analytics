@@ -86,7 +86,7 @@ export default function TournamentMap({ isMock = false }: { isMock?: boolean }) 
                 // 2) Fetch bracket structure, seeds, and names
                 const bracketEndpoint = isMock ? 'mock-bracket' : 'bracket';
                 const [bracketRes, seedsRes, namesRes] = await Promise.all([
-                    fetch(`${API_BASE_URL}/api/tournament/${bracketEndpoint}?season=2036`, { headers: { Authorization: `Bearer ${token}` } }),
+                    fetch(`${API_BASE_URL}/api/tournament/${bracketEndpoint}?season=2036&cb=${Date.now()}`, { headers: { Authorization: `Bearer ${token}` } }),
                     fetch(`${API_BASE_URL}/api/tournament/seeds?season=2036`, { headers: { Authorization: `Bearer ${token}` } }),
                     fetch(`${API_BASE_URL}/api/tournament/team-names`, { headers: { Authorization: `Bearer ${token}` } })
                 ]);
