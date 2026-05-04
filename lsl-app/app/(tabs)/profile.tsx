@@ -260,15 +260,18 @@ export default function ProfileScreen() {
     const handleSyncDBSchema = async () => {
         try {
             const token = await getToken();
-            const res = await fetch(`${API_BASE_URL}/admin/db/create-state-table`, {
+            // Call the specific column patch endpoint
+            const res = await fetch(`${API_BASE_URL}/admin/db/patch-seedlist-columns`, {
                 method: 'POST',
                 headers: { Authorization: `Bearer ${token}` }
             });
             if (res.ok) {
-                Alert.alert("Success", "Database schema synced. New tables are ready.");
+                Alert.alert("Success", "Columns added successfully.");
+            } else {
+                Alert.alert("Error", "Migration failed.");
             }
         } catch (e) {
-            Alert.alert("Error", "Failed to sync DB schema.");
+            Alert.alert("Error", "Network error.");
         }
     };
 
