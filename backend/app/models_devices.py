@@ -123,6 +123,8 @@ class TournamentSeedList(SQLModel, table=True):
     is_autobid: bool
     resume_score: float
     power_value: float
+    sos: float = Field(default=0.0)
+    form: float = Field(default=0.0)
 
     # Core Stats (Already Averages)
     ppg: float = Field(default=0.0)

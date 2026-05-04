@@ -183,7 +183,9 @@ async def admin_sync_bracketology(
                 seed=((f['rank']-1)//5)+1,
                 is_autobid=f['auto'],
                 resume_score=0.0, # EXPLICITLY SET
-                power_value=0.0   # EXPLICITLY SET
+                power_value=0.0,  # EXPLICITLY SET
+                sos=0.0,
+                form=0.0
             )
             session.add(seed_entry)
         
@@ -228,8 +230,25 @@ async def run_bracket_sim(season: int = 2036, current_user: User = Depends(get_c
             matchup_probs = {(1,16): 0.99, (2,15): 0.94, (3,14): 0.85, (4,13): 0.79, (5,12): 0.64, (6,11): 0.62, (7,10): 0.60, (8,9): 0.51}
             win_prob = matchup_probs.get((fav_s, dog_s), 0.50 + ((dog_s - fav_s) * 0.04))
             
-            # B. Power Modifier (2.5% per point)
-            if fav_p > 0 and dog_p > 0: win_prob += ((fav_p - dog_p) * 0.025)
+            # B. Analytics Edge
+            # 1. Power Modifier (The primary analytical weight)
+            if fav_p > 0 and dog_p > 0: 
+                win_prob += ((fav_p - dog_p) * 0.025)
+            elif fav_p > 0:
+                win_prob += 0.05 # Small boost if only favorite is tracked
+
+            # 2. Triple Threat Factor (Resume, SOS, Form)
+            # Find the full seed records for both teams from the seeds_list
+            f_meta = next((s for s in seeds_list if s.team_id == fav_id), None)
+            d_meta = next((s for s in seeds_list if s.team_id == dog_id), None)
+            
+            if f_meta and d_meta:
+                # Resume Score: (1pt gap = 1% nudge)
+                win_prob += ((f_meta.resume_score - d_meta.resume_score) * 0.01)
+                # SOS: (1pt gap = 0.5% nudge)
+                win_prob += ((f_meta.sos - d_meta.sos) * 0.005)
+                # Form: (1pt gap = 1.5% nudge)
+                win_prob += ((f_meta.form - d_meta.form) * 0.015)
 
             # C. Defending Champ Penalty (Curse)
             if round_name in ["Sweet_16", "Elite_8"] and fav_id == "XAVIER": win_prob -= 0.15

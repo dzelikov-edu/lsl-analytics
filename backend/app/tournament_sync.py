@@ -39,7 +39,9 @@ async def sync_official_tournament(season: int, region_order: list[str]):
                 seed=((f['rank']-1)//5)+1,
                 is_autobid=f['auto'],
                 resume_score=0.0,
-                power_value=0.0
+                power_value=0.0,
+                sos=0.0,
+                form=0.0
             ))
         # ---------------------
 
