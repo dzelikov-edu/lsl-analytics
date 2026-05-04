@@ -19,10 +19,20 @@ type MatchupProps = {
     pickedWinnerId?: string | null;
     onPressTeamA?: () => void;
     onPressTeamB?: () => void;
-    onLongPress?: () => void; // ADD
+    onLongPress?: () => void;
+    showPickIndicators?: boolean; // NEW
 };
 
-export default function TournamentMatchup({ teamA, teamB, status, pickedWinnerId, onPressTeamA, onPressTeamB, onLongPress }: MatchupProps) {
+export default function TournamentMatchup({
+    teamA,
+    teamB,
+    status,
+    pickedWinnerId,
+    onPressTeamA,
+    onPressTeamB,
+    onLongPress,
+    showPickIndicators = true,
+}: MatchupProps) {
     const colorScheme = useColorScheme() ?? 'light';
     const theme = AppColors[colorScheme];
     // Only mark as picked if the ID matches AND it's a real team (not TBD)
@@ -38,18 +48,20 @@ export default function TournamentMatchup({ teamA, teamB, status, pickedWinnerId
                 <Text
                     style={[
                         styles.teamName,
-                        { color: theme.text, fontWeight: isPickedA ? '900' : '400' }
+                        { color: theme.text, fontWeight: showPickIndicators && isPickedA ? '900' : '400' }
                     ]}
                     numberOfLines={1}
                 >
                     {teamA.name}
                 </Text>
                 {/* THE RADIO CIRCLE */}
-                <View style={[
-                    styles.radioCircle,
-                    { borderColor: theme.border },
-                    isPickedA && { backgroundColor: '#34C759', borderColor: '#34C759' } // Green when picked
-                ]} />
+                {showPickIndicators && (
+                    <View style={[
+                        styles.radioCircle,
+                        { borderColor: theme.border },
+                        isPickedA && { backgroundColor: '#34C759', borderColor: '#34C759' }
+                    ]} />
+                )}
             </Pressable>
 
             <View style={[styles.divider, { backgroundColor: theme.border }]} />
@@ -61,18 +73,20 @@ export default function TournamentMatchup({ teamA, teamB, status, pickedWinnerId
                 <Text
                     style={[
                         styles.teamName,
-                        { color: theme.text, fontWeight: isPickedB ? '900' : '400' }
+                        { color: theme.text, fontWeight: showPickIndicators && isPickedB ? '900' : '400' }
                     ]}
                     numberOfLines={1}
                 >
                     {teamB.name}
                 </Text>
                 {/* THE RADIO CIRCLE */}
-                <View style={[
-                    styles.radioCircle,
-                    { borderColor: theme.border },
-                    isPickedB && { backgroundColor: '#34C759', borderColor: '#34C759' }
-                ]} />
+                {showPickIndicators && (
+                    <View style={[
+                        styles.radioCircle,
+                        { borderColor: theme.border },
+                        isPickedB && { backgroundColor: '#34C759', borderColor: '#34C759' }
+                    ]} />
+                )}
             </Pressable>
         </View>
     );

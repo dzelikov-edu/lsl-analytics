@@ -307,3 +307,255 @@ async def get_mock_bracket(season: int = 2036):
 
         return mock_games
 
+@router.post("/simulate")
+async def simulate_personal_bracket(
+    season: int = 2036,
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Runs the LSL AI simulation once and returns a full mock bracket
+    WITHOUT persisting it. Used for personal Bracketology "My Sim" views.
+    """
+    async with AsyncSessionLocal() as session:
+        # 1. Fetch current Seeds
+        stmt = select(TournamentSeedList).where(TournamentSeedList.season == season)
+        seeds_list = (await session.exec(stmt)).all()
+        if not seeds_list:
+            raise HTTPException(status_code=400, detail="No seeds found. Sync Bracketology first.")
+
+        team_power = {s.team_id: s.power_value for s in seeds_list}
+        team_seed_val = {s.team_id: s.seed for s in seeds_list}
+        from app.bracket_constants import REGION_MAP
+        import random
+
+        # --- LOCAL SIM ENGINE (same behavior as run_bracket_sim, no DB writes) ---
+        def simulate_game(id_a, id_b, round_name):
+            if id_a == "TBD": return id_b
+            if id_b == "TBD": return id_a
+
+            s_a, s_b = team_seed_val.get(id_a, 16), team_seed_val.get(id_b, 16)
+            p_a, p_b = team_power.get(id_a, 0), team_power.get(id_b, 0)
+
+            # Favorite / underdog by seed, then power
+            if s_a < s_b:
+                fav_id, dog_id, fav_s, dog_s, fav_p, dog_p = id_a, id_b, s_a, s_b, p_a, p_b
+            elif s_b < s_a:
+                fav_id, dog_id, fav_s, dog_s, fav_p, dog_p = id_b, id_a, s_b, s_a, p_b, p_a
+            else:
+                if p_a >= p_b:
+                    fav_id, dog_id, fav_s, dog_s, fav_p, dog_p = id_a, id_b, s_a, s_b, p_a, p_b
+                else:
+                    fav_id, dog_id, fav_s, dog_s, fav_p, dog_p = id_b, id_a, s_b, s_a, p_b, p_a
+
+            # A. Base probabilities
+            matchup_probs = {
+                (1,16): 0.99, (2,15): 0.94, (3,14): 0.85, (4,13): 0.79,
+                (5,12): 0.64, (6,11): 0.62, (7,10): 0.60, (8,9): 0.51,
+            }
+            win_prob = matchup_probs.get((fav_s, dog_s), 0.50 + ((dog_s - fav_s) * 0.04))
+
+            # B. Analytics Edge (power + resume/SOS/form, if present)
+            if fav_p > 0 and dog_p > 0:
+                win_prob += ((fav_p - dog_p) * 0.025)
+            elif fav_p > 0:
+                win_prob += 0.05
+
+            f_meta = next((s for s in seeds_list if s.team_id == fav_id), None)
+            d_meta = next((s for s in seeds_list if s.team_id == dog_id), None)
+            if f_meta and d_meta:
+                win_prob += ((f_meta.resume_score - d_meta.resume_score) * 0.01)
+                win_prob += ((f_meta.sos - d_meta.sos) * 0.005)
+                win_prob += ((f_meta.form - d_meta.form) * 0.015)
+
+            # C. Defending champ penalty (Xavier)
+            if round_name in ["Sweet_16", "Elite_8"] and fav_id == "XAVIER":
+                win_prob -= 0.15
+
+            # D. Strict 10% Gate
+            underdog_prob = 1.0 - win_prob
+            if underdog_prob < 0.10:
+                return fav_id
+
+            return fav_id if random.random() < win_prob else dog_id
+
+        regions = ["West", "Midwest", "East", "South"]
+        final_picks: dict[str, str] = {}
+
+        # Simple single-run sim (no EvanMiya macro loop here; we just run once)
+        sim_results: dict[str, str] = {}
+        bracket_tree: dict[str, str] = {}
+
+        # Round of 64 + Survival
+        for idx, r_name in enumerate(regions):
+            reg_num = idx + 1
+            for s_num in range(1, 9):
+                cfg = REGION_MAP[reg_num][s_num]
+                # Survival 16
+                team_b = "TBD"
+                if cfg.get("b_is_playin"):
+                    p1 = next(s.team_id for s in seeds_list if s.overall_rank == cfg['p_a'])
+                    p2 = next(s.team_id for s in seeds_list if s.overall_rank == cfg['p_b'])
+                    surv_win = simulate_game(p1, p2, "Survival_16")
+                    sim_results[f"mock_p_{reg_num}_{s_num}"] = surv_win
+                    team_b = surv_win
+                else:
+                    team_b = next(s.team_id for s in seeds_list if s.overall_rank == cfg['b'])
+
+                team_a = next(s.team_id for s in seeds_list if s.overall_rank == cfg['a'])
+                r64_win = simulate_game(team_a, team_b, "Round_64")
+                gid = f"mock_r64_{reg_num}_{s_num}"
+                sim_results[gid] = r64_win
+                bracket_tree[gid] = r64_win
+
+        # R32 -> S16 -> E8
+        for curr, nxt, slots in [("r64", "r32", 4), ("r32", "s16", 2), ("s16", "e8", 1)]:
+            for reg_num in range(1, 5):
+                for s in range(1, slots + 1):
+                    t_a = bracket_tree[f"mock_{curr}_{reg_num}_{s*2-1}"]
+                    t_b = bracket_tree[f"mock_{curr}_{reg_num}_{s*2}"]
+                    win = simulate_game(t_a, t_b, nxt)
+                    n_id = f"mock_{nxt}_{reg_num}_{s}" if nxt != "e8" else f"mock_e8_{reg_num}"
+                    sim_results[n_id] = win
+                    bracket_tree[n_id] = win
+
+        # Final Four & Champ
+        ff1 = simulate_game(bracket_tree["mock_e8_1"], bracket_tree["mock_e8_4"], "National Semifinals")
+        ff2 = simulate_game(bracket_tree["mock_e8_2"], bracket_tree["mock_e8_3"], "National Semifinals")
+        sim_results["mock_ff_1"], sim_results["mock_ff_2"] = ff1, ff2
+        sim_results["mock_champ"] = simulate_game(ff1, ff2, "Championship")
+
+        final_picks = sim_results
+
+        # 2. Build full game objects (same shape as /mock-bracket)
+        mock_games: list[dict] = []
+        regions_map = ["West", "Midwest", "East", "South"]
+
+        # Final Four skeleton
+        champ_id = "mock_champ"
+        semi_1_id = "mock_ff_1"
+        semi_2_id = "mock_ff_2"
+        mock_games.append({
+            "id": champ_id,
+            "region": "Final Four",
+            "round": "Championship",
+            "game_slot": 1,
+            "team_a_id": final_picks.get("mock_ff_1", "TBD"),
+            "team_b_id": final_picks.get("mock_ff_2", "TBD"),
+            "seed_a": 0,
+            "seed_b": 0,
+            "winner_id": final_picks.get(champ_id),
+            "next_game_id": None,
+        })
+        mock_games.append({
+            "id": semi_1_id,
+            "region": "Final Four",
+            "round": "National Semifinals",
+            "game_slot": 1,
+            "team_a_id": final_picks.get("mock_e8_1", "TBD"),
+            "team_b_id": final_picks.get("mock_e8_4", "TBD"),
+            "seed_a": 0,
+            "seed_b": 0,
+            "winner_id": final_picks.get(semi_1_id),
+            "next_game_id": champ_id,
+        })
+        mock_games.append({
+            "id": semi_2_id,
+            "region": "Final Four",
+            "round": "National Semifinals",
+            "game_slot": 2,
+            "team_a_id": final_picks.get("mock_e8_2", "TBD"),
+            "team_b_id": final_picks.get("mock_e8_3", "TBD"),
+            "seed_a": 0,
+            "seed_b": 0,
+            "winner_id": final_picks.get(semi_2_id),
+            "next_game_id": champ_id,
+        })
+
+        # Regionals
+        for idx, region_name in enumerate(regions_map):
+            reg_num = idx + 1
+            target_semi = semi_1_id if idx in [0, 3] else semi_2_id
+            e8_id = f"mock_e8_{reg_num}"
+            mock_games.append({
+                "id": e8_id,
+                "region": region_name,
+                "round": "Elite_8",
+                "game_slot": 1,
+                "team_a_id": final_picks.get(f"mock_s16_{reg_num}_1", "TBD"),
+                "team_b_id": final_picks.get(f"mock_s16_{reg_num}_2", "TBD"),
+                "seed_a": 0,
+                "seed_b": 0,
+                "winner_id": final_picks.get(e8_id),
+                "next_game_id": target_semi,
+            })
+
+            for s16_slot in range(1, 3):
+                s16_id = f"mock_s16_{reg_num}_{s16_slot}"
+                mock_games.append({
+                    "id": s16_id,
+                    "region": region_name,
+                    "round": "Sweet_16",
+                    "game_slot": s16_slot,
+                    "team_a_id": final_picks.get(f"mock_r32_{reg_num}_{s16_slot*2-1}", "TBD"),
+                    "team_b_id": final_picks.get(f"mock_r32_{reg_num}_{s16_slot*2}", "TBD"),
+                    "seed_a": 0,
+                    "seed_b": 0,
+                    "winner_id": final_picks.get(s16_id),
+                    "next_game_id": e8_id,
+                })
+
+                for r32_slot in range(1, 3):
+                    r32_abs_slot = ((s16_slot-1)*2)+r32_slot
+                    r32_id = f"mock_r32_{reg_num}_{r32_abs_slot}"
+                    mock_games.append({
+                        "id": r32_id,
+                        "region": region_name,
+                        "round": "Round_32",
+                        "game_slot": r32_abs_slot,
+                        "team_a_id": final_picks.get(f"mock_r64_{reg_num}_{r32_abs_slot*2-1}", "TBD"),
+                        "team_b_id": final_picks.get(f"mock_r64_{reg_num}_{r32_abs_slot*2}", "TBD"),
+                        "seed_a": 0,
+                        "seed_b": 0,
+                        "winner_id": final_picks.get(r32_id),
+                        "next_game_id": s16_id,
+                    })
+
+                    for r64_sub in range(1, 3):
+                        slot_num = ((r32_abs_slot-1)*2)+r64_sub
+                        r64_id = f"mock_r64_{reg_num}_{slot_num}"
+                        cfg = REGION_MAP[reg_num][slot_num]
+
+                        team_a = next(s.team_id for s in seeds_list if s.overall_rank == cfg['a'])
+                        team_b = "TBD"
+                        if cfg.get("b_is_playin"):
+                            p_id = f"mock_p_{reg_num}_{slot_num}"
+                            mock_games.append({
+                                "id": p_id,
+                                "region": region_name,
+                                "round": "Survival_16",
+                                "game_slot": slot_num,
+                                "team_a_id": next(s.team_id for s in seeds_list if s.overall_rank == cfg['p_a']),
+                                "team_b_id": next(s.team_id for s in seeds_list if s.overall_rank == cfg['p_b']),
+                                "seed_a": cfg['seed_b'],
+                                "seed_b": cfg['seed_b'],
+                                "winner_id": final_picks.get(p_id),
+                                "next_game_id": r64_id,
+                            })
+                            team_b = final_picks.get(p_id, "TBD")
+                        else:
+                            team_b = next(s.team_id for s in seeds_list if s.overall_rank == cfg['b'])
+
+                        mock_games.append({
+                            "id": r64_id,
+                            "region": region_name,
+                            "round": "Round_64",
+                            "game_slot": slot_num,
+                            "team_a_id": team_a,
+                            "team_b_id": team_b,
+                            "seed_a": cfg['seed_a'],
+                            "seed_b": cfg['seed_b'],
+                            "winner_id": final_picks.get(r64_id),
+                            "next_game_id": r32_id,
+                        })
+
+        return mock_games

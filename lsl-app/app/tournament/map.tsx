@@ -8,11 +8,19 @@ import { API_BASE_URL } from '@/lib/api';
 import { getToken } from '@/lib/auth-storage';
 import TournamentMatchup from '@/components/TournamentMatchup';
 import ScoutingReport from '@/components/ScoutingReport';
+import TeamLogo from '@/components/TeamLogo';
 import { getGameCoordinates, GAME_HEIGHT, CENTER_X, CENTER_Y } from '@/lib/bracketLayout';
+import { getTeamBranding } from '@/lib/teamBranding';
+import { useFocusEffect } from 'expo-router';
 
 const MAP_SIZE = 5000;
 
-export default function TournamentMap({ isMock = false }: { isMock?: boolean }) {
+type TournamentMapProps = {
+    isMock?: boolean;
+    overrideBracketData?: any[]; // personal sim results, optional
+};
+
+export default function TournamentMap({ isMock = false, overrideBracketData }: TournamentMapProps) {
     const colorScheme = useColorScheme() ?? 'light';
     const theme = AppColors[colorScheme];
     const [loading, setLoading] = useState(true);
@@ -30,176 +38,187 @@ export default function TournamentMap({ isMock = false }: { isMock?: boolean }) 
     const offset = useSharedValue({ x: -1000, y: -1000 });
     const start = useSharedValue({ x: -1000, y: -1000 });
 
+    // --- Champion Computation (Shared Across Modes) ---
+    const champGame = bracketGames.find((g: any) => g.round === "Championship");
+    let champTeamId: string | null = null;
+
+    if (champGame) {
+        if (isMock) {
+            // Bracketology: AI simulation stored winner_id on the Championship game
+            champTeamId = champGame.winner_id || null;
+        } else {
+            // Challenge / Live: use the user's pick for the Champ if it exists; fallback to official winner_id
+            champTeamId = picks[champGame.id] || champGame.winner_id || null;
+        }
+    }
+
+    const champName = champTeamId ? (teamNames[champTeamId] || champTeamId) : null;
+    const champSeed = champTeamId ? (teamSeeds[champTeamId] || 0) : 0;
+
+    let champLine: string | null = null;
+    if (champTeamId && champName) {
+        const seedPart = champSeed > 0 ? `${champSeed}) ` : "";
+        if (isMock) {
+            champLine = `AI PROJECTED CHAMPION: ${seedPart}${champName}`;
+        } else {
+            champLine = `YOUR CHAMPION: ${seedPart}${champName}`;
+        }
+    } else {
+        if (isMock) {
+            champLine = "AI PROJECTED CHAMPION: TBD";
+        } else {
+            champLine = "YOUR CHAMPION: TBD";
+        }
+    }
+
+    const champBranding = champTeamId ? getTeamBranding(champTeamId) : null;
+    const champAccent = champBranding?.primary ?? theme.border;
+    const champAccentSecondary = champBranding?.secondary ?? theme.border;
+
     const panGesture = Gesture.Pan().onUpdate((e) => {
         const nextX = e.translationX + start.value.x;
         const nextY = e.translationY + start.value.y;
-        offset.value = { x: Math.min(-320, Math.max(nextX, -2550)), y: Math.min(-100, Math.max(nextY, -1075)) };
+        offset.value = { x: Math.min(-320, Math.max(nextX, -2550)), y: Math.min(-85, Math.max(nextY, -1075)) };
     }).onEnd(() => {
         start.value = { x: offset.value.x, y: offset.value.y };
     });
 
     const animatedStyle = useAnimatedStyle(() => ({ transform: [{ translateX: offset.value.x }, { translateY: offset.value.y }] }));
 
-    useEffect(() => {
-        async function loadData() {
-            try {
-                const token = await getToken();
-                if (!token) {
-                    setLoading(false);
-                    return;
+    async function loadData() {
+        // Optimistic UI: Only show spinner if the map is currently empty.
+        // This prevents the "white flash" when switching tabs.
+        if (bracketGames.length === 0) setLoading(true);
+
+        try {
+            const token = await getToken();
+            if (!token) { setLoading(false); return; }
+            const cb = Date.now();
+
+            // 1. Parallel Launch: Trigger all 4 major data fetches simultaneously
+            const bracketEndpoint = isMock ? 'mock-bracket' : 'bracket';
+            const [bracketsRes, mainDataRes, seedsRes, namesRes] = await Promise.all([
+                fetch(`${API_BASE_URL}/api/tournament/brackets?season=2036&cb=${cb}`, { headers: { Authorization: `Bearer ${token}` } }),
+                fetch(`${API_BASE_URL}/api/tournament/${bracketEndpoint}?season=2036&cb=${cb}`, { headers: { Authorization: `Bearer ${token}` } }),
+                fetch(`${API_BASE_URL}/api/tournament/seeds?season=2036&cb=${cb}`, { headers: { Authorization: `Bearer ${token}` } }),
+                fetch(`${API_BASE_URL}/api/tournament/team-names?cb=${cb}`, { headers: { Authorization: `Bearer ${token}` } })
+            ]);
+
+            // Parse all JSON in parallel
+            const [brackets, apiBracketData, seedListData, namesData] = await Promise.all([
+                bracketsRes.json(), mainDataRes.json(), seedsRes.json(), namesRes.json()
+            ]);
+
+            // Use override data if provided (personal sim), otherwise use API data
+            const bracketData = (isMock && overrideBracketData && overrideBracketData.length > 0)
+                ? overrideBracketData
+                : apiBracketData;
+
+            // 2. Process Team Names and Stats immediately
+            setTeamNames(namesData);
+            const statsMap: Record<string, any> = {};
+            (seedListData || []).forEach((row: any) => {
+                statsMap[row.team_id] = {
+                    ppg: row.ppg,
+                    rpg: row.rpg,
+                    apg: row.apg,
+                    fg_pct: row.fg_pct,
+                    three_pct: row.three_pct,
+                    oppg: row.oppg,
+                    topg: row.topg,
+                    fpg: row.fpg,
+                    record: row.games_played > 0 ? `~${row.games_played} gp` : "—",
+                };
+            });
+            setTeamStats(statsMap);
+
+            const seedMap: Record<string, number> = {};
+            bracketData.forEach((g: any) => {
+                if (g.round === "Round_64" || g.round === "Survival_16") {
+                    if (g.team_a_id !== "TBD") seedMap[g.team_a_id] = g.seed_a;
+                    if (g.team_b_id !== "TBD") seedMap[g.team_b_id] = g.seed_b;
                 }
+            });
+            setTeamSeeds(seedMap);
 
-                // 1) Get or create a UserBracket for this user/season
-                let activeBracketId: string | null = null;
-                try {
-                    const bracketsRes = await fetch(`${API_BASE_URL}/api/tournament/brackets?season=2036`, {
-                        headers: { Authorization: `Bearer ${token}` },
-                    });
-                    if (bracketsRes.ok) {
-                        const brackets = await bracketsRes.json();
-                        if (Array.isArray(brackets) && brackets.length > 0) {
-                            const unlocked = brackets.filter((b: any) => !b.is_locked);
-                            const chosen = unlocked[0] || brackets[0];
-                            activeBracketId = chosen.id;
-                        }
-                    }
+            // 3. Setup Region Order
+            const foundRegions = [...new Set(bracketData.map((g: any) => g.region))];
+            const finalRegions = ["West", "Midwest", "East", "South"].filter(r => foundRegions.includes(r));
+            setRegionOrder(finalRegions);
 
-                    if (!activeBracketId) {
-                        const createRes = await fetch(`${API_BASE_URL}/api/tournament/brackets`, {
-                            method: 'POST',
-                            headers: {
-                                Authorization: `Bearer ${token}`,
-                                'Content-Type': 'application/json',
-                            },
-                            body: JSON.stringify({ name: 'My 2036 Bracket', season: 2036 }),
-                        });
-                        if (createRes.ok) {
-                            const created = await createRes.json();
-                            activeBracketId = created.id;
-                        }
-                    }
-                } catch (e) {
-                    console.log('Error initializing bracket', e);
-                }
-                setBracketId(activeBracketId);
-
-                // 2) Fetch bracket structure, seeds, and names
-                const bracketEndpoint = isMock ? 'mock-bracket' : 'bracket';
-                const [bracketRes, seedsRes, namesRes] = await Promise.all([
-                    fetch(`${API_BASE_URL}/api/tournament/${bracketEndpoint}?season=2036&cb=${Date.now()}`, { headers: { Authorization: `Bearer ${token}` } }),
-                    fetch(`${API_BASE_URL}/api/tournament/seeds?season=2036`, { headers: { Authorization: `Bearer ${token}` } }),
-                    fetch(`${API_BASE_URL}/api/tournament/team-names`, { headers: { Authorization: `Bearer ${token}` } })
-                ]);
-
-                const bracketData = await bracketRes.json();
-                const seedListData = await seedsRes.json();
-                const namesData = await namesRes.json();
-
-                setTeamNames(namesData);
-
-                const statsMap: Record<string, any> = {};
-                (seedListData || []).forEach((row: any) => {
-                    statsMap[row.team_id] = {
-                        ppg: row.ppg,
-                        rpg: row.rpg,
-                        apg: row.apg,
-                        fg_pct: row.fg_pct,
-                        three_pct: row.three_pct,
-                        oppg: row.oppg,
-                        topg: row.topg,
-                        fpg: row.fpg,
-                        record: row.games_played > 0 ? `~${row.games_played} gp` : "—",
-                    };
-                });
-                setTeamStats(statsMap);
-
-                const seedMap: Record<string, number> = {};
-                bracketData.forEach((g: any) => {
-                    if (g.round === "Round_64" || g.round === "Survival_16") {
-                        if (g.team_a_id !== "TBD") seedMap[g.team_a_id] = g.seed_a;
-                        if (g.team_b_id !== "TBD") seedMap[g.team_b_id] = g.seed_b;
-                    }
-                });
-                setTeamSeeds(seedMap);
-
-                // Force order for layout consistency: West, Midwest, East, South
-                const foundRegions = [...new Set(bracketData.map((g: any) => g.region))];
-                const finalRegions = ["West", "Midwest", "East", "South"].filter(r => foundRegions.includes(r));
-                setRegionOrder(finalRegions);
-
-                // Start from raw bracketData and then apply any saved picks
-                let updatedGames: any[] = [...bracketData];
-                let initialPicks: { [k: string]: string } = {};
-
-                // 3) Hydrate picks
-                let finalPicks: { [k: string]: string } = {};
-
-                if (isMock) {
-                    // For Mock mode, extract winners directly from the simulation data
-                    bracketData.forEach((g: any) => {
-                        if (g.winner_id) finalPicks[g.id] = g.winner_id;
-                    });
-                } else if (activeBracketId) {
-                    try {
-                        const picksRes = await fetch(
-                            `${API_BASE_URL}/api/tournament/brackets/${activeBracketId}/picks`,
-                            { headers: { Authorization: `Bearer ${token}` } }
-                        );
-                        if (picksRes.ok) {
-                            const picksData = await picksRes.json();
-                            if (picksData && picksData.picks) {
-                                finalPicks = picksData.picks as { [k: string]: string };
-
-                                // Replay each pick into the bracket tree to fill downstream slots
-                                Object.entries(finalPicks).forEach(([gameId, winnerId]) => {
-                                    if (!winnerId || winnerId === "TBD") return;
-                                    const gameIdx = updatedGames.findIndex((g: any) => g.id === gameId);
-                                    if (gameIdx === -1) return;
-                                    const currentGame = updatedGames[gameIdx];
-
-                                    if (currentGame && currentGame.next_game_id) {
-                                        const nextIdx = updatedGames.findIndex((g: any) => g.id === currentGame.next_game_id);
-                                        if (nextIdx === -1) return;
-                                        const nextGame = { ...updatedGames[nextIdx] };
-
-                                        const regionIdx = finalRegions.indexOf(currentGame.region);
-                                        const isTopRegion = regionIdx === 0 || regionIdx === 1;
-
-                                        let isTop = false;
-                                        if (currentGame.round === "Survival_16") isTop = false;
-                                        else if (currentGame.round === "Elite_8") isTop = isTopRegion;
-                                        else if (currentGame.round === "National Semifinals") isTop = currentGame.game_slot === 1;
-                                        else isTop = currentGame.game_slot % 2 !== 0;
-
-                                        if (isTop) nextGame.team_a_id = winnerId;
-                                        else nextGame.team_b_id = winnerId;
-                                        updatedGames[nextIdx] = nextGame;
-                                    }
-                                });
-                            }
-                        }
-                    } catch (e) {
-                        console.log('Error loading bracket picks', e);
-                    }
-                }
-
-                // Final state updates
-                setBracketGames(updatedGames);
-                setPicks(finalPicks);
-            } catch (e) {
-                console.error(e);
-            } finally {
-                setLoading(false);
+            // 4. Handle Active Bracket ID (if not mock)
+            let currentBracketId = bracketId;
+            if (!isMock && Array.isArray(brackets) && brackets.length > 0) {
+                const unlocked = brackets.filter((b: any) => !b.is_locked);
+                currentBracketId = unlocked[0]?.id || brackets[0].id;
+                setBracketId(currentBracketId);
             }
+
+            // 5. Final Data Transformation (Picks & Propagation)
+            let updatedGames: any[] = [...bracketData];
+            let finalPicks: { [k: string]: string } = {};
+
+            if (isMock && overrideBracketData && overrideBracketData.length > 0) {
+                // Personal Sim Mode: Use winners from the override data
+                bracketData.forEach((g: any) => {
+                    if (g.winner_id) finalPicks[g.id] = g.winner_id;
+                });
+            } else if (!isMock && currentBracketId) {
+                // Real Mode: Fetch user picks...
+                const pRes = await fetch(`${API_BASE_URL}/api/tournament/brackets/${currentBracketId}/picks?cb=${cb}`, { headers: { Authorization: `Bearer ${token}` } });
+                // (rest stays the same)
+                if (pRes.ok) {
+                    const pData = await pRes.json();
+                    if (pData?.picks) {
+                        finalPicks = pData.picks;
+                        // Propagation loop
+                        Object.entries(finalPicks).forEach(([gameId, winnerId]) => {
+                            if (!winnerId || winnerId === "TBD") return;
+                            const gIdx = updatedGames.findIndex((g: any) => g.id === gameId);
+                            if (gIdx === -1) return;
+                            const cur = updatedGames[gIdx];
+                            if (cur?.next_game_id) {
+                                const nIdx = updatedGames.findIndex((g: any) => g.id === cur.next_game_id);
+                                if (nIdx === -1) return;
+                                const nxt = { ...updatedGames[nIdx] };
+                                const regIdx = finalRegions.indexOf(cur.region);
+                                const isTop = (cur.round === "Survival_16") ? false : (cur.round === "Elite_8" ? (regIdx < 2) : (cur.round === "National Semifinals" ? cur.game_slot === 1 : cur.game_slot % 2 !== 0));
+                                if (isTop) nxt.team_a_id = winnerId; else nxt.team_b_id = winnerId;
+                                updatedGames[nIdx] = nxt;
+                            }
+                        });
+                    }
+                }
+            }
+
+            // 6. Bulk UI Update
+            setBracketGames(updatedGames);
+            setPicks(finalPicks);
+
+        } catch (e) {
+            console.error("LCAA Load Error:", e);
+        } finally {
+            setLoading(false);
         }
+    }
+
+    useEffect(() => {
         loadData();
     }, [isMock]); // ADD isMock to the dependency array
+
+    useFocusEffect(
+        React.useCallback(() => {
+            // Re-run the data loading whenever the user navigates to this tab
+            loadData();
+        }, [isMock])
+    );
 
     const getPickCount = (roundName: string) => {
         return bracketGames.filter(g => g.round === roundName && picks[g.id]).length;
     };
 
     const handlePick = (gameId: string, teamId: string) => {
+        if (isMock) return; // <--- ADD THIS LINE: Completely disables manual picking in mock mode
         if (teamId === "TBD") return;
         const isDeselecting = picks[gameId] === teamId;
         const newWinnerId = isDeselecting ? "" : teamId;
@@ -350,18 +369,133 @@ export default function TournamentMap({ isMock = false }: { isMock?: boolean }) 
 
                         {bracketGames.map((game) => {
                             const coords = getGameCoordinates(game.region, game.round, game.game_slot, regionOrder);
+                            const isChampGame = champGame && game.id === champGame.id && champTeamId;
+
                             return (
-                                <View key={game.id} style={{ position: 'absolute', left: coords.x, top: coords.y }}>
-                                    <TournamentMatchup
-                                        teamA={{ id: game.team_a_id, name: teamNames[game.team_a_id] || game.team_a_id, seed: teamSeeds[game.team_a_id] || 0 }}
-                                        teamB={{ id: game.team_b_id, name: teamNames[game.team_b_id] || game.team_b_id, seed: teamSeeds[game.team_b_id] || 0 }}
-                                        status="PREDICTION"
-                                        pickedWinnerId={picks[game.id]}
-                                        onPressTeamA={() => handlePick(game.id, game.team_a_id)}
-                                        onPressTeamB={() => handlePick(game.id, game.team_b_id)}
-                                        onLongPress={() => openScoutingReport(game)} // ADD
-                                    />
-                                </View>
+                                <React.Fragment key={game.id}>
+                                    <View style={{ position: 'absolute', left: coords.x, top: coords.y }}>
+                                        <TournamentMatchup
+                                            teamA={{ id: game.team_a_id, name: teamNames[game.team_a_id] || game.team_a_id, seed: teamSeeds[game.team_a_id] || 0 }}
+                                            teamB={{ id: game.team_b_id, name: teamNames[game.team_b_id] || game.team_b_id, seed: teamSeeds[game.team_b_id] || 0 }}
+                                            status="PREDICTION"
+                                            pickedWinnerId={picks[game.id]}
+                                            onPressTeamA={() => handlePick(game.id, game.team_a_id)}
+                                            onPressTeamB={() => handlePick(game.id, game.team_b_id)}
+                                            onLongPress={!isMock ? () => openScoutingReport(game) : undefined}
+                                            showPickIndicators={!isMock}
+                                        />
+                                    </View>
+
+                                    {isChampGame && (
+                                        (() => {
+                                            const PANEL_WIDTH = 260;
+                                            const panelCenterX = coords.x + 110; // 110 = half of 220 (matchup width)
+                                            const panelLeft = panelCenterX - PANEL_WIDTH / 2;
+                                            const panelTop = coords.y + GAME_HEIGHT + 40; // Leave solid space under game
+
+                                            return (
+                                                <View
+                                                    style={{
+                                                        position: 'absolute',
+                                                        left: panelLeft,
+                                                        top: panelTop,
+                                                        width: PANEL_WIDTH,
+                                                    }}
+                                                >
+                                                    <View
+                                                        style={{
+                                                            borderRadius: 16,
+                                                            overflow: 'hidden',
+                                                            backgroundColor: theme.card,
+                                                            borderWidth: 2,
+                                                            borderColor: champAccentSecondary, // use secondary as border
+                                                            shadowColor: '#000',
+                                                            shadowOffset: { width: 0, height: 3 },
+                                                            shadowOpacity: 0.2,
+                                                            shadowRadius: 6,
+                                                            elevation: 5,
+                                                        }}
+                                                    >
+                                                        {/* Top stripe (like the Final Four header band) */}
+                                                        <View
+                                                            style={{
+                                                                paddingVertical: 6,
+                                                                paddingHorizontal: 10,
+                                                                backgroundColor: champAccent, // primary as stripe
+                                                                alignItems: 'center',
+                                                            }}
+                                                        >
+                                                            <Text
+                                                                style={{
+                                                                    color: '#FFFFFF',
+                                                                    fontWeight: '900',
+                                                                    fontSize: 10,
+                                                                    letterSpacing: 1,
+                                                                }}
+                                                            >
+                                                                {isMock ? 'PROJECTED NATIONAL CHAMPION' : 'NATIONAL CHAMPION'}
+                                                            </Text>
+                                                        </View>
+
+                                                        {/* Middle: logo + seed + name */}
+                                                        <View
+                                                            style={{
+                                                                paddingVertical: 12,
+                                                                paddingHorizontal: 12,
+                                                                alignItems: 'center',
+                                                            }}
+                                                        >
+                                                            <TeamLogo teamId={champTeamId!} size={40} />
+                                                            <Text
+                                                                style={{
+                                                                    color: theme.text,
+                                                                    fontWeight: '900',
+                                                                    fontSize: 16,
+                                                                    marginTop: 8,
+                                                                }}
+                                                                numberOfLines={1}
+                                                            >
+                                                                {champName}
+                                                            </Text>
+                                                            {champSeed > 0 && (
+                                                                <Text
+                                                                    style={{
+                                                                        color: theme.mutedText,
+                                                                        fontSize: 11,
+                                                                        marginTop: 2,
+                                                                    }}
+                                                                    numberOfLines={1}
+                                                                >
+                                                                    {champSeed}‑SEED
+                                                                </Text>
+                                                            )}
+                                                        </View>
+
+                                                        {/* Bottom label (mode aware) */}
+                                                        <View
+                                                            style={{
+                                                                paddingVertical: 6,
+                                                                alignItems: 'center',
+                                                                borderTopWidth: 1,
+                                                                borderTopColor: champAccentSecondary,
+                                                            }}
+                                                        >
+                                                            <Text
+                                                                style={{
+                                                                    color: theme.mutedText,
+                                                                    fontSize: 10,
+                                                                    fontWeight: '700',
+                                                                }}
+                                                            >
+                                                                {isMock ? 'Based on current seeds & power ratings' : 'From your locked bracket'}
+                                                            </Text>
+                                                        </View>
+                                                    </View>
+                                                </View>
+                                            );
+                                        })()
+                                    )}
+                                </React.Fragment>
                             );
                         })}
                     </Animated.View>
@@ -372,6 +506,7 @@ export default function TournamentMap({ isMock = false }: { isMock?: boolean }) 
                         <Text style={{ color: theme.text, fontWeight: '800', fontSize: 13 }}>
                             {isMock ? 'LCAA BRACKETOLOGY • 2036' : 'OFFICIAL LCAA BRACKET • 2036'}
                         </Text>
+
                         {isMock && (
                             <Text style={{ color: '#FF9500', fontWeight: '900', fontSize: 9, letterSpacing: 1 }}>
                                 PRESEASON • V1.0
@@ -381,17 +516,25 @@ export default function TournamentMap({ isMock = false }: { isMock?: boolean }) 
                 </View>
 
                 <View style={[styles.bottomBar, { backgroundColor: theme.card }]}>
-                    <Text style={{ color: theme.text, fontSize: 10, fontWeight: '600', flex: 1 }}>
-                        Picks: S16 {getPickCount("Survival_16")}/16 • R64 {getPickCount("Round_64")}/32 • R32 {getPickCount("Round_32")}/16 • S16 {getPickCount("Sweet_16")}/8 • E8 {getPickCount("Elite_8")}/4 • FF {getPickCount("National Semifinals")}/2 • Champ {getPickCount("Championship")}/1
-                    </Text>
-                    <Pressable
-                        onPress={handleLockBracket}
-                        style={{ paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8, backgroundColor: locking ? theme.border : '#34C759', marginLeft: 8 }}
-                    >
-                        <Text style={{ color: '#fff', fontSize: 10, fontWeight: '700' }}>
-                            {locking ? 'Locking…' : 'Lock Bracket'}
+                    {isMock ? (
+                        <Text style={{ color: theme.text, fontSize: 10, fontWeight: '600', flex: 1 }}>
+                            LCAA Bracketology Projection • AI Sim based on seeds & power. Re-run from Profile → 🤖 Run LCAA AI Simulation.
                         </Text>
-                    </Pressable>
+                    ) : (
+                        <>
+                            <Text style={{ color: theme.text, fontSize: 10, fontWeight: '600', flex: 1 }}>
+                                Picks: S16 {getPickCount("Survival_16")}/16 • R64 {getPickCount("Round_64")}/32 • R32 {getPickCount("Round_32")}/16 • S16 {getPickCount("Sweet_16")}/8 • E8 {getPickCount("Elite_8")}/4 • FF {getPickCount("National Semifinals")}/2 • Champ {getPickCount("Championship")}/1
+                            </Text>
+                            <Pressable
+                                onPress={handleLockBracket}
+                                style={{ paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8, backgroundColor: locking ? theme.border : '#34C759', marginLeft: 8 }}
+                            >
+                                <Text style={{ color: '#fff', fontSize: 10, fontWeight: '700' }}>
+                                    {locking ? 'Locking…' : 'Lock Bracket'}
+                                </Text>
+                            </Pressable>
+                        </>
+                    )}
                 </View>
 
                 {selectedMatchup && <ScoutingReport visible={modalVisible} onClose={() => setModalVisible(false)} teamA={{ ...selectedMatchup.teamA, name: teamNames[selectedMatchup.teamA.id] || selectedMatchup.teamA.id }} teamB={{ ...selectedMatchup.teamB, name: teamNames[selectedMatchup.teamB.id] || selectedMatchup.teamB.id }} />}
@@ -409,7 +552,7 @@ const styles = StyleSheet.create({
         top: 0,
         left: 0,
         right: 0,
-        height: 48, // Increased from 40 to 48
+        height: 72, // Increased from 40 to 48
         alignItems: 'center',
         justifyContent: 'center',
         borderBottomWidth: 1,
