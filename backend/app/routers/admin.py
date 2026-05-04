@@ -199,114 +199,112 @@ async def run_bracket_sim(season: int = 2036, current_user: User = Depends(get_c
         raise HTTPException(status_code=403, detail="Admin only.")
 
     async with AsyncSessionLocal() as session:
-        # 1. Fetch current Seeds
         stmt = select(TournamentSeedList).where(TournamentSeedList.season == season)
-        seeds_res = await session.exec(stmt)
-        seeds = seeds_res.all()
-        if not seeds: raise HTTPException(status_code=400, detail="No seeds found. Sync Bracketology first.")
+        seeds = (await session.exec(stmt)).all()
+        if not seeds: raise HTTPException(status_code=400, detail="No seeds.")
 
         team_power = {s.team_id: s.power_value for s in seeds}
         team_seed_val = {s.team_id: s.seed for s in seeds}
+        # Identifying tracked teams (those with a power value > 0)
+        tracked_teams = {s.team_id for s in seeds if s.power_value > 0}
 
         from app.bracket_constants import REGION_MAP
         import random
 
-        # --- THE LSL LOGIC ENGINE ---
         def get_sim_winner(id_a, id_b, round_name):
             if id_a == "TBD": return id_b
             if id_b == "TBD": return id_a
 
             s_a, s_b = team_seed_val.get(id_a, 16), team_seed_val.get(id_b, 16)
             p_a, p_b = team_power.get(id_a, 0), team_power.get(id_b, 0)
+            
+            # 1. Identify Fav/Dog
+            if s_a < s_b: fav_id, dog_id, fav_s, dog_s, fav_p, dog_p = id_a, id_b, s_a, s_b, p_a, p_b
+            elif s_b < s_a: fav_id, dog_id, fav_s, dog_s, fav_p, dog_p = id_b, id_a, s_b, s_a, p_b, p_a
+            else: # Same seeds
+                if p_a >= p_b: fav_id, dog_id, fav_s, dog_s, fav_p, dog_p = id_a, id_b, s_a, s_b, p_a, p_b
+                else: fav_id, dog_id, fav_s, dog_s, fav_p, dog_p = id_b, id_a, s_b, s_a, p_b, p_a
 
-            # Identify Favorite vs Underdog by seed
-            if s_a <= s_b:
-                fav_id, dog_id = id_a, id_b
-                fav_s, dog_s = s_a, s_b
-                fav_p, dog_p = p_a, p_b
+            # 2. Base Prob (Steeper Curve)
+            prob = 0.50 + ((dog_s - fav_s) * 0.05) # Increased from 0.035
+
+            # 3. AUTHORITY BOOST (Tracked vs Nontracked)
+            if fav_id in tracked_teams and dog_id not in tracked_teams:
+                prob += 0.15 # Massive advantage for tracked programs
+            
+            # 4. EVANMIYA TREND ANCHORS
+            if fav_s == 1 and dog_s == 16: prob = 0.99 # Unkillable
+            if fav_s == 2 and dog_s == 15: prob = 0.96 
+            if fav_s == 5 and dog_s == 12: prob = 0.64 
+            if fav_s == 6 and dog_s == 11: prob = 0.62 
+            if fav_s == 8 and dog_s == 9: prob = 0.52
+
+            # 5. NATIONAL CHAMPION CURSE (Xavier)
+            if round_name in ["Sweet_16", "Elite_8", "National Semifinals"]:
+                if fav_id == "XAVIER": prob -= 0.20 # The LCAA historical penalty
+                if dog_id == "XAVIER": prob += 0.20
+
+            # 6. The Strict 10% Rule (Modified for 1-seeds)
+            if fav_s > 1:
+                prob = max(0.10, min(0.95, prob))
             else:
-                fav_id, dog_id = id_b, id_a
-                fav_s, dog_s = s_b, s_a
-                fav_p, dog_p = p_b, p_a
-
-            # 1. Base Prob (Seed Gap Formula)
-            prob = 0.50 + ((dog_s - fav_s) * 0.035)
-
-            # 2. Hardcoded Trend Overwrites
-            if fav_s == 1 and dog_s == 16: prob = 0.98
-            if fav_s == 5 and dog_s == 12: prob = 0.64
-            if fav_s == 6 and dog_s == 11: prob = 0.62
-            if fav_s == 8 and dog_s == 9: prob = 0.51
-
-            # 3. Analytics Edge
-            if fav_p > 0 and dog_p > 0:
-                prob += ((fav_p - dog_p) * 0.02)
-            elif fav_p > 0: prob += 0.05
-
-            # 4. LCAA Legacy (Xavier Curse)
-            if round_name in ["Sweet_16", "Elite_8"]:
-                if fav_id == "XAVIER": prob -= 0.15
-                if dog_id == "XAVIER": prob += 0.15
-
-            # 5. The Strict 10% Rule
-            prob = max(0.10, min(0.90, prob))
+                prob = max(0.01, min(0.99, prob)) # 1-seeds can be 99% safe
 
             return fav_id if random.random() < prob else dog_id
 
-        # --- EXECUTION ---
-        results = {}
-        bracket_tree = {} # Local cache to track advancement
-        regions = ["West", "Midwest", "East", "South"]
-        stmt_seeds = select(TournamentSeedList).where(TournamentSeedList.season == season).order_by(TournamentSeedList.overall_rank)
-        all_seeds = (await session.exec(stmt_seeds)).all()
-        rank_to_id = {s.overall_rank: s.team_id for s in all_seeds}
-
-        # ROUND 1 (Survival & R64)
-        for idx, region_name in enumerate(regions):
-            reg_num = idx + 1
-            for slot_num in range(1, 9):
-                cfg = REGION_MAP[reg_num][slot_num]
-                team_b_r64 = rank_to_id.get(cfg.get('b'), "TBD")
-
-                if cfg.get("b_is_playin"):
-                    p_id = f"mock_p_{reg_num}_{slot_num}"
-                    winner = get_sim_winner(rank_to_id.get(cfg['p_a']), rank_to_id.get(cfg['p_b']), "Survival_16")
-                    results[p_id] = winner
-                    team_b_r64 = winner
-
-                r64_id = f"mock_r64_{reg_num}_{slot_num}"
-                winner_r64 = get_sim_winner(rank_to_id.get(cfg['a']), team_b_r64, "Round_64")
-                results[r64_id] = winner_r64
-                bracket_tree[r64_id] = winner_r64
-
-        # PROPAGATE R32 -> E8
-        for curr, nxt, slots in [("r64", "r32", 4), ("r32", "s16", 2), ("s16", "e8", 1)]:
-            round_map = {"r32": "Round_32", "s16": "Sweet_16", "e8": "Elite_8"}
-            for reg_num in range(1, 5):
-                region_name = regions[reg_num-1]
-                for s in range(1, slots + 1):
-                    # Find winners of previous two games
-                    t_a = bracket_tree[f"mock_{curr}_{reg_num}_{s*2-1}"]
-                    t_b = bracket_tree[f"mock_{curr}_{reg_num}_{s*2}"]
-                    winner = get_sim_winner(t_a, t_b, round_map[nxt])
+        # --- EXECUTION LOOP (With re-roll for realistic Final Four) ---
+        final_results = {}
+        for attempt in range(10): # Try up to 10 times to get a "Sensible" LSL bracket
+            results = {}
+            bracket_tree = {}
+            regions = ["West", "Midwest", "East", "South"]
+            
+            # R1 (Survival & R64)
+            for idx, region_name in enumerate(regions):
+                reg_num = idx + 1
+                for slot_num in range(1, 9):
+                    cfg = REGION_MAP[reg_num][slot_num]
+                    # Survival
+                    team_b = seeds[cfg.get('b')-1].team_id if cfg.get('b') else "TBD"
+                    if cfg.get("b_is_playin"):
+                        p_winner = get_sim_winner(seeds[cfg['p_a']-1].team_id, seeds[cfg['p_b']-1].team_id, "Survival_16")
+                        results[f"mock_p_{reg_num}_{slot_num}"] = p_winner
+                        team_b = p_winner
                     
-                    n_id = f"mock_{nxt}_{reg_num}_{s}" if nxt != "e8" else f"mock_e8_{reg_num}"
-                    results[n_id] = winner
-                    bracket_tree[n_id] = winner
+                    # R64
+                    r64_winner = get_sim_winner(seeds[cfg['a']-1].team_id, team_b, "Round_64")
+                    results[f"mock_r64_{reg_num}_{slot_num}"] = r64_winner
+                    bracket_tree[f"mock_r64_{reg_num}_{slot_num}"] = r64_winner
 
-        # FINAL FOUR (West vs South | Midwest vs East)
-        ff1_winner = get_sim_winner(bracket_tree["mock_e8_1"], bracket_tree["mock_e8_4"], "National Semifinals")
-        results["mock_ff_1"] = ff1_winner
-        ff2_winner = get_sim_winner(bracket_tree["mock_e8_2"], bracket_tree["mock_e8_3"], "National Semifinals")
-        results["mock_ff_2"] = ff2_winner
-        
-        # CHAMPIONSHIP
-        results["mock_champ"] = get_sim_winner(ff1_winner, ff2_winner, "Championship")
+            # Propagate R32 -> E8
+            for curr, nxt, slots in [("r64", "r32", 4), ("r32", "s16", 2), ("s16", "e8", 1)]:
+                for reg_num in range(1, 5):
+                    for s in range(1, slots + 1):
+                        t_a, t_b = bracket_tree[f"mock_{curr}_{reg_num}_{s*2-1}"], bracket_tree[f"mock_{curr}_{reg_num}_{s*2}"]
+                        winner = get_sim_winner(t_a, t_b, nxt)
+                        n_id = f"mock_{nxt}_{reg_num}_{s}" if nxt != "e8" else f"mock_e8_{reg_num}"
+                        results[n_id] = winner
+                        bracket_tree[n_id] = winner
+
+            # Final Four
+            ff1 = get_sim_winner(bracket_tree["mock_e8_1"], bracket_tree["mock_e8_4"], "National Semifinals")
+            ff2 = get_sim_winner(bracket_tree["mock_e8_2"], bracket_tree["mock_e8_3"], "National Semifinals")
+            results["mock_ff_1"], results["mock_ff_2"] = ff1, ff2
+            results["mock_champ"] = get_sim_winner(ff1, ff2, "Championship")
+
+            # EVANMIYA CHECK: Are there roughly 2 one-seeds in the FF?
+            ff_teams = [ff1, ff2, bracket_tree["mock_e8_1"], bracket_tree["mock_e8_4"], bracket_tree["mock_e8_2"], bracket_tree["mock_e8_3"]]
+            one_seeds_in_ff = len([t for r, t in results.items() if r.startswith("mock_ff") and team_seed_val.get(t) == 1])
+            
+            if one_seeds_in_ff >= 1: # Acceptance criteria for a "Good Story"
+                final_results = results
+                break
+            final_results = results
 
         # SAVE TO DB
         await session.execute(delete(MockBracketResult).where(MockBracketResult.season == season))
-        for gid, win_id in results.items():
+        for gid, win_id in final_results.items():
             session.add(MockBracketResult(season=season, game_id=gid, winner_id=win_id))
-        
         await session.commit()
-    return {"status": "success", "message": "LCAA Simulation Published."}
+
+    return {"status": "success", "message": "AI Simulation Published with EvanMiya constraints."}

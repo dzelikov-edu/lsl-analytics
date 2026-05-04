@@ -131,8 +131,15 @@ export default function TournamentMap({ isMock = false }: { isMock?: boolean }) 
                 let updatedGames: any[] = [...bracketData];
                 let initialPicks: { [k: string]: string } = {};
 
-                // 3) Hydrate picks for this bracket (only if NOT in mock mode)
-                if (activeBracketId && !isMock) {
+                // 3) Hydrate picks
+                let finalPicks: { [k: string]: string } = {};
+
+                if (isMock) {
+                    // For Mock mode, extract winners directly from the simulation data
+                    bracketData.forEach((g: any) => {
+                        if (g.winner_id) finalPicks[g.id] = g.winner_id;
+                    });
+                } else if (activeBracketId) {
                     try {
                         const picksRes = await fetch(
                             `${API_BASE_URL}/api/tournament/brackets/${activeBracketId}/picks`,
@@ -141,45 +148,31 @@ export default function TournamentMap({ isMock = false }: { isMock?: boolean }) 
                         if (picksRes.ok) {
                             const picksData = await picksRes.json();
                             if (picksData && picksData.picks) {
-                                initialPicks = picksData.picks as { [k: string]: string };
+                                finalPicks = picksData.picks as { [k: string]: string };
 
                                 // Replay each pick into the bracket tree to fill downstream slots
-                                Object.entries(initialPicks).forEach(([gameId, winnerId]) => {
+                                Object.entries(finalPicks).forEach(([gameId, winnerId]) => {
                                     if (!winnerId || winnerId === "TBD") return;
-
                                     const gameIdx = updatedGames.findIndex((g: any) => g.id === gameId);
                                     if (gameIdx === -1) return;
                                     const currentGame = updatedGames[gameIdx];
 
                                     if (currentGame && currentGame.next_game_id) {
-                                        const nextIdx = updatedGames.findIndex(
-                                            (g: any) => g.id === currentGame.next_game_id
-                                        );
+                                        const nextIdx = updatedGames.findIndex((g: any) => g.id === currentGame.next_game_id);
                                         if (nextIdx === -1) return;
                                         const nextGame = { ...updatedGames[nextIdx] };
 
-                                        // ... inside the if (activeBracketId && !isMock) block ...
-                                        const regionIdx = finalRegions.indexOf(currentGame.region); // Changed from uniqueRegions
+                                        const regionIdx = finalRegions.indexOf(currentGame.region);
                                         const isTopRegion = regionIdx === 0 || regionIdx === 1;
 
                                         let isTop = false;
-                                        if (currentGame.round === "Survival_16") {
-                                            // Survival winners always take the bottom slot of Round of 64
-                                            isTop = false;
-                                        } else if (currentGame.round === "Elite_8") {
-                                            // Top regions feed Team A, bottom regions feed Team B of Semis
-                                            isTop = isTopRegion;
-                                        } else if (currentGame.round === "National Semifinals") {
-                                            // Left Semi feeds Team A, Right Semi feeds Team B of Champ
-                                            isTop = currentGame.game_slot === 1;
-                                        } else {
-                                            // Standard Round of 64, 32, and 16 logic
-                                            isTop = currentGame.game_slot % 2 !== 0;
-                                        }
+                                        if (currentGame.round === "Survival_16") isTop = false;
+                                        else if (currentGame.round === "Elite_8") isTop = isTopRegion;
+                                        else if (currentGame.round === "National Semifinals") isTop = currentGame.game_slot === 1;
+                                        else isTop = currentGame.game_slot % 2 !== 0;
 
                                         if (isTop) nextGame.team_a_id = winnerId;
                                         else nextGame.team_b_id = winnerId;
-
                                         updatedGames[nextIdx] = nextGame;
                                     }
                                 });
@@ -189,13 +182,10 @@ export default function TournamentMap({ isMock = false }: { isMock?: boolean }) 
                         console.log('Error loading bracket picks', e);
                     }
                 }
-                // Save final bracket state plus picks
+
+                // Final state updates
                 setBracketGames(updatedGames);
-                if (!isMock && Object.keys(initialPicks).length > 0) {
-                    setPicks(initialPicks);
-                } else if (isMock) {
-                    setPicks({}); // Clear picks if switching to mock
-                }
+                setPicks(finalPicks);
             } catch (e) {
                 console.error(e);
             } finally {
@@ -203,7 +193,7 @@ export default function TournamentMap({ isMock = false }: { isMock?: boolean }) 
             }
         }
         loadData();
-    }, []);
+    }, [isMock]); // ADD isMock to the dependency array
 
     const getPickCount = (roundName: string) => {
         return bracketGames.filter(g => g.round === roundName && picks[g.id]).length;

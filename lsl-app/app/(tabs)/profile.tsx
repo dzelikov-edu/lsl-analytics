@@ -257,6 +257,21 @@ export default function ProfileScreen() {
         }
     };
 
+    const handleSyncDBSchema = async () => {
+        try {
+            const token = await getToken();
+            const res = await fetch(`${API_BASE_URL}/admin/db/create-state-table`, {
+                method: 'POST',
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            if (res.ok) {
+                Alert.alert("Success", "Database schema synced. New tables are ready.");
+            }
+        } catch (e) {
+            Alert.alert("Error", "Failed to sync DB schema.");
+        }
+    };
+
     const handleRunBracketSim = async () => {
         Alert.alert(
             "Run Tournament Simulation",
@@ -508,6 +523,13 @@ export default function ProfileScreen() {
                                 Generate the bracket from the Official Field Google Sheet.
                             </Text>
                         </View>
+                    </Pressable>
+
+                    <Pressable
+                        style={[styles.logoutButton, { backgroundColor: '#8E8E93', marginTop: 10 }]}
+                        onPress={handleSyncDBSchema}
+                    >
+                        <Text style={styles.buttonText}>🛠️ Sync DB Schema</Text>
                     </Pressable>
 
                     <Pressable
