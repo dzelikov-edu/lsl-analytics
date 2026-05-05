@@ -20,6 +20,8 @@ export default function BracketTab() {
     const [personalSim, setPersonalSim] = useState<any[] | null>(null);
     const [simLoading, setSimLoading] = useState(false);
 
+    const [viewMode, setViewMode] = useState<'BRACKETS' | 'GROUPS'>('BRACKETS');
+
     const loadInitialData = async () => {
         try {
             const token = await getToken();
@@ -41,7 +43,13 @@ export default function BracketTab() {
         }
     };
 
-    useFocusEffect(useCallback(() => { loadInitialData(); }, []));
+    // This will trigger loadInitialData every time you tap the LCAA tab 
+    // OR every time you hit the "← My Brackets" button to return to the list
+    useFocusEffect(
+        useCallback(() => {
+            loadInitialData();
+        }, [])
+    );
 
     const handleCreateBracket = async () => {
         if (brackets.length >= 10) {
@@ -67,6 +75,11 @@ export default function BracketTab() {
         } catch (e) {
             Alert.alert("Error", "Could not create bracket.");
         }
+    };
+
+    const handleCloseMap = () => {
+        setSelectedBracketId(null); // Close the map
+        loadInitialData();          // Refresh the list counts immediately
     };
 
     const handleRenameBracket = (id: string, currentName: string) => {
@@ -150,7 +163,8 @@ export default function BracketTab() {
             <View style={{ flex: 1, backgroundColor: theme.background }}>
                 {/* Header for the Map to get back to the list */}
                 <View style={{ height: 90, backgroundColor: theme.background, justifyContent: 'flex-end', paddingBottom: 10, paddingHorizontal: 20, borderBottomWidth: 1, borderBottomColor: theme.border }}>
-                    <Pressable onPress={() => setSelectedBracketId(null)}>
+                    {/* CHANGE: Use handleCloseMap instead of an inline arrow function */}
+                    <Pressable onPress={handleCloseMap}>
                         <Text style={{ color: '#007AFF', fontWeight: 'bold' }}>← My Brackets</Text>
                     </Pressable>
                 </View>
@@ -163,69 +177,104 @@ export default function BracketTab() {
     return (
         <ScrollView style={{ flex: 1, backgroundColor: theme.background }} contentContainerStyle={{ padding: 20, paddingTop: 60 }}>
             <Text style={{ color: theme.text, fontSize: 32, fontWeight: '800', marginBottom: 5 }}>LCAA Bracket Challenge</Text>
-            <Text style={{ color: theme.mutedText, fontSize: 16, marginBottom: 30 }}>Manage your 2036 Tournament bracket entries.</Text>
 
-            <Text style={{ color: theme.text, fontSize: 18, fontWeight: '700', marginBottom: 15 }}>My Brackets ({brackets.length}/10)</Text>
-
-            {/* Replace the brackets.map block with this */}
-            {brackets.map((b) => (
+            {/* --- MODE TOGGLE (NEW) --- */}
+            <View style={{ flexDirection: 'row', backgroundColor: theme.card, borderRadius: 12, padding: 4, marginVertical: 20, borderWidth: 1, borderColor: theme.border }}>
                 <Pressable
-                    key={b.id}
-                    onPress={() => setSelectedBracketId(b.id)}
-                    onLongPress={() => handleRenameBracket(b.id, b.name)} // Added Renaming
-                    style={{
-                        backgroundColor: theme.card,
-                        padding: 16,
-                        borderRadius: 15,
-                        marginBottom: 12,
-                        borderWidth: 1,
-                        borderColor: theme.border,
-                        flexDirection: 'row',
-                        justifyContent: 'space-between',
-                        alignItems: 'center'
-                    }}
+                    onPress={() => setViewMode('BRACKETS')}
+                    style={{ flex: 1, paddingVertical: 8, borderRadius: 8, backgroundColor: viewMode === 'BRACKETS' ? theme.border : 'transparent', alignItems: 'center' }}
                 >
-                    <View style={{ flex: 1 }}>
-                        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                            <Text style={{ color: theme.text, fontSize: 18, fontWeight: '800' }}>{b.name}</Text>
-                            {b.is_locked && <Text style={{ marginLeft: 8, fontSize: 12 }}>🔒</Text>}
-                        </View>
+                    <Text style={{ color: theme.text, fontWeight: '700', fontSize: 13 }}>My Brackets</Text>
+                </Pressable>
+                <Pressable
+                    onPress={() => setViewMode('GROUPS')}
+                    style={{ flex: 1, paddingVertical: 8, borderRadius: 8, backgroundColor: viewMode === 'GROUPS' ? theme.border : 'transparent', alignItems: 'center' }}
+                >
+                    <Text style={{ color: theme.text, fontWeight: '700', fontSize: 13 }}>My Groups</Text>
+                </Pressable>
+            </View>
 
-                        <View style={{ flexDirection: 'row', marginTop: 6, alignItems: 'center' }}>
-                            <View style={{
-                                backgroundColor: b.is_locked ? '#34C75922' : '#FF950022',
-                                paddingHorizontal: 8,
-                                paddingVertical: 2,
-                                borderRadius: 4,
-                                marginRight: 10
-                            }}>
-                                <Text style={{ color: b.is_locked ? '#34C759' : '#FF9500', fontSize: 10, fontWeight: '900' }}>
-                                    {b.is_locked ? 'PUBLISHED' : 'DRAFT'}
-                                </Text>
+            {viewMode === 'BRACKETS' ? (
+                /* --- EXISTING BRACKETS LIST --- */
+                <>
+                    <Text style={{ color: theme.mutedText, fontSize: 16, marginBottom: 30 }}>Manage your 2036 Tournament bracket entries.</Text>
+                    <Text style={{ color: theme.text, fontSize: 18, fontWeight: '700', marginBottom: 15 }}>My Brackets ({brackets.length}/10)</Text>
+
+                    {brackets.map((b) => (
+                        <Pressable
+                            key={b.id}
+                            onPress={() => setSelectedBracketId(b.id)}
+                            onLongPress={() => handleRenameBracket(b.id, b.name)}
+                            style={{
+                                backgroundColor: theme.card,
+                                padding: 16,
+                                borderRadius: 15,
+                                marginBottom: 12,
+                                borderWidth: 1,
+                                borderColor: theme.border,
+                                flexDirection: 'row',
+                                justifyContent: 'space-between',
+                                alignItems: 'center'
+                            }}
+                        >
+                            <View style={{ flex: 1 }}>
+                                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                    <Text style={{ color: theme.text, fontSize: 18, fontWeight: '800' }}>{b.name}</Text>
+                                    {b.is_locked && <Text style={{ marginLeft: 8, fontSize: 12 }}>🔒</Text>}
+                                </View>
+
+                                <View style={{ flexDirection: 'row', marginTop: 6, alignItems: 'center' }}>
+                                    <View style={{
+                                        backgroundColor: b.is_locked ? '#34C75922' : '#FF950022',
+                                        paddingHorizontal: 8,
+                                        paddingVertical: 2,
+                                        borderRadius: 4,
+                                        marginRight: 10
+                                    }}>
+                                        <Text style={{ color: b.is_locked ? '#34C759' : '#FF9500', fontSize: 10, fontWeight: '900' }}>
+                                            {b.is_locked ? 'LOCKED' : 'DRAFT'}
+                                        </Text>
+                                    </View>
+                                    <Text style={{ color: theme.text, fontSize: 12, fontWeight: '600' }}>
+                                        {b.pick_count ?? 0} / 79 Picks Made
+                                    </Text>
+                                </View>
                             </View>
-                            {/* We will add real pick counts here in the next step */}
-                            <Text style={{ color: theme.text, fontSize: 12, fontWeight: '600' }}>
-                                {b.pick_count ?? 0} / 79 Picks Made
-                            </Text>
-                        </View>
-                    </View>
 
-                    <Pressable
-                        onPress={() => handleDeleteBracket(b.id)}
-                        style={{ padding: 10 }}
-                    >
-                        <Text style={{ fontSize: 18 }}>🗑️</Text>
+                            <Pressable
+                                onPress={() => handleDeleteBracket(b.id)}
+                                style={{ padding: 10, marginLeft: 10 }}
+                            >
+                                <Text style={{ fontSize: 18 }}>🗑️</Text>
+                            </Pressable>
+                        </Pressable>
+                    ))}
+
+                    {brackets.length < 10 && (
+                        <Pressable
+                            onPress={handleCreateBracket}
+                            style={{ backgroundColor: '#007AFF', padding: 18, borderRadius: 15, alignItems: 'center', marginTop: 10 }}
+                        >
+                            <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 16 }}>+ Create New Bracket</Text>
+                        </Pressable>
+                    )}
+                </>
+            ) : (
+                /* --- GROUPS VIEW PLACEHOLDER --- */
+                <View style={{ alignItems: 'center', marginTop: 40 }}>
+                    <Text style={{ fontSize: 40, marginBottom: 20 }}>🏆</Text>
+                    <Text style={{ color: theme.text, fontSize: 18, fontWeight: '700' }}>Group Competition Coming Soon</Text>
+                    <Text style={{ color: theme.mutedText, textAlign: 'center', marginTop: 10, paddingHorizontal: 20 }}>
+                        Join or Create a group to compete with friends and the Legends community.
+                    </Text>
+
+                    <Pressable style={{ backgroundColor: '#5856D6', padding: 16, borderRadius: 12, width: '100%', alignItems: 'center', marginTop: 30 }}>
+                        <Text style={{ color: '#fff', fontWeight: 'bold' }}>Create a Group</Text>
                     </Pressable>
-                </Pressable>
-            ))}
-
-            {brackets.length < 10 && (
-                <Pressable
-                    onPress={handleCreateBracket}
-                    style={{ backgroundColor: '#007AFF', padding: 18, borderRadius: 15, alignItems: 'center', marginTop: 10 }}
-                >
-                    <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 16 }}>+ Create New Bracket</Text>
-                </Pressable>
+                    <Pressable style={{ borderWidth: 1, borderColor: '#5856D6', padding: 16, borderRadius: 12, width: '100%', alignItems: 'center', marginTop: 12 }}>
+                        <Text style={{ color: '#5856D6', fontWeight: 'bold' }}>Join with Code</Text>
+                    </Pressable>
+                </View>
             )}
         </ScrollView>
     );

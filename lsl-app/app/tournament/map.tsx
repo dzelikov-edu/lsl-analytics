@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { StyleSheet, View, Dimensions, Text, ActivityIndicator, Pressable } from 'react-native';
+import { StyleSheet, View, Dimensions, Text, ActivityIndicator, Pressable, Alert } from 'react-native';
 import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
 import Animated, { useSharedValue, useAnimatedStyle } from 'react-native-reanimated';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -338,11 +338,11 @@ export default function TournamentMap({ isMock = false, overrideBracketData, onR
                 }
             );
 
-            const data = await res.json();
             if (!res.ok) {
-                console.log("Failed to lock bracket:", data);
+                Alert.alert("Error", "Failed to save picks. Check connection.");
             } else {
-                console.log("Bracket saved/locked:", data);
+                await res.json(); // Clear the buffer
+                Alert.alert("Success", "Picks saved! Your progress has been updated.");
             }
         } catch (e) {
             console.log("Error locking bracket:", e);
@@ -771,8 +771,25 @@ export default function TournamentMap({ isMock = false, overrideBracketData, onR
                             )}
                         </>
                     ) : (
+                        /* --- CHALLENGE MODE BOTTOM BAR --- */
                         <>
-                            {/* existing picks + Lock Bracket UI */}
+                            <Text style={{ color: theme.text, fontSize: 10, fontWeight: '700', flex: 1 }}>
+                                {getPickCount("Survival_16") + getPickCount("Round_64") + getPickCount("Round_32") + getPickCount("Sweet_16") + getPickCount("Elite_8") + getPickCount("National Semifinals") + getPickCount("Championship")} / 79 TOTAL PICKS MADE
+                            </Text>
+                            <Pressable
+                                onPress={handleLockBracket}
+                                style={{
+                                    paddingHorizontal: 16,
+                                    paddingVertical: 8,
+                                    borderRadius: 8,
+                                    backgroundColor: locking ? theme.border : '#34C759',
+                                    marginLeft: 8
+                                }}
+                            >
+                                <Text style={{ color: '#fff', fontSize: 11, fontWeight: '900' }}>
+                                    {locking ? 'SAVING...' : 'SAVE PICKS'}
+                                </Text>
+                            </Pressable>
                         </>
                     )}
                 </View>
