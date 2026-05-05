@@ -43,12 +43,19 @@ export default function TournamentMatchup({
         <View style={[styles.container, { backgroundColor: theme.card, borderColor: theme.border }]}>
             {/* Team A Row */}
             <Pressable style={styles.teamRow} onPress={onPressTeamA} onLongPress={onLongPress}>
-                <Text style={[styles.seed, { color: theme.mutedText }]}>{teamA.seed}</Text>
+                <Text style={[styles.seed, { color: theme.mutedText, opacity: (pickedWinnerId && pickedWinnerId !== teamA.id) ? 0.35 : 1 }]}>
+                    {teamA.seed}
+                </Text>
                 <TeamLogo teamId={teamA.id} size={22} />
                 <Text
                     style={[
                         styles.teamName,
-                        { color: theme.text, fontWeight: showPickIndicators && isPickedA ? '900' : '400' }
+                        {
+                            color: theme.text,
+                            fontWeight: showPickIndicators && isPickedA ? '900' : '400',
+                            // ADD THIS LINE: If Team B is picked, Team A fades out
+                            opacity: (pickedWinnerId && pickedWinnerId !== teamA.id) ? 0.35 : 1
+                        }
                     ]}
                     numberOfLines={1}
                 >
@@ -68,12 +75,19 @@ export default function TournamentMatchup({
 
             {/* Team B Row */}
             <Pressable style={styles.teamRow} onPress={onPressTeamB} onLongPress={onLongPress}>
-                <Text style={[styles.seed, { color: theme.mutedText }]}>{teamB.seed}</Text>
+                <Text style={[styles.seed, { color: theme.mutedText, opacity: (pickedWinnerId && pickedWinnerId !== teamB.id) ? 0.35 : 1 }]}>
+                    {teamB.seed}
+                </Text>
                 <TeamLogo teamId={teamB.id} size={22} />
                 <Text
                     style={[
                         styles.teamName,
-                        { color: theme.text, fontWeight: showPickIndicators && isPickedB ? '900' : '400' }
+                        {
+                            color: theme.text,
+                            fontWeight: showPickIndicators && isPickedB ? '900' : '400',
+                            // ADD THIS LINE: If Team A is picked, Team B fades out
+                            opacity: (pickedWinnerId && pickedWinnerId !== teamB.id) ? 0.35 : 1
+                        }
                     ]}
                     numberOfLines={1}
                 >

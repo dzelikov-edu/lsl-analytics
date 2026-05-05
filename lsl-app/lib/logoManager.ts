@@ -14,6 +14,10 @@ const GITHUB_CONFS_BASE = "https://raw.githubusercontent.com/dzelikov-edu/lsl-re
 // Hardcoded list of your 9 conferences to ensure they sync
 const CONFERENCES = ["AAC", "ACC", "B10", "B12", "BE", "MW", "P12", "SEC", "WCC"];
 
+// Special non-team IDs that should also sync from the team-logos folder
+// The file must exist at: team-logos/LCAA_FOREVER_FOUR.png in your GitHub repo
+const SPECIAL_TEAM_ASSETS = ["LCAA_FOREVER_FOUR"];
+
 export async function importLogoPack(teamIds: string[], onProgress?: (current: number, total: number) => void) {
     console.log(`[SYNC] Starting sync for ${teamIds.length} teams and ${CONFERENCES.length} conferences...`);
 
@@ -24,10 +28,29 @@ export async function importLogoPack(teamIds: string[], onProgress?: (current: n
 
         let successCount = 0;
         let failCount = 0;
-        const totalFiles = teamIds.length + CONFERENCES.length;
+        const totalFiles = teamIds.length + CONFERENCES.length + SPECIAL_TEAM_ASSETS.length;
 
         // 2. Sync Team Logos (one by one)
         for (const tid of teamIds) {
+            const fileName = `${tid}.png`;
+            const downloadUrl = `${GITHUB_TEAMS_BASE}${fileName}`;
+            const fileUri = `${TEAM_LOGO_DIR}${fileName}`;
+
+            try {
+                const res = await FileSystem.downloadAsync(downloadUrl, fileUri);
+                if (res.status === 200) {
+                    successCount++;
+                } else {
+                    failCount++;
+                }
+            } catch (e) {
+                failCount++;
+            }
+            if (onProgress) onProgress(successCount + failCount, totalFiles);
+        }
+
+        // 2b. Sync special non-team assets (e.g., LCAA_FOREVER_FOUR)
+        for (const tid of SPECIAL_TEAM_ASSETS) {
             const fileName = `${tid}.png`;
             const downloadUrl = `${GITHUB_TEAMS_BASE}${fileName}`;
             const fileUri = `${TEAM_LOGO_DIR}${fileName}`;

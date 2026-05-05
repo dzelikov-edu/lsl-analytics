@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
-from sqlmodel import select
+from sqlmodel import select, delete
+from sqlalchemy import func
 from app.db import AsyncSessionLocal
 from app.models_devices import (
     TournamentBracket,
@@ -95,28 +96,36 @@ async def list_brackets(
     current_user: User = Depends(get_current_user),
 ):
     """
-    List all brackets the current user owns for a season.
-    Admins may pass user_id to inspect another user.
+    List all brackets the current user owns for a season, 
+    now including the count of picks made.
     """
     async with AsyncSessionLocal() as session:
+        # 1. Fetch the user's brackets
         stmt = select(UserBracket).where(
             UserBracket.user_id == current_user.id,
             UserBracket.season == season,
         )
-        res = await session.exec(stmt)
-        brackets = res.all()
+        brackets = (await session.exec(stmt)).all()
 
-    return [
-        {
-            "id": b.id,
-            "season": b.season,
-            "name": b.name,
-            "is_locked": b.is_locked,
-            "created_at": b.created_at,
-            "locked_at": b.locked_at,
-        }
-        for b in brackets
-    ]
+        output = []
+        for b in brackets:
+            # 2. Count picks for this specific bracket
+            # This is efficient enough for a list of 10
+            count_stmt = select(UserBracketPick).where(UserBracketPick.user_bracket_id == b.id)
+            picks_res = await session.exec(count_stmt)
+            pick_count = len(picks_res.all())
+
+            output.append({
+                "id": b.id,
+                "season": b.season,
+                "name": b.name,
+                "is_locked": b.is_locked,
+                "created_at": b.created_at,
+                "locked_at": b.locked_at,
+                "pick_count": pick_count # NEW
+            })
+
+    return output
 
 @router.post("/brackets/{bracket_id}/picks")
 async def save_bracket_picks(
@@ -569,3 +578,36 @@ async def simulate_personal_bracket(
                         })
 
         return mock_games
+
+@router.patch("/brackets/{bracket_id}")
+async def rename_bracket(
+    bracket_id: str,
+    name: str,
+    current_user: User = Depends(get_current_user)
+):
+    async with AsyncSessionLocal() as session:
+        stmt = select(UserBracket).where(UserBracket.id == bracket_id)
+        bracket = (await session.exec(stmt)).one_or_none()
+        if not bracket or bracket.user_id != current_user.id:
+            raise HTTPException(status_code=404, detail="Bracket not found.")
+        
+        bracket.name = name.strip()
+        await session.commit()
+    return {"status": "success", "new_name": bracket.name}
+
+@router.delete("/brackets/{bracket_id}")
+async def delete_bracket(
+    bracket_id: str,
+    current_user: User = Depends(get_current_user)
+):
+    async with AsyncSessionLocal() as session:
+        stmt = select(UserBracket).where(UserBracket.id == bracket_id)
+        bracket = (await session.exec(stmt)).one_or_none()
+        if not bracket or bracket.user_id != current_user.id:
+            raise HTTPException(status_code=404, detail="Bracket not found.")
+        
+        # Delete associated picks first
+        await session.execute(delete(UserBracketPick).where(UserBracketPick.user_bracket_id == bracket_id))
+        await session.delete(bracket)
+        await session.commit()
+    return {"status": "success"}

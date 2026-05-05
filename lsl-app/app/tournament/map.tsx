@@ -12,16 +12,17 @@ import TeamLogo from '@/components/TeamLogo';
 import { getGameCoordinates, GAME_HEIGHT, CENTER_X, CENTER_Y } from '@/lib/bracketLayout';
 import { getTeamBranding } from '@/lib/teamBranding';
 import { useFocusEffect } from 'expo-router';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const MAP_SIZE = 5000;
 
 type TournamentMapProps = {
     isMock?: boolean;
-    overrideBracketData?: any[];         // personal sim
+    overrideBracketData?: any[]; initialBracketId?: string | null;
     onRunPersonalSim?: () => void;       // handler for bottom-bar button
 };
 
-export default function TournamentMap({ isMock = false, overrideBracketData, onRunPersonalSim }: TournamentMapProps) {
+export default function TournamentMap({ isMock = false, overrideBracketData, onRunPersonalSim, initialBracketId }: TournamentMapProps) {
     const colorScheme = useColorScheme() ?? 'light';
     const theme = AppColors[colorScheme];
     const [loading, setLoading] = useState(true);
@@ -35,9 +36,20 @@ export default function TournamentMap({ isMock = false, overrideBracketData, onR
     const [modalVisible, setModalVisible] = useState(false);
     const [bracketId, setBracketId] = useState<string | null>(null); // NEW
     const [locking, setLocking] = useState(false);
+    const [hasCustomLogos, setHasCustomLogos] = useState(false);
 
     const offset = useSharedValue({ x: -1000, y: -1000 });
     const start = useSharedValue({ x: -1000, y: -1000 });
+
+    const roundHeaders = [
+        { round: 'Survival_16', label: 'SURVIVAL 16', dates: '3/16 – 3/17', gap: 140 },
+        { round: 'Round_64', label: 'ROUND OF 64', dates: '3/18 – 3/19', gap: 140 },
+        { round: 'Round_32', label: 'ROUND OF 32', dates: '3/20 – 3/21', gap: 140 },
+        { round: 'Sweet_16', label: 'SUPREME 16', dates: '3/25 – 3/26', gap: 140 },
+        { round: 'Elite_8', label: 'ETERNAL 8', dates: '3/27 – 3/28', gap: 67 },
+        { round: 'National Semifinals', label: 'FOREVER FOUR', dates: '4/3', gap: 0 },
+        // Championship handled by center title + champ panel
+    ];
 
     // --- Champion Computation (Shared Across Modes) ---
     const champGame = bracketGames.find((g: any) => g.round === "Championship");
@@ -79,12 +91,27 @@ export default function TournamentMap({ isMock = false, overrideBracketData, onR
     const panGesture = Gesture.Pan().onUpdate((e) => {
         const nextX = e.translationX + start.value.x;
         const nextY = e.translationY + start.value.y;
-        offset.value = { x: Math.min(-320, Math.max(nextX, -2550)), y: Math.min(-85, Math.max(nextY, -1075)) };
+        offset.value = { x: Math.min(-320, Math.max(nextX, -2550)), y: Math.min(-85, Math.max(nextY, -1035)) };
     }).onEnd(() => {
         start.value = { x: offset.value.x, y: offset.value.y };
     });
 
     const animatedStyle = useAnimatedStyle(() => ({ transform: [{ translateX: offset.value.x }, { translateY: offset.value.y }] }));
+
+    const headerAnimatedStyle = useAnimatedStyle(() => ({
+        transform: [{ translateX: offset.value.x }],
+    }));
+
+    useEffect(() => {
+        (async () => {
+            try {
+                const flag = await AsyncStorage.getItem('has_custom_logos');
+                setHasCustomLogos(flag === 'true');
+            } catch (e) {
+                console.log('Error reading has_custom_logos', e);
+            }
+        })();
+    }, []);
 
     async function loadData() {
         // Optimistic UI: Only show spinner if the map is currently empty.
@@ -146,13 +173,13 @@ export default function TournamentMap({ isMock = false, overrideBracketData, onR
             const finalRegions = ["West", "Midwest", "East", "South"].filter(r => foundRegions.includes(r));
             setRegionOrder(finalRegions);
 
-            // 4. Handle Active Bracket ID (if not mock)
-            let currentBracketId = bracketId;
-            if (!isMock && Array.isArray(brackets) && brackets.length > 0) {
+            // 4. Handle Active Bracket ID
+            let currentBracketId = initialBracketId || bracketId;
+            if (!isMock && !currentBracketId && Array.isArray(brackets) && brackets.length > 0) {
                 const unlocked = brackets.filter((b: any) => !b.is_locked);
                 currentBracketId = unlocked[0]?.id || brackets[0].id;
-                setBracketId(currentBracketId);
             }
+            setBracketId(currentBracketId);
 
             // 5. Final Data Transformation (Picks & Propagation)
             let updatedGames: any[] = [...bracketData];
@@ -324,6 +351,93 @@ export default function TournamentMap({ isMock = false, overrideBracketData, onR
         }
     };
 
+    const renderSideRoundHeaders = (side: 'left' | 'right') => {
+        if (!bracketGames.length || !regionOrder.length) return null;
+
+        // Left side anchor = first region; right side anchor = last region
+        const regionIndex = side === 'left' ? 0 : regionOrder.length - 1;
+        const regionId = regionOrder[regionIndex];
+
+        return roundHeaders.map((m) => {
+            const sample = bracketGames.find(
+                (g: any) => g.round === m.round && g.region === regionId
+            );
+            if (!sample) return null;
+
+            const c = getGameCoordinates(sample.region, sample.round, sample.game_slot, regionOrder);
+            const headerX = c.x + 110;     // center over 220px card
+            const headerY = c.y - 40;      // above that round’s game row
+
+            return (
+                <View
+                    key={`${side}-${m.round}`}
+                    style={{
+                        position: 'absolute',
+                        left: headerX,
+                        top: headerY,
+                        alignItems: 'center',
+                    }}
+                >
+                    <Text
+                        style={{
+                            color: theme.text,
+                            fontSize: 10,
+                            fontWeight: '800',
+                        }}
+                    >
+                        {m.label}
+                    </Text>
+                    <Text
+                        style={{
+                            color: theme.mutedText,
+                            fontSize: 9,
+                        }}
+                    >
+                        {m.dates}
+                    </Text>
+                </View>
+            );
+        });
+    };
+
+    const renderChampHeader = () => {
+        if (!champGame) return null;
+        if (!regionOrder.length) return null;
+
+        const c = getGameCoordinates(champGame.region, champGame.round, champGame.game_slot, regionOrder);
+        const headerX = c.x + 110;
+        const headerY = c.y - 40;
+
+        return (
+            <View
+                style={{
+                    position: 'absolute',
+                    left: headerX,
+                    top: headerY,
+                    alignItems: 'center',
+                }}
+            >
+                <Text
+                    style={{
+                        color: theme.text,
+                        fontSize: 11,
+                        fontWeight: '900',
+                    }}
+                >
+                    NATIONAL CHAMPIONSHIP
+                </Text>
+                <Text
+                    style={{
+                        color: theme.mutedText,
+                        fontSize: 9,
+                    }}
+                >
+                    4/5
+                </Text>
+            </View>
+        );
+    };
+
     const renderElbowLine = (game: any) => {
         if (!game.next_game_id) return null;
         const startCoords = getGameCoordinates(game.region, game.round, game.game_slot, regionOrder);
@@ -358,11 +472,100 @@ export default function TournamentMap({ isMock = false, overrideBracketData, onR
                         {regionOrder.map((r) => {
                             const posA = getGameCoordinates(r, 'Round_32', 2, regionOrder);
                             const posB = getGameCoordinates(r, 'Round_32', 3, regionOrder);
+
+                            // Vertical placement: between those two R32 games, nudged down
                             const labelY = (posA.y + posB.y) / 2 + 40;
-                            const labelX = posA.x + 110;
-                            return (<Text key={r} style={[styles.watermark, { top: labelY, left: labelX, color: theme.text, opacity: 0.35, transform: [{ translateX: -50 }] }]}>{r.toUpperCase()}</Text>);
+
+                            // Horizontal center of this region’s column (220px card width → +110)
+                            const centerX = posA.x + 110;
+
+                            // Use a container centered on that X so text is really centered
+                            const containerWidth = 220;
+                            const containerLeft = centerX - containerWidth / 2;
+
+                            return (
+                                <View
+                                    key={r}
+                                    style={{
+                                        position: 'absolute',
+                                        top: labelY,
+                                        left: containerLeft,
+                                        width: containerWidth,
+                                        alignItems: 'center',
+                                    }}
+                                >
+                                    <Text
+                                        style={[
+                                            styles.watermark,
+                                            {
+                                                position: 'relative', // override absolute from styles.watermark
+                                                color: theme.text,
+                                                opacity: 0.35,
+                                            },
+                                        ]}
+                                        numberOfLines={1}
+                                    >
+                                        {r.toUpperCase()}
+                                    </Text>
+                                </View>
+                            );
                         })}
-                        <Text style={[styles.watermark, { top: CENTER_Y - 100, left: CENTER_X - 160, fontSize: 40, color: theme.text }]}>FOREVER FOUR</Text>
+                        {hasCustomLogos ? (
+                            <View
+                                style={{
+                                    position: 'absolute',
+                                    top: CENTER_Y - 212,
+                                    left: CENTER_X - 79,
+                                    width: 160,
+                                    height: 160,
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                }}
+                            >
+                                <TeamLogo teamId="LCAA_FOREVER_FOUR" size={190} />
+                            </View>
+                        ) : (
+                            <Text
+                                style={[
+                                    styles.watermark,
+                                    { top: CENTER_Y - 100, left: CENTER_X - 160, fontSize: 40, color: theme.text },
+                                ]}
+                            >
+                                FOREVER FOUR
+                            </Text>
+                        )}
+
+                        {/* --- IN-CANVAS CHAMPIONSHIP HEADER --- */}
+                        <View
+                            style={{
+                                position: 'absolute',
+                                top: CENTER_Y - 32, // Positioned below the logo, above the game
+                                left: CENTER_X - 98,
+                                width: 200,
+                                alignItems: 'center',
+                            }}
+                        >
+                            <Text
+                                style={{
+                                    color: theme.text,
+                                    fontSize: 12,
+                                    fontWeight: '900',
+                                    letterSpacing: 0.5,
+                                }}
+                            >
+                                NATIONAL CHAMPIONSHIP
+                            </Text>
+                            <Text
+                                style={{
+                                    color: theme.mutedText,
+                                    fontSize: 10,
+                                    fontWeight: '700',
+                                    marginTop: 2,
+                                }}
+                            >
+                                4/5
+                            </Text>
+                        </View>
 
                         {bracketGames.map(renderElbowLine)}
 
@@ -501,25 +704,55 @@ export default function TournamentMap({ isMock = false, overrideBracketData, onR
                 </GestureDetector>
 
                 <View style={[styles.topBar, { backgroundColor: theme.background }]}>
-                    <View style={{ alignItems: 'center' }}>
-                        <Text style={{ color: theme.text, fontWeight: '800', fontSize: 13 }}>
+                    {/* CENTER TITLE - Pushed up for room, champLine removed */}
+                    <View style={{ position: 'absolute', top: 20, left: 0, right: 0, alignItems: 'center', zIndex: 10 }}>
+                        <Text style={{ color: theme.text, fontWeight: '900', fontSize: 14, letterSpacing: 0.5 }}>
                             {isMock ? 'LCAA BRACKETOLOGY • 2036' : 'OFFICIAL LCAA BRACKET • 2036'}
                         </Text>
-
-                        {isMock && (
-                            <Text style={{ color: '#FF9500', fontWeight: '900', fontSize: 9, letterSpacing: 1 }}>
-                                PRESEASON • V1.0
-                            </Text>
-                        )}
                     </View>
+
+                    {/* SLIDING HEADERS LAYER */}
+                    <Animated.View style={[{ position: 'absolute', top: 41, left: 0, flexDirection: 'row' }, headerAnimatedStyle]}>
+                        {/* LEFT SIDE */}
+                        <View style={{ flexDirection: 'row', marginLeft: 401 }}>
+                            {roundHeaders.map(m => (
+                                <View key={`l-${m.round}`} style={{ alignItems: 'center', width: 100, marginRight: m.gap }}>
+                                    <Text style={{ color: theme.text, fontSize: 9.5, fontWeight: '900' }}>{m.label}</Text>
+                                    <Text style={{ color: theme.mutedText, fontSize: 8.5, fontWeight: '600' }}>{m.dates}</Text>
+                                </View>
+                            ))}
+                        </View>
+
+                        {/* RIGHT SIDE (Mirrored Spacing) */}
+                        <View style={{ flexDirection: 'row-reverse', marginLeft: 384 }}>
+                            {roundHeaders.map(m => (
+                                <View key={`r-${m.round}`} style={{ alignItems: 'center', width: 100, marginLeft: m.gap }}>
+                                    <Text style={{ color: theme.text, fontSize: 9.5, fontWeight: '900' }}>{m.label}</Text>
+                                    <Text style={{ color: theme.mutedText, fontSize: 8.5, fontWeight: '600' }}>{m.dates}</Text>
+                                </View>
+                            ))}
+                        </View>
+                    </Animated.View>
                 </View>
 
                 <View style={[styles.bottomBar, { backgroundColor: theme.card }]}>
                     {isMock ? (
                         <>
-                            <Text style={{ color: theme.text, fontSize: 10, fontWeight: '600', flex: 1 }}>
-                                Bracketology: seeded field. Run an AI sim to see one possible tournament outcome.
-                            </Text>
+                            <View style={{ flex: 1 }}>
+                                <Text style={{ color: theme.text, fontSize: 10, fontWeight: '600' }}>
+                                    Bracketology: seeded field. Run an AI sim to see one possible tournament path.
+                                </Text>
+                                <Text
+                                    style={{
+                                        color: '#FF9500',
+                                        fontSize: 9,
+                                        fontWeight: '800',
+                                        marginTop: 2,
+                                    }}
+                                >
+                                    PRESEASON • V1.0
+                                </Text>
+                            </View>
                             {onRunPersonalSim && (
                                 <Pressable
                                     onPress={onRunPersonalSim}
@@ -559,11 +792,11 @@ const styles = StyleSheet.create({
         top: 0,
         left: 0,
         right: 0,
-        height: 72, // Increased from 40 to 48
-        alignItems: 'center',
-        justifyContent: 'center',
+        height: 72,
         borderBottomWidth: 1,
-        borderBottomColor: '#333'
+        borderBottomColor: '#333',
+        overflow: 'hidden',
+        zIndex: 1000,
     },
     bottomBar: { position: 'absolute', left: 0, right: 0, bottom: 0, height: 50, alignItems: 'center', justifyContent: 'center', borderTopWidth: 1, borderTopColor: '#333', flexDirection: 'row', paddingHorizontal: 10 }
 });

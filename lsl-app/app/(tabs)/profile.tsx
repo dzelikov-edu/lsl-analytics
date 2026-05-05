@@ -275,6 +275,38 @@ export default function ProfileScreen() {
         }
     };
 
+    const handleSetTournamentPhase = async (newPhase: string) => {
+        Alert.alert(
+            "Change Tournament Phase",
+            `Are you sure you want to switch the app to ${newPhase} mode?`,
+            [
+                { text: "Cancel", style: "cancel" },
+                {
+                    text: "Confirm",
+                    onPress: async () => {
+                        setLoading(true);
+                        try {
+                            const token = await getToken();
+                            const res = await fetch(`${API_BASE_URL}/admin/tournament/set-phase?phase=${newPhase}&season=2036`, {
+                                method: 'POST',
+                                headers: { Authorization: `Bearer ${token}` }
+                            });
+                            if (res.ok) {
+                                Alert.alert("Success", `Phase changed to ${newPhase}. Please restart the app.`);
+                            } else {
+                                Alert.alert("Error", "Failed to update phase.");
+                            }
+                        } catch (e) {
+                            Alert.alert("Error", "Network error.");
+                        } finally {
+                            setLoading(false);
+                        }
+                    }
+                }
+            ]
+        );
+    };
+
     const handleRunBracketSim = async () => {
         Alert.alert(
             "Run Tournament Simulation",
@@ -514,6 +546,27 @@ export default function ProfileScreen() {
                             </Text>
                         </View>
                     </Pressable>
+
+                    {/* --- INSERT THIS NEW PHASE CONTROL BLOCK --- */}
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 10 }}>
+                        <Pressable
+                            style={[styles.settingRow, { flex: 1, marginRight: 5, backgroundColor: '#8E8E93', marginBottom: 0 }]}
+                            onPress={() => handleSetTournamentPhase('BRACKETOLOGY')}
+                        >
+                            <View style={{ alignItems: 'center', width: '100%' }}>
+                                <Text style={[styles.settingLabel, { color: '#fff', fontSize: 14 }]}>📅 Regular Season Mode</Text>
+                            </View>
+                        </Pressable>
+                        <Pressable
+                            style={[styles.settingRow, { flex: 1, marginLeft: 5, backgroundColor: '#FF9500', marginBottom: 0 }]}
+                            onPress={() => handleSetTournamentPhase('LIVE')}
+                        >
+                            <View style={{ alignItems: 'center', width: '100%' }}>
+                                <Text style={[styles.settingLabel, { color: '#fff', fontSize: 14 }]}>🟠 LCAA Tournament Mode</Text>
+                            </View>
+                        </Pressable>
+                    </View>
+                    {/* ------------------------------------------- */}
 
                     {/* --- OFFICIAL TOURNAMENT SYNC (BLUE) --- */}
                     <Pressable
