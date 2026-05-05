@@ -10,6 +10,9 @@ from app.models_devices import (
     UserBracket,
     UserBracketPick,
     User,
+    BracketGroup,      
+    GroupMembership,
+    GroupBracket,   
 )
 from typing import List
 
@@ -19,6 +22,7 @@ from app.ingest import load_team_map_names  # existing
 from datetime import datetime
 from pydantic import BaseModel
 import string
+import random
 
 router = APIRouter(prefix="/api/tournament", tags=["tournament"])
 
@@ -619,11 +623,9 @@ async def create_bracket_group(
     season: int = 2036,
     current_user: User = Depends(get_current_user)
 ):
-    """
-    Creates a new bracket group and generates a unique join code.
-    """
+    """Creates a new group and generates a unique 6-char join code."""
     async with AsyncSessionLocal() as session:
-        # Generate a simple 6-char code (e.g., LSL-XJ2)
+        # Generate a unique 6-char code
         code = ''.join(random.choices(string.ascii_uppercase + string.digits, k=6))
         
         group = BracketGroup(
@@ -634,7 +636,7 @@ async def create_bracket_group(
         )
         session.add(group)
         
-        # Auto-join the creator
+        # Auto-join the creator as a member
         membership = GroupMembership(group_id=group.id, user_id=current_user.id)
         session.add(membership)
         
@@ -642,44 +644,14 @@ async def create_bracket_group(
         await session.refresh(group)
     return group
 
-@router.post("/groups/join")
-async def join_bracket_group(
-    code: str,
-    user_bracket_id: str,
-    current_user: User = Depends(get_current_user)
-):
-    """
-    Joins a group using a code and submits a specific bracket.
-    Enforces: one bracket per user per group, and unique bracket usage.
-    """
-    code = code.strip().upper()
+@router.get("/groups/me")
+async def list_my_groups(season: int = 2036, current_user: User = Depends(get_current_user)):
+    """Returns all groups the user is a member of."""
     async with AsyncSessionLocal() as session:
-        # 1. Find the group
-        stmt = select(BracketGroup).where(BracketGroup.join_code == code)
-        group = (await session.exec(stmt)).one_or_none()
-        if not group:
-            raise HTTPException(status_code=404, detail="Group code not found.")
-        
-        # 2. Check if already in group
-        check_stmt = select(GroupBracket).where(
-            GroupBracket.group_id == group.id, 
-            GroupBracket.user_id == current_user.id
+        # Join GroupMembership with BracketGroup
+        stmt = select(BracketGroup).join(GroupMembership).where(
+            GroupMembership.user_id == current_user.id,
+            BracketGroup.season == season
         )
-        existing = (await session.exec(check_stmt)).one_or_none()
-        if existing:
-            raise HTTPException(status_code=400, detail="You already have a bracket in this group.")
-
-        # 3. Check if this specific bracket is already used elsewhere
-        bracket_check = select(GroupBracket).where(GroupBracket.user_bracket_id == user_bracket_id)
-        if (await session.exec(bracket_check)).one_or_none():
-            raise HTTPException(status_code=400, detail="This bracket is already entered in another group.")
-
-        # 4. Join
-        entry = GroupBracket(
-            group_id=group.id,
-            user_bracket_id=user_bracket_id,
-            user_id=current_user.id
-        )
-        session.add(entry)
-        await session.commit()
-    return {"status": "success", "group_name": group.name}
+        res = await session.exec(stmt)
+        return res.all()

@@ -21,20 +21,24 @@ export default function BracketTab() {
     const [simLoading, setSimLoading] = useState(false);
 
     const [viewMode, setViewMode] = useState<'BRACKETS' | 'GROUPS'>('BRACKETS');
+    const [myGroups, setMyGroups] = useState<any[]>([]);
 
     const loadInitialData = async () => {
         try {
             const token = await getToken();
-            const [stateRes, bracketsRes] = await Promise.all([
+            const [stateRes, bracketsRes, groupsRes] = await Promise.all([
                 fetch(`${API_BASE_URL}/api/tournament/state?season=2036`),
-                fetch(`${API_BASE_URL}/api/tournament/brackets?season=2036`, { headers: { Authorization: `Bearer ${token}` } })
+                fetch(`${API_BASE_URL}/api/tournament/brackets?season=2036`, { headers: { Authorization: `Bearer ${token}` } }),
+                fetch(`${API_BASE_URL}/api/tournament/groups/me?season=2036`, { headers: { Authorization: `Bearer ${token}` } }) // NEW
             ]);
 
             const stateData = await stateRes.json();
             const bracketListData = await bracketsRes.json();
+            const groupsListData = await groupsRes.json(); // NEW
 
             setPhase(stateData.phase);
             setBrackets(bracketListData);
+            setMyGroups(groupsListData); // NEW
         } catch (e) {
             console.error(e);
             setPhase('BRACKETOLOGY');
@@ -128,6 +132,31 @@ export default function BracketTab() {
         );
     };
 
+    const handleCreateGroup = () => {
+        Alert.prompt(
+            "Create Bracket Group",
+            "Enter a name for your league (e.g., The Office Pool):",
+            [
+                { text: "Cancel", style: "cancel" },
+                {
+                    text: "Create",
+                    onPress: async (groupName?: string) => {
+                        if (!groupName) return;
+                        const token = await getToken();
+                        const res = await fetch(`${API_BASE_URL}/api/tournament/groups?name=${groupName}&season=2036`, {
+                            method: 'POST',
+                            headers: { Authorization: `Bearer ${token}` }
+                        });
+                        if (res.ok) {
+                            Alert.alert("Success", "Group created! Share the code with friends.");
+                            loadInitialData(); // Refresh both lists
+                        }
+                    }
+                }
+            ]
+        );
+    };
+
     const runPersonalSim = async () => {
         if (simLoading) return;
         setSimLoading(true);
@@ -176,7 +205,7 @@ export default function BracketTab() {
     // 3. List View (Default LIVE state)
     return (
         <ScrollView style={{ flex: 1, backgroundColor: theme.background }} contentContainerStyle={{ padding: 20, paddingTop: 60 }}>
-            <Text style={{ color: theme.text, fontSize: 32, fontWeight: '800', marginBottom: 5 }}>LCAA Bracket Challenge</Text>
+            <Text style={{ color: theme.text, fontSize: 32, fontWeight: '800', marginBottom: 5 }}>LCAA Tournament Bracket Challenge</Text>
 
             {/* --- MODE TOGGLE (NEW) --- */}
             <View style={{ flexDirection: 'row', backgroundColor: theme.card, borderRadius: 12, padding: 4, marginVertical: 20, borderWidth: 1, borderColor: theme.border }}>
@@ -260,21 +289,47 @@ export default function BracketTab() {
                     )}
                 </>
             ) : (
-                /* --- GROUPS VIEW PLACEHOLDER --- */
-                <View style={{ alignItems: 'center', marginTop: 40 }}>
-                    <Text style={{ fontSize: 40, marginBottom: 20 }}>🏆</Text>
-                    <Text style={{ color: theme.text, fontSize: 18, fontWeight: '700' }}>Group Competition Coming Soon</Text>
-                    <Text style={{ color: theme.mutedText, textAlign: 'center', marginTop: 10, paddingHorizontal: 20 }}>
-                        Join or Create a group to compete with friends and the Legends community.
-                    </Text>
+                /* --- GROUPS VIEW --- */
+                <>
+                    <Text style={{ color: theme.mutedText, fontSize: 16, marginBottom: 30 }}>Compete against friends in custom leagues.</Text>
 
-                    <Pressable style={{ backgroundColor: '#5856D6', padding: 16, borderRadius: 12, width: '100%', alignItems: 'center', marginTop: 30 }}>
-                        <Text style={{ color: '#fff', fontWeight: 'bold' }}>Create a Group</Text>
+                    {myGroups.length > 0 ? (
+                        myGroups.map((g) => (
+                            <Pressable
+                                key={g.id}
+                                style={{ backgroundColor: theme.card, padding: 18, borderRadius: 15, marginBottom: 12, borderWidth: 1, borderColor: theme.border }}
+                                onPress={() => Alert.alert("Group Details", `Join Code: ${g.join_code}\nLeaderboard functionality coming next!`)}
+                            >
+                                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                                    <View>
+                                        <Text style={{ color: theme.text, fontSize: 17, fontWeight: '800' }}>{g.name}</Text>
+                                        <Text style={{ color: theme.mutedText, fontSize: 12, marginTop: 4 }}>CODE: {g.join_code}</Text>
+                                    </View>
+                                    <Text style={{ color: theme.mutedText }}>→</Text>
+                                </View>
+                            </Pressable>
+                        ))
+                    ) : (
+                        <View style={{ alignItems: 'center', marginVertical: 40 }}>
+                            <Text style={{ fontSize: 40, marginBottom: 10 }}>🏆</Text>
+                            <Text style={{ color: theme.text, fontWeight: '700' }}>No Groups Joined Yet</Text>
+                        </View>
+                    )}
+
+                    <Pressable
+                        onPress={handleCreateGroup}
+                        style={{ backgroundColor: '#5856D6', padding: 16, borderRadius: 12, alignItems: 'center', marginTop: 10 }}
+                    >
+                        <Text style={{ color: '#fff', fontWeight: 'bold' }}>+ Create a Group</Text>
                     </Pressable>
-                    <Pressable style={{ borderWidth: 1, borderColor: '#5856D6', padding: 16, borderRadius: 12, width: '100%', alignItems: 'center', marginTop: 12 }}>
+
+                    <Pressable
+                        onPress={() => Alert.alert("Join Group", "Enter the 6-character code to join.")}
+                        style={{ borderWidth: 1, borderColor: '#5856D6', padding: 16, borderRadius: 12, alignItems: 'center', marginTop: 12 }}
+                    >
                         <Text style={{ color: '#5856D6', fontWeight: 'bold' }}>Join with Code</Text>
                     </Pressable>
-                </View>
+                </>
             )}
         </ScrollView>
     );
