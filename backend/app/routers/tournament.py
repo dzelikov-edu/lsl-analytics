@@ -655,3 +655,48 @@ async def list_my_groups(season: int = 2036, current_user: User = Depends(get_cu
         )
         res = await session.exec(stmt)
         return res.all()
+
+@router.post("/groups/join")
+async def join_bracket_group(
+    code: str,
+    user_bracket_id: str,
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Joins a group using a code and submits a specific bracket.
+    Enforces: one bracket per user per group, and unique bracket usage globally.
+    """
+    code = code.strip().upper()
+    async with AsyncSessionLocal() as session:
+        # 1. Find the group
+        stmt = select(BracketGroup).where(BracketGroup.join_code == code)
+        group = (await session.exec(stmt)).one_or_none()
+        if not group:
+            raise HTTPException(status_code=404, detail="Group code not found.")
+        
+        # 2. Check if user already has an entry in this group
+        check_stmt = select(GroupBracket).where(
+            GroupBracket.group_id == group.id, 
+            GroupBracket.user_id == current_user.id
+        )
+        if (await session.exec(check_stmt)).one_or_none():
+            raise HTTPException(status_code=400, detail="You already have an entry in this group.")
+
+        # 3. Check if this specific bracket ID is already used in ANY group
+        # This enforces your "One-Use-Only" rule for bracket IDs
+        usage_stmt = select(GroupBracket).where(GroupBracket.user_bracket_id == user_bracket_id)
+        if (await session.exec(usage_stmt)).one_or_none():
+            raise HTTPException(status_code=400, detail="This bracket is already entered in another group.")
+
+        # 4. Create Group Membership AND the Bracket Entry
+        membership = GroupMembership(group_id=group.id, user_id=current_user.id)
+        entry = GroupBracket(
+            group_id=group.id,
+            user_bracket_id=user_bracket_id,
+            user_id=current_user.id
+        )
+        session.add(membership)
+        session.add(entry)
+        await session.commit()
+
+    return {"status": "success", "group_name": group.name}

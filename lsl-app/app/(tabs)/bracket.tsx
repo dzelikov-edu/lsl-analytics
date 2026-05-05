@@ -157,6 +157,51 @@ export default function BracketTab() {
         );
     };
 
+    const handleJoinGroup = () => {
+        Alert.prompt(
+            "Join Bracket Group",
+            "Enter the 6-character join code:",
+            [
+                { text: "Cancel", style: "cancel" },
+                {
+                    text: "Next",
+                    onPress: (code?: string) => { // Added type
+                        if (!code) return;
+
+                        // Create the buttons list
+                        const bracketButtons = brackets.map(b => ({
+                            text: b.name,
+                            onPress: async () => {
+                                const token = await getToken();
+                                const res = await fetch(`${API_BASE_URL}/api/tournament/groups/join?code=${code.toUpperCase()}&user_bracket_id=${b.id}`, {
+                                    method: 'POST',
+                                    headers: { Authorization: `Bearer ${token}` }
+                                });
+                                const data = await res.json();
+                                if (res.ok) {
+                                    Alert.alert("Welcome!", `You've joined ${data.group_name}.`);
+                                    loadInitialData();
+                                } else {
+                                    Alert.alert("Error", data.detail || "Failed to join group.");
+                                }
+                            }
+                        }));
+
+                        // Show selection with a separate cancel button to avoid type mismatch
+                        Alert.alert(
+                            "Select Your Entry",
+                            "Choose which bracket to enter into this group. Remember: a bracket can only be used in one group.",
+                            [
+                                ...bracketButtons,
+                                { text: "Cancel", style: "cancel" }
+                            ]
+                        );
+                    }
+                }
+            ]
+        );
+    };
+
     const runPersonalSim = async () => {
         if (simLoading) return;
         setSimLoading(true);
@@ -324,7 +369,7 @@ export default function BracketTab() {
                     </Pressable>
 
                     <Pressable
-                        onPress={() => Alert.alert("Join Group", "Enter the 6-character code to join.")}
+                        onPress={handleJoinGroup} // Update this line
                         style={{ borderWidth: 1, borderColor: '#5856D6', padding: 16, borderRadius: 12, alignItems: 'center', marginTop: 12 }}
                     >
                         <Text style={{ color: '#5856D6', fontWeight: 'bold' }}>Join with Code</Text>
