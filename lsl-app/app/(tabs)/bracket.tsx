@@ -202,6 +202,28 @@ export default function BracketTab() {
         );
     };
 
+    const handleDeleteGroup = (id: string) => {
+        Alert.alert(
+            "Delete Group",
+            "Are you sure? This will permanently disband this group for all members currently in it.",
+            [
+                { text: "Cancel", style: "cancel" },
+                {
+                    text: "Delete",
+                    style: "destructive",
+                    onPress: async () => {
+                        const token = await getToken();
+                        await fetch(`${API_BASE_URL}/api/tournament/groups/${id}`, {
+                            method: 'DELETE',
+                            headers: { Authorization: `Bearer ${token}` }
+                        });
+                        loadInitialData(); // Refresh the list
+                    }
+                }
+            ]
+        );
+    };
+
     const runPersonalSim = async () => {
         if (simLoading) return;
         setSimLoading(true);
@@ -339,20 +361,37 @@ export default function BracketTab() {
                     <Text style={{ color: theme.mutedText, fontSize: 16, marginBottom: 30 }}>Compete against friends in custom leagues.</Text>
 
                     {myGroups.length > 0 ? (
-                        myGroups.map((g) => (
-                            <Pressable
-                                key={g.id}
-                                style={{ backgroundColor: theme.card, padding: 18, borderRadius: 15, marginBottom: 12, borderWidth: 1, borderColor: theme.border }}
-                                onPress={() => Alert.alert("Group Details", `Join Code: ${g.join_code}\nLeaderboard functionality coming next!`)}
+                        myGroups.map((g, index) => (
+                            <View
+                                key={`${g.id}-${index}`}
+                                style={{
+                                    backgroundColor: theme.card,
+                                    padding: 18,
+                                    borderRadius: 15,
+                                    marginBottom: 12,
+                                    borderWidth: 1,
+                                    borderColor: theme.border,
+                                    flexDirection: 'row',
+                                    justifyContent: 'space-between',
+                                    alignItems: 'center'
+                                }}
                             >
-                                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                                    <View>
-                                        <Text style={{ color: theme.text, fontSize: 17, fontWeight: '800' }}>{g.name}</Text>
-                                        <Text style={{ color: theme.mutedText, fontSize: 12, marginTop: 4 }}>CODE: {g.join_code}</Text>
-                                    </View>
-                                    <Text style={{ color: theme.mutedText }}>→</Text>
-                                </View>
-                            </Pressable>
+                                <Pressable
+                                    style={{ flex: 1 }}
+                                    onPress={() => Alert.alert("Group Details", `Join Code: ${g.join_code}\nLeaderboard functionality coming next!`)}
+                                >
+                                    <Text style={{ color: theme.text, fontSize: 17, fontWeight: '800' }}>{g.name}</Text>
+                                    <Text style={{ color: theme.mutedText, fontSize: 12, marginTop: 4 }}>CODE: {g.join_code}</Text>
+                                </Pressable>
+
+                                {/* DELETE BUTTON */}
+                                <Pressable
+                                    onPress={() => handleDeleteGroup(g.id)}
+                                    style={{ padding: 5, marginLeft: 10 }}
+                                >
+                                    <Text style={{ fontSize: 18 }}>🗑️</Text>
+                                </Pressable>
+                            </View>
                         ))
                     ) : (
                         <View style={{ alignItems: 'center', marginVertical: 40 }}>

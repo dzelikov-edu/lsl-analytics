@@ -688,15 +688,52 @@ async def join_bracket_group(
         if (await session.exec(usage_stmt)).one_or_none():
             raise HTTPException(status_code=400, detail="This bracket is already entered in another group.")
 
-        # 4. Create Group Membership AND the Bracket Entry
-        membership = GroupMembership(group_id=group.id, user_id=current_user.id)
+        # 4. Create Group Membership (ONLY if not already a member)
+        membership_stmt = select(GroupMembership).where(
+            GroupMembership.group_id == group.id, 
+            GroupMembership.user_id == current_user.id
+        )
+        if not (await session.exec(membership_stmt)).one_or_none():
+            new_membership = GroupMembership(group_id=group.id, user_id=current_user.id)
+            session.add(new_membership)
+            
+        # 5. Create the Bracket Entry
         entry = GroupBracket(
             group_id=group.id,
             user_bracket_id=user_bracket_id,
             user_id=current_user.id
         )
-        session.add(membership)
         session.add(entry)
         await session.commit()
 
     return {"status": "success", "group_name": group.name}
+
+@router.delete("/groups/{group_id}")
+async def delete_bracket_group(
+    group_id: str,
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Deletes a bracket group. Only the owner can delete it.
+    Clears all memberships and bracket entries for that group.
+    """
+    async with AsyncSessionLocal() as session:
+        stmt = select(BracketGroup).where(BracketGroup.id == group_id)
+        group = (await session.exec(stmt)).one_or_none()
+        
+        if not group:
+            raise HTTPException(status_code=404, detail="Group not found.")
+        
+        # Only owner (or admin) can delete
+        if group.owner_user_id != current_user.id and not current_user.is_admin:
+            raise HTTPException(status_code=403, detail="Only the owner can delete this group.")
+        
+        # 1. Delete all bracket entries in this group
+        await session.execute(delete(GroupBracket).where(GroupBracket.group_id == group_id))
+        # 2. Delete all memberships in this group
+        await session.execute(delete(GroupMembership).where(GroupMembership.group_id == group_id))
+        # 3. Delete the group itself
+        await session.delete(group)
+        
+        await session.commit()
+    return {"status": "success"}
