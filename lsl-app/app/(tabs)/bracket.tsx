@@ -23,6 +23,9 @@ export default function BracketTab() {
     const [viewMode, setViewMode] = useState<'BRACKETS' | 'GROUPS'>('BRACKETS');
     const [myGroups, setMyGroups] = useState<any[]>([]);
 
+    const [activeGroupId, setActiveGroupId] = useState<string | null>(null);
+    const [leaderboard, setLeaderboard] = useState<any[]>([]);
+
     const loadInitialData = async () => {
         try {
             const token = await getToken();
@@ -224,6 +227,23 @@ export default function BracketTab() {
         );
     };
 
+    const loadLeaderboard = async (groupId: string) => {
+        setLoading(true);
+        try {
+            const token = await getToken();
+            const res = await fetch(`${API_BASE_URL}/api/tournament/groups/${groupId}/leaderboard`, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            const data = await res.json();
+            setLeaderboard(data);
+            setActiveGroupId(groupId);
+        } catch (e) {
+            Alert.alert("Error", "Could not load leaderboard.");
+        } finally {
+            setLoading(false);
+        }
+    };
+
     const runPersonalSim = async () => {
         if (simLoading) return;
         setSimLoading(true);
@@ -266,6 +286,47 @@ export default function BracketTab() {
                 </View>
                 <TournamentMap isMock={false} initialBracketId={selectedBracketId} />
             </View>
+        );
+    }
+
+    if (activeGroupId) {
+        return (
+            <ScrollView style={{ flex: 1, backgroundColor: theme.background }} contentContainerStyle={{ padding: 20, paddingTop: 60 }}>
+                <Pressable onPress={() => setActiveGroupId(null)} style={{ marginBottom: 20 }}>
+                    <Text style={{ color: '#007AFF', fontWeight: 'bold' }}>← Back to Groups</Text>
+                </Pressable>
+
+                <Text style={{ color: theme.text, fontSize: 28, fontWeight: '800' }}>Leaderboard</Text>
+                <Text style={{ color: theme.mutedText, marginBottom: 30 }}>LCAA Tournament Standings</Text>
+
+                {leaderboard.map((row, index) => (
+                    <View key={index} style={{
+                        backgroundColor: theme.card,
+                        padding: 16,
+                        borderRadius: 15,
+                        marginBottom: 10,
+                        borderWidth: index === 0 ? 2 : 1,
+                        borderColor: index === 0 ? '#FFD700' : theme.border
+                    }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                            {/* Rank */}
+                            <Text style={{ color: theme.text, fontSize: 18, fontWeight: '900', width: 35 }}>{index + 1}</Text>
+
+                            {/* User Info */}
+                            <View style={{ flex: 1 }}>
+                                <Text style={{ color: theme.text, fontWeight: '800', fontSize: 16 }}>{row.user_name}</Text>
+                                <Text style={{ color: theme.mutedText, fontSize: 11 }}>{row.bracket_name}</Text>
+                            </View>
+
+                            {/* Scores */}
+                            <View style={{ alignItems: 'flex-end' }}>
+                                <Text style={{ color: theme.text, fontSize: 22, fontWeight: '900' }}>{row.score}</Text>
+                                <Text style={{ color: theme.mutedText, fontSize: 10, fontWeight: '700' }}>{row.pts_rem} REM</Text>
+                            </View>
+                        </View>
+                    </View>
+                ))}
+            </ScrollView>
         );
     }
 
@@ -378,7 +439,7 @@ export default function BracketTab() {
                             >
                                 <Pressable
                                     style={{ flex: 1 }}
-                                    onPress={() => Alert.alert("Group Details", `Join Code: ${g.join_code}\nLeaderboard functionality coming next!`)}
+                                    onPress={() => loadLeaderboard(g.id)} // <--- CHANGE THIS
                                 >
                                     <Text style={{ color: theme.text, fontSize: 17, fontWeight: '800' }}>{g.name}</Text>
                                     <Text style={{ color: theme.mutedText, fontSize: 12, marginTop: 4 }}>CODE: {g.join_code}</Text>

@@ -737,3 +737,73 @@ async def delete_bracket_group(
         
         await session.commit()
     return {"status": "success"}
+
+@router.get("/groups/{group_id}/leaderboard")
+async def get_group_leaderboard(
+    group_id: str,
+    current_user: User = Depends(get_current_user)
+):
+    async with AsyncSessionLocal() as session:
+        # 1. Verification & Fetch
+        stmt = (
+            select(GroupBracket, User.email, UserBracket.name, UserBracket.id)
+            .join(User, GroupBracket.user_id == User.id)
+            .join(UserBracket, GroupBracket.user_bracket_id == UserBracket.id)
+            .where(GroupBracket.group_id == group_id)
+        )
+        results = (await session.exec(stmt)).all()
+
+        # 2. Get Official Status & Seed Map
+        official_games = (await session.exec(select(TournamentBracket))).all()
+        seeds = (await session.exec(select(TournamentSeedList))).all()
+        
+        team_seed_map = {s.team_id: s.seed for s in seeds}
+        # Official state map
+        official_map = {g.id: {"winner": g.winner_id, "round": g.round, "team_a": g.team_a_id, "team_b": g.team_b_id} for g in official_games}
+
+        point_values = {
+            "Survival_16": 1, "Round_64": 2, "Round_32": 4, 
+            "Sweet_16": 8, "Elite_8": 16, "National Semifinals": 32, "Championship": 64
+        }
+
+        leaderboard = []
+        for entry, email, bracket_name, bracket_id in results:
+            picks = (await session.exec(select(UserBracketPick).where(UserBracketPick.user_bracket_id == bracket_id))).all()
+            user_picks_map = {p.tournament_game_id: p.picked_winner_id for p in picks}
+
+            current_score = 0
+            points_rem = 0
+
+            for gid, game in official_map.items():
+                u_pick = user_picks_map.get(gid)
+                if not u_pick or u_pick == "TBD": continue
+                
+                # --- CALC ACTUAL POINTS ---
+                if game["winner"] == u_pick:
+                    # Base Round Pts
+                    round_pts = point_values.get(game["round"], 0)
+                    # Upset Bonus: Disparity between seeds
+                    s_a, s_b = team_seed_map.get(game["team_a"], 0), team_seed_map.get(game["team_b"], 0)
+                    # Only bonus if the numerical higher seed (dog) wins
+                    bonus = abs(s_a - s_b) if team_seed_map.get(game["winner"]) == max(s_a, s_b) and s_a != s_b else 0
+                    current_score += (round_pts + bonus)
+
+                # --- CALC POINTS REMAINING ---
+                # A pick is "Alive" if the real winner is not yet decided OR the real winner matches the pick
+                if game["winner"] is None:
+                    # Check if the user's picked team is still in the real tournament
+                    # (This is a simplified check: we assume all teams in official_map with winner=None are alive)
+                    round_pts = point_values.get(game["round"], 0)
+                    s_a, s_b = team_seed_map.get(game["team_a"], 0), team_seed_map.get(game["team_b"], 0)
+                    bonus = abs(s_a - s_b) if team_seed_map.get(u_pick) == max(s_a, s_b) and s_a != s_b else 0
+                    points_rem += (round_pts + bonus)
+
+            leaderboard.append({
+                "user_name": email.split('@')[0],
+                "bracket_name": bracket_name,
+                "score": current_score,
+                "pts_rem": points_rem
+            })
+
+        leaderboard.sort(key=lambda x: x['score'], reverse=True)
+        return leaderboard
