@@ -80,7 +80,7 @@ export default function GamePreviewScreen() {
     const heroCenterFontSize = isCompact ? 12 : isTablet ? 14 : 13;
 
     const sectionTitleSize = isCompact ? 17 : isTablet ? 22 : 20;
-    const compareCenterWidth = isCompact ? 82 : isTablet ? 108 : 98;
+    const compareCenterWidth = isCompact ? 96 : isTablet ? 110 : 100;
     const compareHeaderFontSize = isCompact ? 13 : 14;
     const compareValueFontSize = isCompact ? 14 : isTablet ? 16 : 15;
     const compareRowPaddingX = isCompact ? 10 : 14;

@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, ActivityIndicator, Pressable, ScrollView, StyleSheet, Alert } from 'react-native';
+import { View, Text, ActivityIndicator, Pressable, ScrollView, StyleSheet, Alert, Image, useWindowDimensions } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { API_BASE_URL } from '@/lib/api';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { AppColors } from '@/constants/app-colors';
@@ -10,6 +11,9 @@ import { useFocusEffect } from 'expo-router';
 export default function BracketTab() {
     const colorScheme = useColorScheme() ?? 'light';
     const theme = AppColors[colorScheme];
+    const insets = useSafeAreaInsets();
+    const { width } = useWindowDimensions();
+    const isTablet = width >= 768;
 
     const [phase, setPhase] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
@@ -268,7 +272,11 @@ export default function BracketTab() {
     if (phase === 'BRACKETOLOGY') {
         return (
             <View style={{ flex: 1, backgroundColor: theme.background }}>
-                <TournamentMap isMock={true} overrideBracketData={personalSim ?? undefined} onRunPersonalSim={runPersonalSim} />
+                <TournamentMap
+                    isMock={true}
+                    overrideBracketData={personalSim ?? undefined}
+                    onRunPersonalSim={runPersonalSim}
+                />
             </View>
         );
     }

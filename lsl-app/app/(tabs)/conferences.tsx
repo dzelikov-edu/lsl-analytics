@@ -5,7 +5,7 @@ import { useCachedApi } from '@/hooks/useCachedApi';
 import { getConferenceBranding } from '@/lib/conferenceBranding';
 import { router } from 'expo-router';
 import { useMemo } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions, Image } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 type ConferenceRow = {
@@ -178,8 +178,24 @@ export default function ConferencesScreen() {
 
     return (
         <ScrollView contentContainerStyle={styles.content}>
-            <Text style={styles.screenTitle}>Conferences</Text>
-            <Text style={styles.screenSubTitle}>Browse conference standings and outlook</Text>
+            {/* --- BRANDED HEADER --- */}
+            <View style={{ alignItems: 'center', marginBottom: 10, marginTop: 10 }}>
+                <Image
+                    source={require('@/assets/images/index_header_icon.png')}
+                    style={{ width: 140, height: 60 }}
+                    resizeMode="contain"
+                />
+                <Text style={{
+                    fontSize: 12,
+                    fontWeight: '800',
+                    color: theme.mutedText,
+                    letterSpacing: 2.5,
+                    marginTop: 8,
+                    textTransform: 'uppercase'
+                }}>
+                    The Universe's Conferences
+                </Text>
+            </View>
 
             {loading ? (
                 <View style={styles.centerBlock}>

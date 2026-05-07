@@ -5,7 +5,7 @@ import { useCachedApi } from '@/hooks/useCachedApi';
 import { getTeamBranding } from '@/lib/teamBranding';
 import { router } from 'expo-router';
 import { useMemo, useState, useEffect } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import { ActivityIndicator, Pressable, SectionList, StyleSheet, Text, View, useWindowDimensions, Image } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 type Top25Row = {
@@ -119,7 +119,7 @@ export default function RankingsScreen() {
                     flex: 1,
                 },
                 listRow: {
-                    fontSize: 18,
+                    fontSize: 16,
                     fontWeight: '700',
                     color: theme.text,
                 },
@@ -159,111 +159,131 @@ export default function RankingsScreen() {
     const top25: Top25Row[] = currentPollData?.top25 ?? [];
     const next5: Next5Row[] = currentPollData?.next5 ?? [];
 
+    // 0. Create a unified list for virtualization
+    const unifiedRankings = useMemo(() => {
+        const list: any[] = top25.map(t => ({ ...t, type: 'TOP25' }));
+        if (next5.length > 0) {
+            // Insert a special header item for the Next 5 section
+            list.push({ type: 'SECTION_HEADER', title: 'Next 5' });
+            list.push(...next5.map(n => ({ ...n, type: 'NEXT5' })));
+        }
+        return list;
+    }, [top25, next5]);
+
+    // 1. Group the data into Pods
+    const sections = useMemo(() => [
+        { title: 'Top 25', data: top25 },
+        { title: 'Next 5', data: next5 }
+    ], [top25, next5]);
+
+    // 2. The Render Item function (recreates the Pod Row look)
+    const renderRankingItem = ({ item, index, section }: { item: any, index: number, section: any }) => {
+        const isFirst = index === 0;
+        const isLast = index === section.data.length - 1;
+
+        return (
+            <Pressable
+                onPress={() => router.push({ pathname: '/team/[teamId]', params: { teamId: item.team_id } })}
+                style={({ pressed }) => [
+                    styles.listRowWrap,
+                    {
+                        backgroundColor: theme.card,
+                        paddingHorizontal: 14,
+                        paddingVertical: 6,
+                        borderLeftWidth: 1,
+                        borderRightWidth: 1,
+                        borderColor: theme.border,
+                        marginBottom: 0, // Tighten rows
+                        // Round the top of the first item in the pod
+                        borderTopLeftRadius: isFirst ? 14 : 0,
+                        borderTopRightRadius: isFirst ? 14 : 0,
+                        borderTopWidth: isFirst ? 1 : 0,
+                        // Round the bottom of the last item in the pod
+                        borderBottomLeftRadius: isLast ? 14 : 0,
+                        borderBottomRightRadius: isLast ? 14 : 0,
+                        borderBottomWidth: isLast ? 1 : 0,
+                    },
+                    pressed && styles.listRowPressed
+                ]}>
+                <Text style={styles.rankNumber}>{item.rank || item.order}.</Text>
+                <TeamLogo teamId={item.team_id} size={24} />
+                <View style={styles.rowTextWrap}>
+                    <Text style={styles.listRow}>
+                        {getTeamBranding(item.team_id, item.team_name).displayName}
+                    </Text>
+                </View>
+            </Pressable>
+        );
+    };
 
     return (
-        <ScrollView
-            contentContainerStyle={styles.content}
-        >
-
-            <Text style={styles.screenTitle}>Rankings</Text>
-
-            <View style={styles.switcherRow}>
-                <Pressable
-                    onPress={() => {
-                        if (selectedPoll !== 'LSL') {
-                            setSelectedPoll('LSL');
-                        }
-                    }}
-                    style={[styles.switchPill, selectedPoll === 'LSL' && styles.switchPillActive]}>
-                    <Text style={[styles.switchText, selectedPoll === 'LSL' && styles.switchTextActive]}>
-                        LSL Poll
-                    </Text>
-                </Pressable>
-
-                <Pressable
-                    onPress={() => {
-                        if (selectedPoll !== 'LCAA') {
-                            setSelectedPoll('LCAA');
-                        }
-                    }}
-                    style={[styles.switchPill, selectedPoll === 'LCAA' && styles.switchPillActive]}>
-                    <Text style={[styles.switchText, selectedPoll === 'LCAA' && styles.switchTextActive]}>
-                        LCAA Poll
-                    </Text>
-                </Pressable>
-            </View>
-
-            {loading && !payload ? (
-                <View style={styles.centerBlock}>
-                    <ActivityIndicator size="large" color={theme.text} />
-                    <Text style={styles.helper}>Loading all rankings...</Text>
-                </View>
-            ) : error ? (
-                <View style={styles.listCard}>
-                    <Text style={styles.errorTitle}>Error</Text>
-                    <Text style={styles.errorText}>{error}</Text>
-                </View>
-            ) : (
-                <>
-                    <View style={styles.section}>
-                        <Text style={styles.sectionTitle}>Top 25</Text>
-                        <View style={styles.listCard}>
-                            {top25.length === 0 ? (
-                                <Text style={styles.emptyText}>No Top 25 rankings available.</Text>
-                            ) : (
-                                top25.map((row) => (
-                                    <Pressable
-                                        key={row?.team_id}
-                                        onPress={() =>
-                                            router.push({
-                                                pathname: '/team/[teamId]',
-                                                params: { teamId: row?.team_id },
-                                            })
-                                        }
-                                        style={({ pressed }) => [styles.listRowWrap, pressed && styles.listRowPressed]}>
-                                        <Text style={styles.rankNumber}>{row?.rank}.</Text>
-                                        <TeamLogo teamId={row?.team_id} size={24} />
-                                        <View style={styles.rowTextWrap}>
-                                            <Text style={styles.listRow}>
-                                                {getTeamBranding(row?.team_id, row?.team_name).displayName}
-                                            </Text>
-                                        </View>
-                                    </Pressable>
-                                ))
-                            )}
+        <View style={{ flex: 1, backgroundColor: theme.background }}>
+            <SectionList
+                sections={sections}
+                renderItem={renderRankingItem}
+                keyExtractor={(item) => item.team_id}
+                contentContainerStyle={styles.content}
+                stickySectionHeadersEnabled={false} // Keeps the title scrolling with the pod
+                removeClippedSubviews={true}
+                initialNumToRender={15}
+                renderSectionHeader={({ section: { title, data } }) => (
+                    data.length > 0 ? (
+                        <Text style={[styles.sectionTitle, { marginTop: title === 'Next 5' ? 24 : 0 }]}>
+                            {title}
+                        </Text>
+                    ) : null
+                )}
+                ListHeaderComponent={
+                    <>
+                        {/* --- BRANDED HEADER --- */}
+                        <View style={{ alignItems: 'center', marginBottom: 10, marginTop: 10 }}>
+                            <Image
+                                source={require('@/assets/images/index_header_icon.png')}
+                                style={{ width: 140, height: 60 }}
+                                resizeMode="contain"
+                            />
+                            <Text style={{
+                                fontSize: 12,
+                                fontWeight: '800',
+                                color: theme.mutedText,
+                                letterSpacing: 2.5,
+                                marginTop: 8,
+                                textTransform: 'uppercase'
+                            }}>
+                                The Universe Rankings
+                            </Text>
                         </View>
-                    </View>
-
-                    <View style={styles.section}>
-                        <Text style={styles.sectionTitle}>Next 5</Text>
-                        <View style={styles.listCard}>
-                            {next5.length === 0 ? (
-                                <Text style={styles.emptyText}>No Next 5 teams available.</Text>
-                            ) : (
-                                next5.map((row) => (
-                                    <Pressable
-                                        key={row?.team_id}
-                                        onPress={() =>
-                                            router.push({
-                                                pathname: '/team/[teamId]',
-                                                params: { teamId: row?.team_id },
-                                            })
-                                        }
-                                        style={({ pressed }) => [styles.listRowWrap, pressed && styles.listRowPressed]}>
-                                        <Text style={styles.rankNumber}>{row?.order}.</Text>
-                                        <TeamLogo teamId={row?.team_id} size={24} />
-                                        <View style={styles.rowTextWrap}>
-                                            <Text style={styles.listRow}>
-                                                {getTeamBranding(row?.team_id, row?.team_name).displayName}
-                                            </Text>
-                                        </View>
-                                    </Pressable>
-                                ))
-                            )}
+                        <View style={styles.switcherRow}>
+                            <Pressable
+                                onPress={() => selectedPoll !== 'LSL' && setSelectedPoll('LSL')}
+                                style={[styles.switchPill, selectedPoll === 'LSL' && styles.switchPillActive]}>
+                                <Text style={[styles.switchText, selectedPoll === 'LSL' && styles.switchTextActive]}>
+                                    LSL Poll
+                                </Text>
+                            </Pressable>
+                            <Pressable
+                                onPress={() => selectedPoll !== 'LCAA' && setSelectedPoll('LCAA')}
+                                style={[styles.switchPill, selectedPoll === 'LCAA' && styles.switchPillActive]}>
+                                <Text style={[styles.switchText, selectedPoll === 'LCAA' && styles.switchTextActive]}>
+                                    LCAA Poll
+                                </Text>
+                            </Pressable>
                         </View>
-                    </View>
-                </>
-            )}
-        </ScrollView>
+
+                        {loading && !payload && (
+                            <View style={styles.centerBlock}>
+                                <ActivityIndicator size="large" color={theme.text} />
+                                <Text style={styles.helper}>Loading all rankings...</Text>
+                            </View>
+                        )}
+                        {error && (
+                            <View style={styles.listCard}><Text style={styles.errorText}>{error}</Text></View>
+                        )}
+                    </>
+                }
+                // Add a small spacer at the bottom of each section/pod
+                SectionSeparatorComponent={() => <View style={{ height: 2 }} />}
+            />
+        </View>
     );
 }

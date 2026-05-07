@@ -5,7 +5,7 @@ import { useCachedApi } from '@/hooks/useCachedApi';
 import { getTeamBranding } from '@/lib/teamBranding';
 import { router } from 'expo-router';
 import { useMemo, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions, TextInput } from 'react-native';
+import { ActivityIndicator, Pressable, FlatList, StyleSheet, Text, View, useWindowDimensions, TextInput, Image } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 type TeamRow = {
@@ -193,66 +193,101 @@ export default function TeamsScreen() {
         ].join(' • ');
     };
 
+    const renderTeamItem = ({ item: team }: { item: TeamRow }) => (
+        <Pressable
+            key={team.team_id}
+            onPress={() => router.push(`/team/${team.team_id}`)}
+            style={({ pressed }) => [styles.teamCard, pressed && styles.teamCardPressed]}>
+            <View style={styles.topRow}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, paddingRight: 12 }}>
+                    <TeamLogo teamId={team.team_id} size={30} />
+                    <View style={{ marginLeft: 10, flex: 1 }}>
+                        <Text style={styles.teamName}>{getTeamBranding(team.team_id, team.team_name).displayName}</Text>
+                    </View>
+                </View>
+
+                <View style={styles.rankBadge}>
+                    <Text style={styles.rankBadgeText}>{formatRankText(team)}</Text>
+                </View>
+            </View>
+
+            <View style={styles.analyticsRow}>
+                <Text style={styles.analyticsLabel}>Analytics Snapshot</Text>
+                <Text style={styles.analyticsStrip}>{formatAnalyticsStrip(team)}</Text>
+            </View>
+        </Pressable>
+    );
+
     return (
-        <ScrollView contentContainerStyle={styles.content}>
-            <Text style={styles.screenTitle}>Teams</Text>
-            <Text style={styles.screenSubTitle}>Browse all tracked teams</Text>
+        <View style={{ flex: 1, backgroundColor: theme.background }}>
+            <FlatList
+                data={filteredTeams}
+                renderItem={renderTeamItem}
+                keyExtractor={(item) => item.team_id}
+                contentContainerStyle={styles.content}
+                removeClippedSubviews={true} // High-impact memory optimization
+                initialNumToRender={10}      // Start small
+                maxToRenderPerBatch={5}      // Add items slowly to prevent CPU spikes
+                windowSize={5}               // Keep only 5 screens of data in RAM
+                ListHeaderComponent={
+                    <>
+                        {/* --- BRANDED HEADER --- */}
+                        <View style={{ alignItems: 'center', marginBottom: 10, marginTop: 10 }}>
+                            <Image
+                                source={require('@/assets/images/index_header_icon.png')}
+                                style={{ width: 140, height: 60 }}
+                                resizeMode="contain"
+                            />
+                            <Text style={{
+                                fontSize: 12,
+                                fontWeight: '800',
+                                color: theme.mutedText,
+                                letterSpacing: 2.5,
+                                marginTop: 8,
+                                textTransform: 'uppercase'
+                            }}>
+                                The Universe's Main Programs
+                            </Text>
+                        </View>
 
-            <TextInput
-                style={styles.searchInput}
-                placeholder="Search teams..."
-                placeholderTextColor={theme.mutedText}
-                value={searchQuery}
-                onChangeText={setSearchQuery}
-                autoCorrect={false}
-                clearButtonMode="while-editing"
+                        <TextInput
+                            style={styles.searchInput}
+                            placeholder="Search teams..."
+                            placeholderTextColor={theme.mutedText}
+                            value={searchQuery}
+                            onChangeText={setSearchQuery}
+                            autoCorrect={false}
+                            clearButtonMode="while-editing"
+                        />
+
+                        {loading && (
+                            <View style={styles.centerBlock}>
+                                <ActivityIndicator size="large" />
+                                <Text style={styles.helper}>Loading teams...</Text>
+                            </View>
+                        )}
+
+                        {error && !loading && (
+                            <View style={styles.teamCard}>
+                                <Text style={styles.errorTitle}>Error</Text>
+                                <Text style={styles.errorText}>{error}</Text>
+                            </View>
+                        )}
+
+                        {!loading && teams.length === 0 && (
+                            <View style={styles.teamCard}>
+                                <Text style={styles.errorText}>No teams available.</Text>
+                            </View>
+                        )}
+
+                        {!loading && teams.length > 0 && filteredTeams.length === 0 && (
+                            <View style={styles.centerBlock}>
+                                <Text style={styles.helper}>No teams found matching "{searchQuery}"</Text>
+                            </View>
+                        )}
+                    </>
+                }
             />
-
-            {loading ? (
-                <View style={styles.centerBlock}>
-                    <ActivityIndicator size="large" />
-                    <Text style={styles.helper}>Loading teams...</Text>
-                </View>
-            ) : error ? (
-                <View style={styles.teamCard}>
-                    <Text style={styles.errorTitle}>Error</Text>
-                    <Text style={styles.errorText}>{error}</Text>
-                </View>
-            ) : teams.length === 0 ? (
-                <View style={styles.teamCard}>
-                    <Text style={styles.errorText}>No teams available.</Text>
-                </View>
-            ) : filteredTeams.length === 0 ? (
-                // --- NEW: Handle search query with no matches ---
-                <View style={styles.centerBlock}>
-                    <Text style={styles.helper}>No teams found matching "{searchQuery}"</Text>
-                </View>
-            ) : (
-                filteredTeams.map((team) => (
-                    <Pressable
-                        key={team.team_id}
-                        onPress={() => router.push(`/team/${team.team_id}`)}
-                        style={({ pressed }) => [styles.teamCard, pressed && styles.teamCardPressed]}>
-                        <View style={styles.topRow}>
-                            <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, paddingRight: 12 }}>
-                                <TeamLogo teamId={team.team_id} size={30} />
-                                <View style={{ marginLeft: 10, flex: 1 }}>
-                                    <Text style={styles.teamName}>{getTeamBranding(team.team_id, team.team_name).displayName}</Text>
-                                </View>
-                            </View>
-
-                            <View style={styles.rankBadge}>
-                                <Text style={styles.rankBadgeText}>{formatRankText(team)}</Text>
-                            </View>
-                        </View>
-
-                        <View style={styles.analyticsRow}>
-                            <Text style={styles.analyticsLabel}>Analytics Snapshot</Text>
-                            <Text style={styles.analyticsStrip}>{formatAnalyticsStrip(team)}</Text>
-                        </View>
-                    </Pressable>
-                ))
-            )}
-        </ScrollView>
+        </View>
     );
 }

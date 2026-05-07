@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { StyleSheet, View, Dimensions, Text, ActivityIndicator, Pressable, Alert } from 'react-native';
+import { StyleSheet, View, Dimensions, Text, ActivityIndicator, Pressable, Alert, useWindowDimensions } from 'react-native';
 import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
 import Animated, { useSharedValue, useAnimatedStyle } from 'react-native-reanimated';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -10,6 +10,7 @@ import TournamentMatchup from '@/components/TournamentMatchup';
 import ScoutingReport from '@/components/ScoutingReport';
 import TeamLogo from '@/components/TeamLogo';
 import { getGameCoordinates, GAME_HEIGHT, CENTER_X, CENTER_Y } from '@/lib/bracketLayout';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { getTeamBranding } from '@/lib/teamBranding';
 import { useFocusEffect } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -25,6 +26,22 @@ type TournamentMapProps = {
 export default function TournamentMap({ isMock = false, overrideBracketData, onRunPersonalSim, initialBracketId }: TournamentMapProps) {
     const colorScheme = useColorScheme() ?? 'light';
     const theme = AppColors[colorScheme];
+    const insets = useSafeAreaInsets();
+    const { width } = useWindowDimensions();
+    const isTablet = width >= 768;
+
+    // --- DYNAMIC FORCEFIELD LOGIC ---
+    // iPad stays at your original -1035. iPhone gets the extra travel to -1200.
+    const maxY = isTablet ? -1035 : -1250;
+    // iPad stays at your original -85 top limit. iPhone gets more room at -20.
+    const minY = isTablet ? -85 : -60;
+
+    // --- HORIZONTAL FORCEFIELD LOGIC ---
+    // maxX: The "Left Wall" (How far you can pan to see the left side)
+    const maxX = isTablet ? -2542 : -2920; // Try -2650 for iPhone to see more left
+    // minX: The "Right Wall" (How far you can pan to see the right side)
+    const minX = isTablet ? -327 : -327;   // Try -150 for iPhone to see more right
+
     const [loading, setLoading] = useState(true);
     const [bracketGames, setBracketGames] = useState<any[]>([]);
     const [regionOrder, setRegionOrder] = useState<string[]>([]);
@@ -38,8 +55,9 @@ export default function TournamentMap({ isMock = false, overrideBracketData, onR
     const [locking, setLocking] = useState(false);
     const [hasCustomLogos, setHasCustomLogos] = useState(false);
 
-    const offset = useSharedValue({ x: -1000, y: -1000 });
-    const start = useSharedValue({ x: -1000, y: -1000 });
+    // iPad starts at your original -1000. iPhone starts higher at -350.
+    const offset = useSharedValue({ x: -1000, y: isTablet ? -1000 : -350 });
+    const start = useSharedValue({ x: -1000, y: isTablet ? -1000 : -350 });
 
     const roundHeaders = [
         { round: 'Survival_16', label: 'SURVIVAL 16', dates: '3/16 – 3/17', gap: 140 },
@@ -92,7 +110,13 @@ export default function TournamentMap({ isMock = false, overrideBracketData, onR
     const panGesture = Gesture.Pan().onUpdate((e) => {
         const nextX = e.translationX + start.value.x;
         const nextY = e.translationY + start.value.y;
-        offset.value = { x: Math.min(-320, Math.max(nextX, -2550)), y: Math.min(-85, Math.max(nextY, -1035)) };
+
+        // Use the dynamic Clamps we just defined
+        // Use the dynamic X and Y Clamps
+        offset.value = {
+            x: Math.min(minX, Math.max(nextX, maxX)),
+            y: Math.min(minY, Math.max(nextY, maxY))
+        };
     }).onEnd(() => {
         start.value = { x: offset.value.x, y: offset.value.y };
     });
@@ -721,16 +745,37 @@ export default function TournamentMap({ isMock = false, overrideBracketData, onR
                     </Animated.View>
                 </GestureDetector>
 
-                <View style={[styles.topBar, { backgroundColor: theme.background }]}>
+                <View style={[
+                    styles.topBar,
+                    {
+                        backgroundColor: theme.background,
+                        height: 72 + (isTablet ? 0 : insets.top - 22)
+                    }
+                ]}>
                     {/* CENTER TITLE - Pushed up for room, champLine removed */}
-                    <View style={{ position: 'absolute', top: 20, left: 0, right: 0, alignItems: 'center', zIndex: 10 }}>
+                    <View style={{
+                        position: 'absolute',
+                        // On iPad, we keep it exactly at 20. 
+                        // On iPhone, we use the inset (notch) but subtract 10 to tuck it tighter.
+                        top: isTablet ? 20 : insets.top - 0,
+                        left: 0,
+                        right: 0,
+                        alignItems: 'center',
+                        zIndex: 10
+                    }}>
                         <Text style={{ color: theme.text, fontWeight: '900', fontSize: 14, letterSpacing: 0.5 }}>
                             {isMock ? 'LCAA BRACKETOLOGY • 2036' : 'OFFICIAL LCAA BRACKET • 2036'}
                         </Text>
                     </View>
 
                     {/* SLIDING HEADERS LAYER */}
-                    <Animated.View style={[{ position: 'absolute', top: 41, left: 0, flexDirection: 'row' }, headerAnimatedStyle]}>
+                    <Animated.View style={[{
+                        position: 'absolute',
+                        // Sync header position with the taller top bar
+                        top: 20 + (isTablet ? 20 : insets.top),
+                        left: 0,
+                        flexDirection: 'row'
+                    }, headerAnimatedStyle]}>
                         {/* LEFT SIDE */}
                         <View style={{ flexDirection: 'row', marginLeft: 401 }}>
                             {roundHeaders.map(m => (
@@ -827,7 +872,7 @@ const styles = StyleSheet.create({
         top: 0,
         left: 0,
         right: 0,
-        height: 72,
+        height: 60, // Keep base height here
         borderBottomWidth: 1,
         borderBottomColor: '#333',
         overflow: 'hidden',

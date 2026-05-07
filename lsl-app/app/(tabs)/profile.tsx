@@ -1,9 +1,10 @@
-import { View, Text, Pressable, StyleSheet, ScrollView, ActivityIndicator, RefreshControl, Alert, Switch } from 'react-native';
+import { View, Text, Pressable, StyleSheet, ScrollView, ActivityIndicator, RefreshControl, Alert, Switch, Image, useWindowDimensions } from 'react-native';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { AppColors } from '@/constants/app-colors';
 import { router, useFocusEffect } from 'expo-router'; // Add useFocusEffect
 import { deleteToken, getToken } from '@/lib/auth-storage';
 import { useEffect, useState, useMemo, useCallback } from 'react'; // Add useCallback
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { API_BASE_URL } from '@/lib/api';
 import TeamLogo from '@/components/TeamLogo';
 import { EmptyState } from '@/components/EmptyState';
@@ -18,6 +19,9 @@ const CONFERENCES = ["AAC", "ACC", "B10", "B12", "BE", "MW", "P12", "SEC", "WCC"
 export default function ProfileScreen() {
     const colorScheme = useColorScheme() ?? 'light';
     const theme = AppColors[colorScheme];
+    const insets = useSafeAreaInsets();
+    const { width } = useWindowDimensions();
+    const isTablet = width >= 768; // Standard breakpoint for iPad
 
     const [user, setUser] = useState<{ email?: string; is_admin?: boolean } | null>(null);
     const [favorites, setFavorites] = useState<string[]>([]);
@@ -427,16 +431,50 @@ export default function ProfileScreen() {
                 <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={theme.text} />
             }
         >
-
-            <Text style={styles.title}>Profile</Text>
-
-            {loading && !user ? (
-                <ActivityIndicator size="small" color={theme.text} style={{ marginBottom: 20 }} />
-            ) : user ? (
-                <Text style={styles.subtitle}>
-                    {user.email}{user.is_admin ? ' • Admin' : ''}
+            {/* --- BRANDED PROFILE HEADER --- */}
+            <View style={{
+                alignItems: 'center',
+                marginBottom: 15,
+                marginTop: isTablet
+                    ? -38 // <--- ADJUST THIS NUMBER FOR IPAD (Try 40, 60, or 80)
+                    : insets.top > 0
+                        ? insets.top - 42 // Your iPhone Sweet Spot
+                        : 30 // Standard Small Phone
+            }}>
+                <Image
+                    source={require('@/assets/images/index_header_icon.png')}
+                    style={{ width: 140, height: 60 }}
+                    resizeMode="contain"
+                />
+                <Text style={{
+                    fontSize: 12,
+                    fontWeight: '800',
+                    color: theme.mutedText,
+                    letterSpacing: 2.5,
+                    marginTop: 8,
+                    textTransform: 'uppercase'
+                }}>
+                    Legends Universe Account
                 </Text>
-            ) : null}
+
+                {loading && !user ? (
+                    <ActivityIndicator size="small" color={theme.text} style={{ marginTop: 15 }} />
+                ) : user ? (
+                    <View style={{
+                        marginTop: 12,
+                        paddingHorizontal: 12,
+                        paddingVertical: 4,
+                        backgroundColor: theme.card,
+                        borderRadius: 8,
+                        borderWidth: 1,
+                        borderColor: theme.border
+                    }}>
+                        <Text style={{ fontSize: 13, fontWeight: '700', color: theme.text }}>
+                            {user.email}{user.is_admin ? ' • ADMIN' : ''}
+                        </Text>
+                    </View>
+                ) : null}
+            </View>
 
             <Text style={styles.sectionTitle}>My Favorite Teams</Text>
 
