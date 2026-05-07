@@ -113,9 +113,11 @@ export default function GamePreviewScreen() {
         return null;
     };
 
-    const formatRankedTeamName = (teamName?: string, team?: TeamPreview | null) => {
+    const formatRankedTeamName = (teamId?: string | null, team?: TeamPreview | null) => {
         const rank = formatPoll(team);
-        return `${rank ? `${rank} ` : ''}${teamName || '-'}`;
+        // We pass the team_name from the 'team' object (API data) into branding
+        const displayName = getTeamBranding(teamId, team?.team_name).displayName;
+        return `${rank ? `${rank} ` : ''}${displayName}`;
     };
 
     const formatLeader = (leader?: Leader) => {
@@ -148,8 +150,8 @@ export default function GamePreviewScreen() {
         return `${value}`;
     };
 
-    const awayTitleName = formatRankedTeamName(game?.away_name, awayTeam);
-    const homeTitleName = formatRankedTeamName(game?.home_name, homeTeam);
+    const awayTitleName = formatRankedTeamName(game?.away_id, awayTeam);
+    const homeTitleName = formatRankedTeamName(game?.home_id, homeTeam);
     const screenTitle =
         game?.away_id && game?.home_id
             ? `${awayTitleName} ${String(game?.matchup_display || '').includes(' at ') ? 'at' : 'vs'} ${homeTitleName}`
@@ -558,7 +560,7 @@ export default function GamePreviewScreen() {
                                 <Text
                                     numberOfLines={2}
                                     style={[styles.heroTeamName, styles.heroTeamNameLeft]}>
-                                    {formatRankedTeamName(game.away_name, awayTeam)}
+                                    {formatRankedTeamName(game.away_id, awayTeam)}
                                 </Text>
                                 <Text style={[styles.heroTeamSub, styles.heroTeamSubLeft]}>
                                     {awayTeam?.record?.overall_record || '—'}
@@ -578,7 +580,7 @@ export default function GamePreviewScreen() {
                                 <Text
                                     numberOfLines={2}
                                     style={[styles.heroTeamName, styles.heroTeamNameRight]}>
-                                    {formatRankedTeamName(game.home_name, homeTeam)}
+                                    {formatRankedTeamName(game.home_id, homeTeam)}
                                 </Text>
                                 <Text style={[styles.heroTeamSub, styles.heroTeamSubRight]}>
                                     {homeTeam?.record?.overall_record || '—'}
@@ -592,11 +594,11 @@ export default function GamePreviewScreen() {
                         <View style={styles.compareCard}>
                             <View style={styles.compareHeader}>
                                 <View style={styles.compareColLeft}>
-                                    <Text style={styles.compareTeamName}>{game.away_name || 'Away'}</Text>
+                                    <Text style={styles.compareTeamName}>{getTeamBranding(game.away_id, game.away_team?.team_name).displayName}</Text>
                                 </View>
                                 <View style={styles.compareColCenter} />
                                 <View style={styles.compareColRight}>
-                                    <Text style={styles.compareTeamName}>{game.home_name || 'Home'}</Text>
+                                    <Text style={styles.compareTeamName}>{getTeamBranding(game.home_id, game.home_team?.team_name).displayName}</Text>
                                 </View>
                             </View>
 
@@ -840,7 +842,7 @@ export default function GamePreviewScreen() {
                                     })
                                 }
                                 style={({ pressed }) => [styles.navRow, pressed && styles.navRowPressed]}>
-                                <Text style={styles.navTitle}>{game.away_name || 'Away'} Team Page</Text>
+                                <Text style={styles.navTitle}>{getTeamBranding(game.away_id, game.away_team?.team_name).displayName} Team Page</Text>
                                 <Text style={styles.navSub}>Open full team detail</Text>
                             </Pressable>
 
@@ -852,7 +854,7 @@ export default function GamePreviewScreen() {
                                     })
                                 }
                                 style={({ pressed }) => [styles.navRow, styles.navRowLast, pressed && styles.navRowPressed]}>
-                                <Text style={styles.navTitle}>{game.home_name || 'Home'} Team Page</Text>
+                                <Text style={styles.navTitle}>{getTeamBranding(game.home_id, game.home_team?.team_name).displayName} Team Page</Text>
                                 <Text style={styles.navSub}>Open full team detail</Text>
                             </Pressable>
                         </View>

@@ -41,7 +41,7 @@ export default function IntroScreen() {
             </View>
 
             <Text style={[styles.body, { color: theme.mutedText, marginTop: 16 }]}>
-                <Text style={{ fontStyle: 'italic' }}>Visual Note:</Text> This app uses a "Store-Safe" generic branding system by default. Members can apply custom visual packs via the Profile tab to personalize their simulation experience.
+                <Text style={{ fontStyle: 'italic' }}>Visual Note:</Text> This app utilizes a custom simulation branding system by default. Users may further personalize their simulation universe by applying external community branding packs via the Profile tab.
             </Text>
 
             <Text style={[styles.body, { color: theme.mutedText, marginTop: 16 }]}>

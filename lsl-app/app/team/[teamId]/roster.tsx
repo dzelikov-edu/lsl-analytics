@@ -2,7 +2,8 @@ import TeamLogo from '@/components/TeamLogo';
 import { AppColors } from '@/constants/app-colors';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useCachedApi } from '@/hooks/useCachedApi';
-import { router, useLocalSearchParams } from 'expo-router';
+import { getTeamBranding } from '@/lib/teamBranding';
+import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { useMemo } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
@@ -195,6 +196,8 @@ export default function TeamRosterScreen() {
         enabled: !!teamId,
     });
 
+    const branding = getTeamBranding(teamId, payload?.team_name); // Get gated name
+
     const players: PlayerRow[] = payload?.players ?? [];
 
     const formatHometown = (p: PlayerRow) => {
@@ -226,6 +229,7 @@ export default function TeamRosterScreen() {
 
     return (
         <ScrollView contentContainerStyle={styles.content}>
+            <Stack.Screen options={{ title: `${branding.displayName} Roster` }} />
             {loading ? (
                 <View style={styles.centerBlock}>
                     <ActivityIndicator size="large" />

@@ -2,6 +2,8 @@ import TeamLogo from '@/components/TeamLogo';
 import { AppColors } from '@/constants/app-colors';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useCachedApi } from '@/hooks/useCachedApi';
+import { getTeamBranding } from '@/lib/teamBranding';
+import { Image } from 'react-native'; // Ensure Image is imported
 import { router } from 'expo-router';
 import { useMemo } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions, RefreshControl } from 'react-native';
@@ -401,10 +403,24 @@ export default function HomeScreen() {
         </View>
       ) : (
         <>
-          <Text style={styles.screenTitle}>Legends CBB</Text>
-          <Text style={styles.screenSubTitle}>
-            League snapshot, featured matchups, rankings, and analytics leaders
-          </Text>
+          {/* --- BRANDED HEADER --- */}
+          <View style={{ alignItems: 'center', marginBottom: 10, marginTop: 10 }}>
+            <Image
+              source={require('@/assets/images/index_header_icon.png')}
+              style={{ width: 140, height: 60 }}
+              resizeMode="contain"
+            />
+            <Text style={{
+              fontSize: 12,
+              fontWeight: '800',
+              color: theme.mutedText,
+              letterSpacing: 2.5,
+              marginTop: 8,
+              textTransform: 'uppercase'
+            }}>
+              The Legends Universe
+            </Text>
+          </View>
 
           {myTeamsSnapshot.length > 0 && (
             <View style={styles.section}>
@@ -439,7 +455,7 @@ export default function HomeScreen() {
                           {game.lsl_rank_away !== null && game.lsl_rank_away !== undefined
                             ? `#${game.lsl_rank_away} `
                             : ''}
-                          {game.away_name}
+                          {getTeamBranding(game.away_id, game.away_name).displayName}
                         </Text>
                       </View>
                       {/* ONLY RENDER THIS IF IT IS A RESULT */}
@@ -458,7 +474,7 @@ export default function HomeScreen() {
                           {game.lsl_rank_home !== null && game.lsl_rank_home !== undefined
                             ? `#${game.lsl_rank_home} `
                             : ''}
-                          {game.home_name}
+                          {getTeamBranding(game.home_id, game.home_name).displayName}
                         </Text>
                       </View>
                       {/* ONLY RENDER THIS IF IT IS A RESULT */}
@@ -497,7 +513,7 @@ export default function HomeScreen() {
                       {game.lsl_rank_away !== null && game.lsl_rank_away !== undefined
                         ? `#${game.lsl_rank_away} `
                         : ''}
-                      {game.away_name || 'Away'}
+                      {getTeamBranding(game.away_id, game.away_name).displayName}
                     </Text>
                   </View>
                 </View>
@@ -509,7 +525,7 @@ export default function HomeScreen() {
                       {game.lsl_rank_home !== null && game.lsl_rank_home !== undefined
                         ? `#${game.lsl_rank_home} `
                         : ''}
-                      {game.home_name || 'Home'}
+                      {getTeamBranding(game.home_id, game.home_name).displayName}
                     </Text>
                   </View>
                 </View>
@@ -535,7 +551,7 @@ export default function HomeScreen() {
                   </Text>
                   <TeamLogo teamId={team.team_id} size={22} />
                   <View style={styles.rankingTextWrap}>
-                    <Text style={styles.rankingName}>{team.team_name}</Text>
+                    <Text style={styles.rankingName}>{getTeamBranding(team.team_id, team.team_name).displayName}</Text>
                   </View>
                 </Pressable>
               ))}
@@ -550,7 +566,7 @@ export default function HomeScreen() {
                 <View style={styles.leaderTextWrap}>
                   <Text style={styles.leaderLabel}>Power Leader</Text>
                   <Text style={styles.leaderName}>
-                    {analytics?.power?.team_name ?? '—'}
+                    {analytics?.power?.team_id ? getTeamBranding(analytics.power.team_id, analytics.power.team_name).displayName : '—'}
                   </Text>
                   <Text style={styles.leaderValue}>
                     {analytics?.power?.rank !== null && analytics?.power?.rank !== undefined
@@ -621,7 +637,7 @@ export default function HomeScreen() {
                               {game.lsl_rank_away !== null && game.lsl_rank_away !== undefined
                                 ? `#${game.lsl_rank_away} `
                                 : ''}
-                              {game.away_name || 'Away'}
+                              {getTeamBranding(game.away_id, game.away_name).displayName}
                             </Text>
                           </View>
                         </View>
@@ -633,7 +649,7 @@ export default function HomeScreen() {
                               {game.lsl_rank_home !== null && game.lsl_rank_home !== undefined
                                 ? `#${game.lsl_rank_home} `
                                 : ''}
-                              {game.home_name || 'Home'}
+                              {getTeamBranding(game.home_id, game.home_name).displayName}
                             </Text>
                           </View>
                         </View>

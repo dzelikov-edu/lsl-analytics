@@ -8,6 +8,7 @@ import { API_BASE_URL } from '@/lib/api';
 import TeamLogo from '@/components/TeamLogo';
 import { EmptyState } from '@/components/EmptyState';
 import { importLogoPack } from '@/lib/logoManager';
+import { getTeamBranding } from '@/lib/teamBranding';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as FileSystem from 'expo-file-system/legacy';
 
@@ -53,14 +54,13 @@ export default function ProfileScreen() {
                 setFavorites(favsData);
             }
 
-            // Build a name map from the teams list
+            // Build a name map from the teams list using the Branding Gate
             if (teamsRes.ok) {
                 const teamsData = await teamsRes.json();
                 const mapping: Record<string, string> = {};
-                // Adjust this loop based on your /teams response structure
-                // Usually it's an array of team objects
                 (teamsData.teams || teamsData).forEach((t: any) => {
-                    mapping[t.team_id] = t.team_name;
+                    // This ensures even the Favorites list obeys your authored names
+                    mapping[t.team_id] = getTeamBranding(t.team_id, t.team_name).displayName;
                 });
                 setTeamNames(mapping);
             }
@@ -442,7 +442,11 @@ export default function ProfileScreen() {
 
             {favorites.length > 0 ? (
                 [...favorites]
-                    .sort((a, b) => (teamNames[a] || a).localeCompare(teamNames[b] || b))
+                    .sort((a, b) => {
+                        const nameA = teamNames[a] || getTeamBranding(a, null).displayName;
+                        const nameB = teamNames[b] || getTeamBranding(b, null).displayName;
+                        return nameA.localeCompare(nameB);
+                    })
                     .map((teamId) => (
                         <Pressable
                             key={teamId}
@@ -453,7 +457,7 @@ export default function ProfileScreen() {
                             })}
                         >
                             <TeamLogo teamId={teamId} size={30} />
-                            <Text style={styles.favText}>{teamNames[teamId] || teamId}</Text>
+                            <Text style={styles.favText}>{teamNames[teamId] || getTeamBranding(teamId, null).displayName}</Text>
                         </Pressable>
                     ))
             ) : (
@@ -600,6 +604,14 @@ export default function ProfileScreen() {
             <Pressable style={styles.logoutButton} onPress={handleLogout}>
                 <Text style={styles.buttonText}>Log Out</Text>
             </Pressable>
+
+            <View style={{ marginTop: 20, padding: 15, backgroundColor: theme.card, borderRadius: 12, borderStyle: 'dashed', borderWidth: 1, borderColor: theme.border }}>
+                <Text style={[styles.sectionTitle, { fontSize: 16, marginBottom: 8 }]}>Simulation Engine</Text>
+                <Text style={{ color: theme.mutedText, fontSize: 13, lineHeight: 18 }}>
+                    Legends CBB results are generated using the <Text style={{ fontWeight: '700' }}>Legacy Simulation Engine</Text>.
+                    Special thanks to the <Text style={{ fontWeight: '700' }}>MML Development Team</Text> for their dedication to simulation realism and community-driven analytics.
+                </Text>
+            </View>
 
             {/* --- VERSION NUMBER --- */}
             <Text style={styles.versionText}>Legends CBB v1.0.0 (Beta)</Text>

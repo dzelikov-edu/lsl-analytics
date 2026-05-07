@@ -2,6 +2,7 @@ import TeamLogo from '@/components/TeamLogo';
 import { AppColors } from '@/constants/app-colors';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useCachedApi } from '@/hooks/useCachedApi';
+import { getTeamBranding } from '@/lib/teamBranding';
 import { router } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions, TextInput } from 'react-native';
@@ -236,7 +237,7 @@ export default function TeamsScreen() {
                             <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, paddingRight: 12 }}>
                                 <TeamLogo teamId={team.team_id} size={30} />
                                 <View style={{ marginLeft: 10, flex: 1 }}>
-                                    <Text style={styles.teamName}>{team.team_name}</Text>
+                                    <Text style={styles.teamName}>{getTeamBranding(team.team_id, team.team_name).displayName}</Text>
                                 </View>
                             </View>
 

@@ -9,8 +9,8 @@ export function getGameCoordinates(region: string, round: string, slot: number, 
     const isLeft = (region === regionOrder[0] || region === regionOrder[3]);
     const isBottom = (region === regionOrder[2] || region === regionOrder[3]);
 
-    // 1. FINAL FOUR - TIGHTER BRIDGE
-    if (region === "Final Four" || round === "National Semifinals" || round === "Championship") {
+    // 1. CENTER STAGE - TIGHTER BRIDGE
+    if (region === "Forever Four" || round === "National Semifinals" || round === "Championship") {
         if (round === "Championship") return { x: CENTER_X - 110, y: CENTER_Y };
         // Pulled Semis significantly closer to Championship
         const semiX = (slot === 1) ? CENTER_X - 350 : CENTER_X + 130;

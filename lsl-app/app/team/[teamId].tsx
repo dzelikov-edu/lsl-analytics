@@ -4,7 +4,9 @@ import { AppColors } from '@/constants/app-colors';
 import { getToken } from '../../lib/auth-storage';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useCachedApi } from '@/hooks/useCachedApi';
-import { router, useLocalSearchParams } from 'expo-router';
+import { getTeamBranding } from '@/lib/teamBranding';
+import { getConferenceBranding } from '@/lib/conferenceBranding';
+import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
@@ -380,37 +382,41 @@ export default function TeamDetailScreen() {
         };
     };
 
-    const formatConferenceName = (name?: string | null) => {
+    const formatConferenceName = (name?: string | null, confId?: string | null, isRealism?: boolean) => {
         if (!name) return null;
 
-        const normalized = name.trim();
-
-        const shortMap: Record<string, string> = {
-            'Atlantic Coast Conference': 'ACC',
-            'Southeastern Conference': 'SEC',
-            'Big Ten Conference': 'Big Ten',
-            'Big 12 Conference': 'Big 12',
-            'Big East Conference': 'Big East',
-            'Pacific-12 Conference': 'Pac-12',
-            'Pac-12 Conference': 'Pac-12',
-            'American Athletic Conference': 'AAC',
-            'Mountain West Conference': 'Mountain West',
-            'West Coast Conference': 'WCC',
-            'Missouri Valley Conference': 'Missouri Valley',
-            'Atlantic 10 Conference': 'A-10',
-            'Atlantic Ten Conference': 'A-10',
-            'Big West Conference': 'Big West',
-            'Missouri Valley Football Conference': 'Missouri Valley',
+        const authoredShortMap: Record<string, string> = {
+            'ACC': 'CEC',
+            'AAC': 'NAC',
+            'A10': 'ECC',
+            'BE': 'MPC',
+            'B10': 'RAC',
+            'B12': 'GPC',
+            'BW': 'LWC',
+            'MVC': 'HAC',
+            'MW': 'RMC',
+            'P12': 'WPC',
+            'SEC': 'SAC',
+            'WCC': 'PRC',
         };
 
-        return shortMap[normalized] ?? normalized.replace(/\s+Conference$/, '');
+        // Use the boolean passed in instead of the missing variable
+        if (isRealism && confId) {
+            return confId;
+        }
+
+        const normalizedId = String(confId).toUpperCase();
+        return authoredShortMap[normalizedId] ?? name.replace(/\s+Conference$/, '');
     };
 
     const overallRecord = team?.record?.overall_record ?? '—';
     const conferenceRecord = team?.record?.conference_record ?? '—';
 
-    const conferenceName = team?.conference_name ?? null;
-    const conferenceDisplayName = formatConferenceName(conferenceName);
+    const teamBranding = getTeamBranding(teamId, team?.team_name);
+    const conferenceBranding = getConferenceBranding(team?.conference_id, team?.conference_name);
+    // If the display name is the same as the API name, realism is "active"
+    const isRealismActive = teamBranding.displayName === team?.team_name;
+    const conferenceDisplayName = conferenceBranding.displayName || 'Conference';
     const playersCount = team?.roster_summary?.players_count ?? 0;
 
     const analyticsCards = [
@@ -422,6 +428,11 @@ export default function TeamDetailScreen() {
 
     return (
         <ScrollView contentContainerStyle={styles.content}>
+            <Stack.Screen
+                options={{
+                    title: teamBranding.displayName
+                }}
+            />
             {loading ? (
                 <View style={styles.centerBlock}>
                     <ActivityIndicator size="large" />
@@ -445,7 +456,7 @@ export default function TeamDetailScreen() {
                             </View>
 
                             <View style={styles.heroTextWrap}>
-                                <Text style={styles.teamName}>{team.team_name}</Text>
+                                <Text style={styles.teamName}>{teamBranding.displayName}</Text>
 
                                 <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                                     <Text style={styles.primaryRecord}>{overallRecord}</Text>
@@ -460,7 +471,7 @@ export default function TeamDetailScreen() {
                                         }}>
                                             <Text style={{ color: theme.background, fontSize: 12, fontWeight: '800' }}>
                                                 {/* ADD 'T-' if tied */}
-                                                {team.conference_is_tied ? 'T-' : ''}{getOrdinal(team.conference_rank)} in {team.conference_id}
+                                                {team.conference_is_tied ? 'T-' : ''}{getOrdinal(team.conference_rank)} in {formatConferenceName(conferenceBranding.displayName, team.conference_id, isRealismActive)}
                                             </Text>
                                         </View>
                                     )}

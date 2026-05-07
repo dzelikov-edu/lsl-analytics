@@ -2,6 +2,7 @@ import TeamLogo from '@/components/TeamLogo';
 import { AppColors } from '@/constants/app-colors';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useCachedApi } from '@/hooks/useCachedApi';
+import { getTeamBranding } from '@/lib/teamBranding';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { useMemo } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
@@ -239,7 +240,9 @@ export default function PlayerDetailScreen() {
         } • ${player?.class || '—'} • ${player?.height || '—'} • ${player?.weight || '—'}`;
 
     const title = player?.player_name || 'Player';
-    const previousTeamName = player?.prev_team_name || player?.prev_team_id || '—';
+    const previousTeamName = player?.prev_team_id
+        ? getTeamBranding(player.prev_team_id, player.prev_team_name).displayName
+        : '—';
     const hasPreviousSeason =
         player?.prev_games_played !== null && player?.prev_games_played !== undefined ||
         player?.prev_ppg !== null && player?.prev_ppg !== undefined ||
@@ -285,7 +288,7 @@ export default function PlayerDetailScreen() {
                                 <Text style={styles.playerName}>{player.player_name}</Text>
                                 <Text style={styles.secondaryLine}>
                                     {player.jersey_number ? `#${player.jersey_number} • ` : ''}
-                                    {player.team_name || player.team_id || '—'}
+                                    {getTeamBranding(player.team_id, player.team_name).displayName}
                                 </Text>
                                 <Text style={styles.secondaryLine}>{roleLine}</Text>
                             </View>

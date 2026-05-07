@@ -30,6 +30,13 @@ export default function ConferencesScreen() {
     const isCompact = width < 430;
     const topTabPadding = isCompact ? insets.top + 8 : 12;
 
+    const formatConfShortName = (branding: any) => {
+        // If we are in realism mode, the headerTitle will be the full name (e.g. Big East)
+        // In that case, we want the short ID (the 'conf.conference_id')
+        // We will handle this logic in the JSX for maximum precision.
+        return branding.headerTitle;
+    };
+
     const styles = useMemo(
         () =>
             StyleSheet.create({
@@ -190,7 +197,7 @@ export default function ConferencesScreen() {
                 </View>
             ) : (
                 conferences.map((conf) => {
-                    const branding = getConferenceBranding(conf.conference_id);
+                    const branding = getConferenceBranding(conf.conference_id, conf.conference_name);
 
                     return (
                         <Pressable
@@ -201,8 +208,14 @@ export default function ConferencesScreen() {
                                 <View style={styles.leftSide}>
                                     <ConferenceLogo confId={conf.conference_id} size={30} />
                                     <View style={styles.nameBlock}>
-                                        <Text style={styles.conferenceName}>{conf.conference_name}</Text>
-                                        <Text style={styles.conferenceId}>{branding.headerTitle}</Text>
+                                        <Text style={styles.conferenceName}>
+                                            {branding.displayName}
+                                        </Text>
+                                        <Text style={styles.conferenceId}>
+                                            {/* Logic: If Realism flipped the title to the full name, show the ID (e.g. SEC). 
+            Otherwise show your authored short code (e.g. SAC). */}
+                                            {branding.displayName === branding.headerTitle ? conf.conference_id : branding.headerTitle}
+                                        </Text>
                                     </View>
                                 </View>
 

@@ -2,6 +2,7 @@ import TeamLogo from '@/components/TeamLogo';
 import { AppColors } from '@/constants/app-colors';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useCachedApi } from '@/hooks/useCachedApi';
+import { getTeamBranding } from '@/lib/teamBranding';
 import { router } from 'expo-router';
 import { useMemo, useState, useEffect } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
@@ -223,7 +224,9 @@ export default function RankingsScreen() {
                                         <Text style={styles.rankNumber}>{row?.rank}.</Text>
                                         <TeamLogo teamId={row?.team_id} size={24} />
                                         <View style={styles.rowTextWrap}>
-                                            <Text style={styles.listRow}>{row?.team_name}</Text>
+                                            <Text style={styles.listRow}>
+                                                {getTeamBranding(row?.team_id, row?.team_name).displayName}
+                                            </Text>
                                         </View>
                                     </Pressable>
                                 ))
@@ -250,7 +253,9 @@ export default function RankingsScreen() {
                                         <Text style={styles.rankNumber}>{row?.order}.</Text>
                                         <TeamLogo teamId={row?.team_id} size={24} />
                                         <View style={styles.rowTextWrap}>
-                                            <Text style={styles.listRow}>{row?.team_name}</Text>
+                                            <Text style={styles.listRow}>
+                                                {getTeamBranding(row?.team_id, row?.team_name).displayName}
+                                            </Text>
                                         </View>
                                     </Pressable>
                                 ))

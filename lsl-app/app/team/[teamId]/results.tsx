@@ -2,7 +2,8 @@ import TeamLogo from '@/components/TeamLogo';
 import { AppColors } from '@/constants/app-colors';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useCachedApi } from '@/hooks/useCachedApi';
-import { useLocalSearchParams } from 'expo-router';
+import { getTeamBranding } from '@/lib/teamBranding';
+import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { useMemo } from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
 
@@ -166,6 +167,8 @@ export default function TeamResultsScreen() {
         enabled: !!teamId,
     });
 
+    const branding = getTeamBranding(teamId, (payload as any)?.team_name || (payload as any)?.team?.team_name);
+
     const games: ResultGame[] = payload?.schedule ?? payload?.results ?? [];
 
     const formatSite = (site?: string) => {
@@ -176,7 +179,7 @@ export default function TeamResultsScreen() {
     };
 
     const formatOpponent = (game: ResultGame) => {
-        const raw = (game.opponent_name || game.opponent_team_id || '—').replace(/_/g, ' ');
+        const raw = getTeamBranding(game.opponent_team_id, game.opponent_name).displayName;
 
         if (game.opponent_lsl_rank !== null && game.opponent_lsl_rank !== undefined) {
             return `#${game.opponent_lsl_rank} ${raw}`;
@@ -202,6 +205,7 @@ export default function TeamResultsScreen() {
 
     return (
         <ScrollView contentContainerStyle={styles.content}>
+            <Stack.Screen options={{ title: `${branding.displayName} Results` }} />
             {loading ? (
                 <View style={styles.centerBlock}>
                     <ActivityIndicator size="large" />

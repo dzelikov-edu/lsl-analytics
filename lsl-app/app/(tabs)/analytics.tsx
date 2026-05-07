@@ -2,6 +2,7 @@ import TeamLogo from '@/components/TeamLogo';
 import { AppColors } from '@/constants/app-colors';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useCachedApi } from '@/hooks/useCachedApi';
+import { getTeamBranding } from '@/lib/teamBranding';
 import { useMemo } from 'react';
 import { router } from 'expo-router';
 import { ActivityIndicator, ScrollView, StyleSheet, Text, View, useWindowDimensions, Pressable } from 'react-native';
@@ -238,7 +239,9 @@ export default function AnalyticsScreen() {
             <View style={styles.leaderRow}>
                 <TeamLogo teamId={item?.team_id} size={28} />
                 <View style={styles.leaderTextWrap}>
-                    <Text style={styles.cardTeam}>{item?.team_name ?? '—'}</Text>
+                    <Text style={styles.cardTeam}>
+                        {item?.team_id ? getTeamBranding(item.team_id, item.team_name).displayName : '—'}
+                    </Text>
                     <Text style={styles.cardValue}>
                         {item?.rank !== null && item?.rank !== undefined ? `#${item.rank}` : '—'}
                         {item?.value !== null && item?.value !== undefined ? ` • ${item.value}` : ''}
@@ -262,7 +265,9 @@ export default function AnalyticsScreen() {
                             </Text>
                             <TeamLogo teamId={row.team_id} size={22} />
                             <View style={styles.rowTextWrap}>
-                                <Text style={styles.listRow}>{row.team_name ?? '—'}</Text>
+                                <Text style={styles.listRow}>
+                                    {row.team_id ? getTeamBranding(row.team_id, row.team_name).displayName : '—'}
+                                </Text>
                                 {row.value !== null && row.value !== undefined ? (
                                     <Text style={styles.listRowValue}>{row.value}</Text>
                                 ) : null}
@@ -309,7 +314,9 @@ export default function AnalyticsScreen() {
                                         <TeamLogo teamId={insight.team_id} size={24} />
                                         <View style={styles.insightTextWrap}>
                                             <Text style={styles.insightTitle}>{insight.title ?? 'Insight'}</Text>
-                                            <Text style={styles.insightTeam}>{insight.team_name ?? '—'}</Text>
+                                            <Text style={styles.insightTeam}>
+                                                {insight.team_id ? getTeamBranding(insight.team_id, insight.team_name).displayName : '—'}
+                                            </Text>
                                             <Text style={styles.insightSummary}>{insight.summary ?? '—'}</Text>
                                             {insight.value !== null && insight.value !== undefined ? (
                                                 <Text style={styles.insightValue}>{insight.value}</Text>

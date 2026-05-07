@@ -1,4 +1,23 @@
 import { getTeamLogo } from '@/lib/teamLogos';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as FileSystem from 'expo-file-system/legacy';
+
+let realismNamesMap: Record<string, string> = {};
+
+async function loadRealismNames() {
+    const path = `${FileSystem.documentDirectory}team_names.json`;
+    try {
+        const info = await FileSystem.getInfoAsync(path);
+        if (info.exists) {
+            const content = await FileSystem.readAsStringAsync(path);
+            realismNamesMap = JSON.parse(content);
+        }
+    } catch (e) {
+        console.log("No realism name map found.");
+    }
+}
+// Trigger load on startup
+loadRealismNames();
 
 export type TeamBranding = {
     displayName: string;
@@ -10,8 +29,12 @@ export type TeamBranding = {
 };
 
 const TEAM_BRANDING: Record<string, TeamBranding> = {
+    // Store-safe base build:
+    // All real-world programs and color schemes have been removed from this bundle.
+    // Fictional / generic teams can be defined here if desired (e.g., LCAA_*)
+    // and real branding is applied only via post-install visual packs.
     ACU: {
-        displayName: 'Abilene Christian',
+        displayName: 'Abilene',
         primary: '#4F2170',
         secondary: '#FFFFFF',
         accent: '#A7A9AC',
@@ -19,7 +42,7 @@ const TEAM_BRANDING: Record<string, TeamBranding> = {
         logo: null,
     },
     AIR_FORCE: {
-        displayName: 'Air Force',
+        displayName: 'Colorado Springs',
         primary: '#003594',
         secondary: '#B2B4B2',
         accent: '#FFFFFF',
@@ -34,8 +57,8 @@ const TEAM_BRANDING: Record<string, TeamBranding> = {
         headerText: '#FFFFFF',
         logo: null,
     },
-    ALABAMA: {
-        displayName: 'Alabama',
+    ALABAMA: { // TRACKED TEAM
+        displayName: 'Tuscaloosa',
         primary: '#9E1B32',
         secondary: '#FFFFFF',
         accent: '#828A8F',
@@ -43,7 +66,7 @@ const TEAM_BRANDING: Record<string, TeamBranding> = {
         logo: null,
     },
     ALABAMA_AM: {
-        displayName: 'Alabama A&M',
+        displayName: 'Huntsville',
         primary: '#800000',
         secondary: '#FFFFFF',
         accent: '#A89968',
@@ -59,7 +82,7 @@ const TEAM_BRANDING: Record<string, TeamBranding> = {
         logo: null,
     },
     ALCORN_STATE: {
-        displayName: 'Alcorn State',
+        displayName: 'Lorman',
         primary: '#512D6D',
         secondary: '#CC8A00',
         accent: '#FFFFFF',
@@ -67,7 +90,7 @@ const TEAM_BRANDING: Record<string, TeamBranding> = {
         logo: null,
     },
     AMERICAN: {
-        displayName: 'American',
+        displayName: 'Washington DC',
         primary: '#002F6C',
         secondary: '#C41130',
         accent: '#FFFFFF',
@@ -75,23 +98,23 @@ const TEAM_BRANDING: Record<string, TeamBranding> = {
         logo: null,
     },
     APP_STATE: {
-        displayName: 'Appalachian State',
+        displayName: 'Boone',
         primary: '#222222',
         secondary: '#FFCC00',
         accent: '#FFFFFF',
         headerText: '#FFFFFF',
         logo: null,
     },
-    ARIZONA: {
-        displayName: 'Arizona',
+    ARIZONA: { // TRACKED TEAM
+        displayName: 'Tucson',
         primary: '#003366',
         secondary: '#CC0033',
         accent: '#FFFFFF',
         headerText: '#FFFFFF',
         logo: null,
     },
-    ARIZONA_STATE: {
-        displayName: 'Arizona State',
+    ARIZONA_STATE: { // TRACKED TEAM
+        displayName: 'Tempe',
         primary: '#8C1D40',
         secondary: '#FFC627',
         accent: '#1E1E1E',
@@ -99,7 +122,7 @@ const TEAM_BRANDING: Record<string, TeamBranding> = {
         logo: null,
     },
     ARKANSAS: {
-        displayName: 'Arkansas',
+        displayName: 'Fayetteville',
         primary: '#9D2235',
         secondary: '#FFFFFF',
         accent: '#000000',
@@ -107,7 +130,7 @@ const TEAM_BRANDING: Record<string, TeamBranding> = {
         logo: null,
     },
     ARKANSAS_STATE: {
-        displayName: 'Arkansas State',
+        displayName: 'Jonesboro',
         primary: '#CC092F',
         secondary: '#000000',
         accent: '#FFFFFF',
@@ -115,14 +138,14 @@ const TEAM_BRANDING: Record<string, TeamBranding> = {
         logo: null,
     },
     ARMY: {
-        displayName: 'Army',
+        displayName: 'West Point',
         primary: '#000000',
         secondary: '#D4BF91',
         accent: '#B2B4B3',
         headerText: '#FFFFFF',
         logo: null,
     },
-    AUBURN: {
+    AUBURN: { // TRACKED TEAM
         displayName: 'Auburn',
         primary: '#0C2340',
         secondary: '#E87722',
@@ -131,7 +154,7 @@ const TEAM_BRANDING: Record<string, TeamBranding> = {
         logo: null,
     },
     AUSTIN_PEAY: {
-        displayName: 'Austin Peay',
+        displayName: 'Clarksville',
         primary: '#BA0C2F',
         secondary: '#000000',
         accent: '#FFFFFF',
@@ -139,15 +162,15 @@ const TEAM_BRANDING: Record<string, TeamBranding> = {
         logo: null,
     },
     BALL_STATE: {
-        displayName: 'Ball State',
+        displayName: 'Muncie',
         primary: '#BA0C2F',
         secondary: '#FFFFFF',
         accent: '#000000',
         headerText: '#FFFFFF',
         logo: null,
     },
-    BAYLOR: {
-        displayName: 'Baylor',
+    BAYLOR: { // TRACKED TEAM
+        displayName: 'Waco',
         primary: '#154734',
         secondary: '#FFB81C',
         accent: '#FFFFFF',
@@ -155,7 +178,7 @@ const TEAM_BRANDING: Record<string, TeamBranding> = {
         logo: null,
     },
     BELLARMINE: {
-        displayName: 'Bellarmine',
+        displayName: 'Louisville',
         primary: '#752936',
         secondary: '#C8C8C8',
         accent: '#000000',
@@ -163,7 +186,7 @@ const TEAM_BRANDING: Record<string, TeamBranding> = {
         logo: null,
     },
     BELMONT: {
-        displayName: 'Belmont',
+        displayName: 'Nashville',
         primary: '#001A4A',
         secondary: '#C41230',
         accent: '#FFFFFF',
@@ -171,7 +194,7 @@ const TEAM_BRANDING: Record<string, TeamBranding> = {
         logo: null,
     },
     BETHUNECOOKMAN: {
-        displayName: 'Bethune-Cookman',
+        displayName: 'Daytona Beach',
         primary: '#7A0019',
         secondary: '#F2A900',
         accent: '#000000',
@@ -179,15 +202,15 @@ const TEAM_BRANDING: Record<string, TeamBranding> = {
         logo: null,
     },
     BINGHAMTON: {
-        displayName: 'Binghamton',
+        displayName: 'Vestal',
         primary: '#005A43',
         secondary: '#BF0D3E',
         accent: '#169B62',
         headerText: '#FFFFFF',
         logo: null,
     },
-    BOISE_STATE: {
-        displayName: 'Boise State',
+    BOISE_STATE: { // TRACKED TEAM
+        displayName: 'Boise',
         primary: '#0033A0',
         secondary: '#D64309',
         accent: '#FFFFFF',
@@ -195,7 +218,7 @@ const TEAM_BRANDING: Record<string, TeamBranding> = {
         logo: null,
     },
     BOSTON: {
-        displayName: 'Boston University',
+        displayName: 'Boston',
         primary: '#CC0000',
         secondary: '#FFFFFF',
         accent: '#000000',
@@ -203,7 +226,7 @@ const TEAM_BRANDING: Record<string, TeamBranding> = {
         logo: null,
     },
     BOSTON_COLLEGE: {
-        displayName: 'Boston College',
+        displayName: 'Chestnut Hill',
         primary: '#8C2232',
         secondary: '#B4A269',
         accent: '#B4B2B3',
@@ -219,7 +242,7 @@ const TEAM_BRANDING: Record<string, TeamBranding> = {
         logo: null,
     },
     BRADLEY: {
-        displayName: 'Bradley',
+        displayName: 'Peoria',
         primary: '#A50000',
         secondary: '#FFFFFF',
         accent: '#B1B3B3',
@@ -227,7 +250,7 @@ const TEAM_BRANDING: Record<string, TeamBranding> = {
         logo: null,
     },
     BROWN: {
-        displayName: 'Brown',
+        displayName: 'Providence',
         primary: '#4E3629',
         secondary: '#C00404',
         accent: '#FFFFFF',
@@ -235,7 +258,7 @@ const TEAM_BRANDING: Record<string, TeamBranding> = {
         logo: null,
     },
     BRYANT: {
-        displayName: 'Bryant',
+        displayName: 'Smithfield',
         primary: '#000000',
         secondary: '#b4975b',
         accent: '#FFFFFF',
@@ -243,7 +266,7 @@ const TEAM_BRANDING: Record<string, TeamBranding> = {
         logo: null,
     },
     BUCKNELL: {
-        displayName: 'Bucknell',
+        displayName: 'Lewisburg',
         primary: '#E87722',
         secondary: '#003865',
         accent: '#FFFFFF',
@@ -259,15 +282,15 @@ const TEAM_BRANDING: Record<string, TeamBranding> = {
         logo: null,
     },
     BUTLER: {
-        displayName: 'Butler',
+        displayName: 'Indianapolis',
         primary: '#13294B',
         secondary: '#C8C9C7',
         accent: '#00A3E0',
         headerText: '#FFFFFF',
         logo: null,
     },
-    BYU: {
-        displayName: 'BYU',
+    BYU: { // TRACKED TEAM
+        displayName: 'Provo',
         primary: '#002E5D',
         secondary: '#FFFFFF',
         accent: '#6CACE4',
@@ -275,15 +298,15 @@ const TEAM_BRANDING: Record<string, TeamBranding> = {
         logo: null,
     },
     C_O_CHARLESTON: {
-        displayName: 'College of Charleston',
+        displayName: 'Charleston',
         primary: '#800000',
         secondary: '#9d8958',
         accent: '#B1B3B3',
         headerText: '#FFFFFF',
         logo: null,
     },
-    CAL: {
-        displayName: 'Cal',
+    CAL: { // TRACKED TEAM
+        displayName: 'Berkeley',
         primary: '#003262',
         secondary: '#FDB515',
         accent: '#FFFFFF',
@@ -291,7 +314,7 @@ const TEAM_BRANDING: Record<string, TeamBranding> = {
         logo: null,
     },
     CSUB: {
-        displayName: 'CSU Bakersfield',
+        displayName: 'Bakersfield',
         primary: '#003594',
         secondary: '#FFC72C',
         accent: '#707372',
@@ -299,7 +322,7 @@ const TEAM_BRANDING: Record<string, TeamBranding> = {
         logo: null,
     },
     CSUF: {
-        displayName: 'Cal State Fullerton',
+        displayName: 'Fullerton',
         primary: '#00274C',
         secondary: '#DC8218',
         accent: '#FFFFFF',
@@ -307,7 +330,7 @@ const TEAM_BRANDING: Record<string, TeamBranding> = {
         logo: null,
     },
     CSUN: {
-        displayName: 'CSUN',
+        displayName: 'Northridge',
         primary: '#D22030',
         secondary: '#000000',
         accent: '#FFFFFF',
@@ -315,7 +338,7 @@ const TEAM_BRANDING: Record<string, TeamBranding> = {
         logo: null,
     },
     CAL_POLY: {
-        displayName: 'Cal Poly',
+        displayName: 'San Luis Obispo',
         primary: '#003831',
         secondary: '#FFE395',
         accent: '#B38F4F',
@@ -323,7 +346,7 @@ const TEAM_BRANDING: Record<string, TeamBranding> = {
         logo: null,
     },
     CAMPBELL: {
-        displayName: 'Campbell',
+        displayName: 'Buies Creek',
         primary: '#EA7125',
         secondary: '#1E252B',
         accent: '#FFFFFF',
@@ -331,7 +354,7 @@ const TEAM_BRANDING: Record<string, TeamBranding> = {
         logo: null,
     },
     CANISIUS: {
-        displayName: 'Canisius',
+        displayName: 'Buffalo',
         primary: '#0C2340',
         secondary: '#FFBA00',
         accent: '#FFFFFF',
@@ -339,7 +362,7 @@ const TEAM_BRANDING: Record<string, TeamBranding> = {
         logo: null,
     },
     CENTRAL_MICHIGAN: {
-        displayName: 'Central Michigan',
+        displayName: 'Mount Pleasant',
         primary: '#6A0032',
         secondary: '#FFC82E',
         accent: '#FFFFFF',
@@ -362,7 +385,7 @@ const TEAM_BRANDING: Record<string, TeamBranding> = {
         headerText: '#FFFFFF',
         logo: null,
     },
-    CINCINNATI: {
+    CINCINNATI: { // TRACKED TEAM
         displayName: 'Cincinnati',
         primary: '#E00122',
         secondary: '#000000',
@@ -370,7 +393,7 @@ const TEAM_BRANDING: Record<string, TeamBranding> = {
         headerText: '#FFFFFF',
         logo: null,
     },
-    CLEMSON: {
+    CLEMSON: { // TRACKED TEAM
         displayName: 'Clemson',
         primary: '#F56600',
         secondary: '#522D80',
@@ -379,7 +402,7 @@ const TEAM_BRANDING: Record<string, TeamBranding> = {
         logo: null,
     },
     CLEVELAND_STATE: {
-        displayName: 'Cleveland State',
+        displayName: 'Cleveland',
         primary: '#006747',
         secondary: '#FFFFFF',
         accent: '#000000',
@@ -387,7 +410,7 @@ const TEAM_BRANDING: Record<string, TeamBranding> = {
         logo: null,
     },
     COASTAL_CAROLINA: {
-        displayName: 'Coastal Carolina',
+        displayName: 'Conway',
         primary: '#006f71',
         secondary: '#A27752',
         accent: '#000000',
@@ -395,15 +418,15 @@ const TEAM_BRANDING: Record<string, TeamBranding> = {
         logo: null,
     },
     COLGATE: {
-        displayName: 'Colgate',
+        displayName: 'Hamilton',
         primary: '#821019',
         secondary: '#FFFFFF',
         accent: '#000000',
         headerText: '#FFFFFF',
         logo: null,
     },
-    COLORADO: {
-        displayName: 'Colorado',
+    COLORADO: { // TRACKED TEAM
+        displayName: 'Boulder',
         primary: '#000000',
         secondary: '#CFB87C',
         accent: '#FFFFFF',
@@ -411,7 +434,7 @@ const TEAM_BRANDING: Record<string, TeamBranding> = {
         logo: null,
     },
     COLORADO_STATE: {
-        displayName: 'Colorado State',
+        displayName: 'Fort Collins',
         primary: '#1E4D2B',
         secondary: '#C8C372',
         accent: '#59595B',
@@ -419,7 +442,7 @@ const TEAM_BRANDING: Record<string, TeamBranding> = {
         logo: null,
     },
     COPPIN_STATE: {
-        displayName: 'Coppin State',
+        displayName: 'Baltimore',
         primary: '#003366',
         secondary: '#FFCC00',
         accent: '#FFFFFF',
@@ -427,15 +450,15 @@ const TEAM_BRANDING: Record<string, TeamBranding> = {
         logo: null,
     },
     CORNELL: {
-        displayName: 'Cornell',
+        displayName: 'Ithaca',
         primary: '#B31B1B',
         secondary: '#FFFFFF',
         accent: '#221F20',
         headerText: '#FFFFFF',
         logo: null,
     },
-    CREIGHTON: {
-        displayName: 'Creighton',
+    CREIGHTON: { // TRACKED TEAM
+        displayName: 'Omaha',
         primary: '#005CA9',
         secondary: '#FFFFFF',
         accent: '#041E42',
@@ -443,7 +466,7 @@ const TEAM_BRANDING: Record<string, TeamBranding> = {
         logo: null,
     },
     DARTMOUTH: {
-        displayName: 'Dartmouth',
+        displayName: 'Hanover',
         primary: '#00693E',
         secondary: '#FFFFFF',
         accent: '#000000',
@@ -467,7 +490,7 @@ const TEAM_BRANDING: Record<string, TeamBranding> = {
         logo: null,
     },
     DELAWARE: {
-        displayName: 'Delaware',
+        displayName: 'Newark',
         primary: '#00539F',
         secondary: '#FFD200',
         accent: '#FFFFFF',
@@ -475,7 +498,7 @@ const TEAM_BRANDING: Record<string, TeamBranding> = {
         logo: null,
     },
     DELAWARE_STATE: {
-        displayName: 'Delaware State',
+        displayName: 'Dover',
         primary: '#EE3124',
         secondary: '#72CDF4',
         accent: '#009DDC',
@@ -491,7 +514,7 @@ const TEAM_BRANDING: Record<string, TeamBranding> = {
         logo: null,
     },
     DEPAUL: {
-        displayName: 'DePaul',
+        displayName: 'Chicago',
         primary: '#003DA5',
         secondary: '#CE112D',
         accent: '#000000',
@@ -499,7 +522,7 @@ const TEAM_BRANDING: Record<string, TeamBranding> = {
         logo: null,
     },
     DETROIT_MERCY: {
-        displayName: 'Detroit Mercy',
+        displayName: 'Detroit',
         primary: '#002D72',
         secondary: '#A6093D',
         accent: '#D7D2CB',
@@ -507,7 +530,7 @@ const TEAM_BRANDING: Record<string, TeamBranding> = {
         logo: null,
     },
     DRAKE: {
-        displayName: 'Drake',
+        displayName: 'Des Moines',
         primary: '#004477',
         secondary: '#FFFFFF',
         accent: '#999999',
@@ -515,15 +538,15 @@ const TEAM_BRANDING: Record<string, TeamBranding> = {
         logo: null,
     },
     DREXEL: {
-        displayName: 'Drexel',
+        displayName: 'Philadelphia',
         primary: '#00437B',
         secondary: '#FFDA02',
         accent: '#FFFFFF',
         headerText: '#FFFFFF',
         logo: null,
     },
-    DUKE: {
-        displayName: 'Duke',
+    DUKE: { // TRACKED TEAM
+        displayName: 'Durham',
         primary: '#003087',
         secondary: '#FFFFFF',
         accent: '#012169',
@@ -531,7 +554,7 @@ const TEAM_BRANDING: Record<string, TeamBranding> = {
         logo: null,
     },
     DUQUESNE: {
-        displayName: 'Duquesne',
+        displayName: 'Pittsburgh',
         primary: '#041E42',
         secondary: '#BA0C2F',
         accent: '#000000',
@@ -539,7 +562,7 @@ const TEAM_BRANDING: Record<string, TeamBranding> = {
         logo: null,
     },
     EKU: {
-        displayName: 'Eastern Kentucky',
+        displayName: 'Richmond',
         primary: '#8A0039',
         secondary: '#FFFFFF',
         accent: '#000000',
@@ -547,7 +570,7 @@ const TEAM_BRANDING: Record<string, TeamBranding> = {
         logo: null,
     },
     ETSU: {
-        displayName: 'East Tennessee State',
+        displayName: 'Johnson City',
         primary: '#041E42',
         secondary: '#FFC72C',
         accent: '#FFFFFF',
@@ -555,7 +578,7 @@ const TEAM_BRANDING: Record<string, TeamBranding> = {
         logo: null,
     },
     EWU: {
-        displayName: 'Eastern Washington',
+        displayName: 'Cheney',
         primary: '#A10022',
         secondary: '#FFFFFF',
         accent: '#000000',
@@ -563,7 +586,7 @@ const TEAM_BRANDING: Record<string, TeamBranding> = {
         logo: null,
     },
     EAST_CAROLINA: {
-        displayName: 'East Carolina',
+        displayName: 'Greenville',
         primary: '#592A8A',
         secondary: '#FEC923',
         accent: '#000000',
@@ -571,7 +594,7 @@ const TEAM_BRANDING: Record<string, TeamBranding> = {
         logo: null,
     },
     EASTERN_ILLINOIS: {
-        displayName: 'Eastern Illinois',
+        displayName: 'Charleston',
         primary: '#004B83',
         secondary: '#919295',
         accent: '#FFFFFF',
@@ -579,7 +602,7 @@ const TEAM_BRANDING: Record<string, TeamBranding> = {
         logo: null,
     },
     EASTERN_MICHIGAN: {
-        displayName: 'Eastern Michigan',
+        displayName: 'Ypsilanti',
         primary: '#006633',
         secondary: '#FFFFFF',
         accent: '#000000',
@@ -603,7 +626,7 @@ const TEAM_BRANDING: Record<string, TeamBranding> = {
         logo: null,
     },
     FAU: {
-        displayName: 'Florida Atlantic',
+        displayName: 'Boca Raton',
         primary: '#003366',
         secondary: '#CC0000',
         accent: '#8A8D8F',
@@ -611,7 +634,7 @@ const TEAM_BRANDING: Record<string, TeamBranding> = {
         logo: null,
     },
     FDU: {
-        displayName: 'Fairleigh Dickinson',
+        displayName: 'Teaneck',
         primary: '#28334A',
         secondary: '#72293C',
         accent: '#FFFFFF',
@@ -619,7 +642,7 @@ const TEAM_BRANDING: Record<string, TeamBranding> = {
         logo: null,
     },
     FGCU: {
-        displayName: 'Florida Gulf Coast',
+        displayName: 'Fort Meyers',
         primary: '#002D72',
         secondary: '#007749',
         accent: '#B9975B',
@@ -627,7 +650,7 @@ const TEAM_BRANDING: Record<string, TeamBranding> = {
         logo: null,
     },
     FIU: {
-        displayName: 'Florida International',
+        displayName: 'Miami',
         primary: '#081E3F',
         secondary: '#B6862C',
         accent: '#FFFFFF',
@@ -642,8 +665,8 @@ const TEAM_BRANDING: Record<string, TeamBranding> = {
         headerText: '#FFFFFF',
         logo: null,
     },
-    FLORIDA: {
-        displayName: 'Florida',
+    FLORIDA: { // TRACKED TEAM
+        displayName: 'Gainesville',
         primary: '#0021A5',
         secondary: '#FA4616',
         accent: '#FFFFFF',
@@ -651,15 +674,15 @@ const TEAM_BRANDING: Record<string, TeamBranding> = {
         logo: null,
     },
     FLORIDA_AM: {
-        displayName: 'Florida A&M',
+        displayName: 'Tallahassee',
         primary: '#EE7624',
         secondary: '#1B5633',
         accent: '#231F20',
         headerText: '#FFFFFF',
         logo: null,
     },
-    FLORIDA_STATE: {
-        displayName: 'Florida State',
+    FLORIDA_STATE: { // TRACKED TEAM
+        displayName: 'Tallahassee',
         primary: '#782F40',
         secondary: '#CEB888',
         accent: '#FFFFFF',
@@ -667,7 +690,7 @@ const TEAM_BRANDING: Record<string, TeamBranding> = {
         logo: null,
     },
     FORDHAM: {
-        displayName: 'Fordham',
+        displayName: 'Bronx',
         primary: '#860038',
         secondary: '#FFFFFF',
         accent: '#000000',
@@ -675,7 +698,7 @@ const TEAM_BRANDING: Record<string, TeamBranding> = {
         logo: null,
     },
     FRESNO_STATE: {
-        displayName: 'Fresno State',
+        displayName: 'Fresno',
         primary: '#B1102B',
         secondary: '#13284C',
         accent: '#CED1D4',
@@ -683,7 +706,7 @@ const TEAM_BRANDING: Record<string, TeamBranding> = {
         logo: null,
     },
     FURMAN: {
-        displayName: 'Furman',
+        displayName: 'Greenville',
         primary: '#582C83',
         secondary: '#FFFFFF',
         accent: '#201547',
@@ -691,7 +714,7 @@ const TEAM_BRANDING: Record<string, TeamBranding> = {
         logo: null,
     },
     GARDNERWEBB: {
-        displayName: 'Gardner-Webb',
+        displayName: 'Boiling Springs',
         primary: '#A80532',
         secondary: '#000000',
         accent: '#FFFFFF',
@@ -699,7 +722,7 @@ const TEAM_BRANDING: Record<string, TeamBranding> = {
         logo: null,
     },
     GEORGE_MASON: {
-        displayName: 'George Mason',
+        displayName: 'Fairfax',
         primary: '#006633',
         secondary: '#FFCC33',
         accent: '#000000',
@@ -707,15 +730,15 @@ const TEAM_BRANDING: Record<string, TeamBranding> = {
         logo: null,
     },
     GEORGE_WASHINGTON: {
-        displayName: 'George Washington',
+        displayName: 'Washington DC',
         primary: '#00407A',
         secondary: '#A4864B',
         accent: '#FFFFFF',
         headerText: '#FFFFFF',
         logo: null,
     },
-    GEORGETOWN: {
-        displayName: 'Georgetown',
+    GEORGETOWN: { // TRACKED TEAM
+        displayName: 'Washington DC',
         primary: '#041E42',
         secondary: '#9EA2A2',
         accent: '#FFFFFF',
@@ -723,7 +746,7 @@ const TEAM_BRANDING: Record<string, TeamBranding> = {
         logo: null,
     },
     GEORGIA: {
-        displayName: 'Georgia',
+        displayName: 'Athens',
         primary: '#BA0C2F',
         secondary: '#000000',
         accent: '#FFFFFF',
@@ -731,7 +754,7 @@ const TEAM_BRANDING: Record<string, TeamBranding> = {
         logo: null,
     },
     GEORGIA_SOUTHERN: {
-        displayName: 'Georgia Southern',
+        displayName: 'Statesboro',
         primary: '#011E41',
         secondary: '#87714D',
         accent: '#FFFFFF',
@@ -739,7 +762,7 @@ const TEAM_BRANDING: Record<string, TeamBranding> = {
         logo: null,
     },
     GEORGIA_STATE: {
-        displayName: 'Georgia State',
+        displayName: 'Atlanta',
         primary: '#0039A6',
         secondary: '#FFFFFF',
         accent: '#C60C30',
@@ -747,15 +770,15 @@ const TEAM_BRANDING: Record<string, TeamBranding> = {
         logo: null,
     },
     GEORGIA_TECH: {
-        displayName: 'Georgia Tech',
+        displayName: 'Atlanta',
         primary: '#003057',
         secondary: '#B3A369',
         accent: '#FFFFFF',
         headerText: '#FFFFFF',
         logo: null,
     },
-    GONZAGA: {
-        displayName: 'Gonzaga',
+    GONZAGA: { // TRACKED TEAM
+        displayName: 'Spokane',
         primary: '#041E42',
         secondary: '#C8102E',
         accent: '#FFFFFF',
@@ -763,7 +786,7 @@ const TEAM_BRANDING: Record<string, TeamBranding> = {
         logo: null,
     },
     GRAMBLING_STATE: {
-        displayName: 'Grambling State',
+        displayName: 'Grambling',
         primary: '#000000',
         secondary: '#EAA921',
         accent: '#FFFFFF',
@@ -771,7 +794,7 @@ const TEAM_BRANDING: Record<string, TeamBranding> = {
         logo: null,
     },
     GRAND_CANYON: {
-        displayName: 'Grand Canyon',
+        displayName: 'Phoenix',
         primary: '#522398',
         secondary: '#000000',
         accent: '#9D9FA2',
@@ -779,7 +802,7 @@ const TEAM_BRANDING: Record<string, TeamBranding> = {
         logo: null,
     },
     HARVARD: {
-        displayName: 'Harvard',
+        displayName: 'Cambridge',
         primary: '#A41034',
         secondary: '#000000',
         accent: '#FFFFFF',
@@ -787,7 +810,7 @@ const TEAM_BRANDING: Record<string, TeamBranding> = {
         logo: null,
     },
     HAWAII: {
-        displayName: 'Hawaii',
+        displayName: 'Honolulu',
         primary: '#024731',
         secondary: '#C1C6C8',
         accent: '#000000',
@@ -803,7 +826,7 @@ const TEAM_BRANDING: Record<string, TeamBranding> = {
         logo: null,
     },
     HOFSTRA: {
-        displayName: 'Hofstra',
+        displayName: 'Hempstead',
         primary: '#003591',
         secondary: '#FFC72C',
         accent: '#FFFFFF',
@@ -811,14 +834,14 @@ const TEAM_BRANDING: Record<string, TeamBranding> = {
         logo: null,
     },
     HOLY_CROSS: {
-        displayName: 'Holy Cross',
+        displayName: 'Worcester',
         primary: '#602D89',
         secondary: '#FFFFFF',
         accent: '#000000',
         headerText: '#FFFFFF',
         logo: null,
     },
-    HOUSTON: {
+    HOUSTON: { // TRACKED TEAM
         displayName: 'Houston',
         primary: '#C8102E',
         secondary: '#FFFFFF',
@@ -827,7 +850,7 @@ const TEAM_BRANDING: Record<string, TeamBranding> = {
         logo: null,
     },
     HOWARD: {
-        displayName: 'Howard',
+        displayName: 'Washington DC',
         primary: '#003366',
         secondary: '#E51937',
         accent: '#FFFFFF',
@@ -835,7 +858,7 @@ const TEAM_BRANDING: Record<string, TeamBranding> = {
         logo: null,
     },
     IDAHO: {
-        displayName: 'Idaho',
+        displayName: 'Moscow',
         primary: '#000000',
         secondary: '#F4D35E',
         accent: '#A2AAAD',
@@ -843,7 +866,7 @@ const TEAM_BRANDING: Record<string, TeamBranding> = {
         logo: null,
     },
     IDAHO_STATE: {
-        displayName: 'Idaho State',
+        displayName: 'Pocatello',
         primary: '#F47920',
         secondary: '#000000',
         accent: '#FFFFFF',
@@ -851,7 +874,7 @@ const TEAM_BRANDING: Record<string, TeamBranding> = {
         logo: null,
     },
     ILLINOIS: {
-        displayName: 'Illinois',
+        displayName: 'Champaign',
         primary: '#FF5F05',
         secondary: '#13294B',
         accent: '#707372',
@@ -859,7 +882,7 @@ const TEAM_BRANDING: Record<string, TeamBranding> = {
         logo: null,
     },
     ILLINOIS_STATE: {
-        displayName: 'Illinois State',
+        displayName: 'Normal',
         primary: '#CE1126',
         secondary: '#F9DD16',
         accent: '#000000',
@@ -867,15 +890,15 @@ const TEAM_BRANDING: Record<string, TeamBranding> = {
         logo: null,
     },
     INCARNATE_WORD: {
-        displayName: 'Incarnate Word',
+        displayName: 'San Antonio',
         primary: '#CC0000',
         secondary: '#000000',
         accent: '#FFFFFF',
         headerText: '#FFFFFF',
         logo: null,
     },
-    INDIANA: {
-        displayName: 'Indiana',
+    INDIANA: { // TRACKED TEAM
+        displayName: 'Bloomington',
         primary: '#990000',
         secondary: '#EEEDEB',
         accent: '#231F20',
@@ -883,7 +906,7 @@ const TEAM_BRANDING: Record<string, TeamBranding> = {
         logo: null,
     },
     INDIANA_STATE: {
-        displayName: 'Indiana State',
+        displayName: 'Terre Haute',
         primary: '#0142BC',
         secondary: '#FFFFFF',
         accent: '#000000',
@@ -891,23 +914,23 @@ const TEAM_BRANDING: Record<string, TeamBranding> = {
         logo: null,
     },
     IONA: {
-        displayName: 'Iona',
+        displayName: 'New Rochelle',
         primary: '#71112D',
         secondary: '#F3D017',
         accent: '#FFFFFF',
         headerText: '#FFFFFF',
         logo: null,
     },
-    IOWA: {
-        displayName: 'Iowa',
+    IOWA: { // TRACKED TEAM
+        displayName: 'Iowa City',
         primary: '#000000',
         secondary: '#FFCD00',
         accent: '#FFFFFF',
         headerText: '#FFFFFF',
         logo: null,
     },
-    IOWA_STATE: {
-        displayName: 'Iowa State',
+    IOWA_STATE: { // TRACKED TEAM
+        displayName: 'Ames',
         primary: '#C8102E',
         secondary: '#F1BE48',
         accent: '#FFFFFF',
@@ -915,7 +938,7 @@ const TEAM_BRANDING: Record<string, TeamBranding> = {
         logo: null,
     },
     IPFW: {
-        displayName: 'Purdue Fort Wayne',
+        displayName: 'Fort Wayne',
         primary: '#000000',
         secondary: '#FFB81C',
         accent: '#FFFFFF',
@@ -923,7 +946,7 @@ const TEAM_BRANDING: Record<string, TeamBranding> = {
         logo: null,
     },
     IUPUI: {
-        displayName: 'IU Indianapolis',
+        displayName: 'Indianapolis',
         primary: '#9D2235',
         secondary: '#DFD1A7',
         accent: '#000000',
@@ -931,7 +954,7 @@ const TEAM_BRANDING: Record<string, TeamBranding> = {
         logo: null,
     },
     JACKSON_STATE: {
-        displayName: 'Jackson State',
+        displayName: 'Jackson',
         primary: '#002147',
         secondary: '#FFFFFF',
         accent: '#C0C0C0',
@@ -947,23 +970,23 @@ const TEAM_BRANDING: Record<string, TeamBranding> = {
         logo: null,
     },
     JAMES_MADISON: {
-        displayName: 'James Madison',
+        displayName: 'Harrisonburg',
         primary: '#450084',
         secondary: '#CBB677',
         accent: '#FFFFFF',
         headerText: '#FFFFFF',
         logo: null,
     },
-    KANSAS: {
-        displayName: 'Kansas',
+    KANSAS: { // TRACKED TEAM
+        displayName: 'Lawrence',
         primary: '#0051BA',
         secondary: '#E8000D',
         accent: '#FFC82D',
         headerText: '#FFFFFF',
         logo: null,
     },
-    KANSAS_STATE: {
-        displayName: 'Kansas State',
+    KANSAS_STATE: { // TRACKED TEAM
+        displayName: 'Manhattan',
         primary: '#512888',
         secondary: '#FFFFFF',
         accent: '#D1D3D4',
@@ -971,7 +994,7 @@ const TEAM_BRANDING: Record<string, TeamBranding> = {
         logo: null,
     },
     KENNESAW_STATE: {
-        displayName: 'Kennesaw State',
+        displayName: 'Kennesaw',
         primary: '#000000',
         secondary: '#FFC629',
         accent: '#FFFFFF',
@@ -979,15 +1002,15 @@ const TEAM_BRANDING: Record<string, TeamBranding> = {
         logo: null,
     },
     KENT_STATE: {
-        displayName: 'Kent State',
+        displayName: 'Kent',
         primary: '#002664',
         secondary: '#EAAB14',
         accent: '#FFFFFF',
         headerText: '#FFFFFF',
         logo: null,
     },
-    KENTUCKY: {
-        displayName: 'Kentucky',
+    KENTUCKY: { // TRACKED TEAM
+        displayName: 'Lexington',
         primary: '#0033A0',
         secondary: '#FFFFFF',
         accent: '#C4CED4',
@@ -995,7 +1018,7 @@ const TEAM_BRANDING: Record<string, TeamBranding> = {
         logo: null,
     },
     LA_TECH: {
-        displayName: 'Louisiana Tech',
+        displayName: 'Ruston',
         primary: '#002F8B',
         secondary: '#E31B23',
         accent: '#FFFFFF',
@@ -1003,7 +1026,7 @@ const TEAM_BRANDING: Record<string, TeamBranding> = {
         logo: null,
     },
     LA_SALLE: {
-        displayName: 'La Salle',
+        displayName: 'Philadelphia',
         primary: '#002D62',
         secondary: '#FDB927',
         accent: '#FFFFFF',
@@ -1011,7 +1034,7 @@ const TEAM_BRANDING: Record<string, TeamBranding> = {
         logo: null,
     },
     LAMAR: {
-        displayName: 'Lamar',
+        displayName: 'Beaumont',
         primary: '#C0111F',
         secondary: '#FFFFFF',
         accent: '#000000',
@@ -1019,7 +1042,7 @@ const TEAM_BRANDING: Record<string, TeamBranding> = {
         logo: null,
     },
     LEHIGH: {
-        displayName: 'Lehigh',
+        displayName: 'Bethlehem',
         primary: '#653600',
         secondary: '#cfab7a',
         accent: '#FFFFFF',
@@ -1027,7 +1050,7 @@ const TEAM_BRANDING: Record<string, TeamBranding> = {
         logo: null,
     },
     LIBERTY: {
-        displayName: 'Liberty',
+        displayName: 'Lynchburg',
         primary: '#002D62',
         secondary: '#C41230',
         accent: '#FFFFFF',
@@ -1035,7 +1058,7 @@ const TEAM_BRANDING: Record<string, TeamBranding> = {
         logo: null,
     },
     LIPSCOMB: {
-        displayName: 'Lipscomb',
+        displayName: 'Nashville',
         primary: '#331E54',
         secondary: '#F4AA00',
         accent: '#FFFFFF',
@@ -1051,7 +1074,7 @@ const TEAM_BRANDING: Record<string, TeamBranding> = {
         logo: null,
     },
     LONG_BEACH_STATE: {
-        displayName: 'Long Beach State',
+        displayName: 'Long Beach',
         primary: '#000000',
         secondary: '#FFC72A',
         accent: '#FFFFFF',
@@ -1059,14 +1082,14 @@ const TEAM_BRANDING: Record<string, TeamBranding> = {
         logo: null,
     },
     LONGWOOD: {
-        displayName: 'Longwood',
+        displayName: 'Farmville',
         primary: '#15213B',
         secondary: '#999D9E',
         accent: '#FFFFFF',
         headerText: '#FFFFFF',
         logo: null,
     },
-    LOUISVILLE: {
+    LOUISVILLE: { // TRACKED TEAM
         displayName: 'Louisville',
         primary: '#AD0000',
         secondary: '#000000',
@@ -1075,7 +1098,7 @@ const TEAM_BRANDING: Record<string, TeamBranding> = {
         logo: null,
     },
     LOYOLA_CHICAGO: {
-        displayName: 'Loyola Chicago',
+        displayName: 'Chicago',
         primary: '#922247',
         secondary: '#FEBD18',
         accent: '#FFFFFF',
@@ -1083,7 +1106,7 @@ const TEAM_BRANDING: Record<string, TeamBranding> = {
         logo: null,
     },
     LOYOLA_MARYLAND: {
-        displayName: 'Loyola Maryland',
+        displayName: 'Baltimore',
         primary: '#00694E',
         secondary: '#CACAC8',
         accent: '#000000',
@@ -1091,15 +1114,15 @@ const TEAM_BRANDING: Record<string, TeamBranding> = {
         logo: null,
     },
     LOYOLA_MARYMOUNT: {
-        displayName: 'Loyola Marymount',
+        displayName: 'Los Angeles',
         primary: '#B62B3A',
         secondary: '#00447C',
         accent: '#C8C9C7',
         headerText: '#FFFFFF',
         logo: null,
     },
-    LSU: {
-        displayName: 'LSU',
+    LSU: { // TRACKED TEAM
+        displayName: 'Baton Rouge',
         primary: '#461D7C',
         secondary: '#FDD023',
         accent: '#FFFFFF',
@@ -1107,7 +1130,7 @@ const TEAM_BRANDING: Record<string, TeamBranding> = {
         logo: null,
     },
     MAINE: {
-        displayName: 'Maine',
+        displayName: 'Orono',
         primary: '#003263',
         secondary: '#B0D7FF',
         accent: '#FFFFFF',
@@ -1115,7 +1138,7 @@ const TEAM_BRANDING: Record<string, TeamBranding> = {
         logo: null,
     },
     MANHATTAN: {
-        displayName: 'Manhattan',
+        displayName: 'Riverdale',
         primary: '#00703C',
         secondary: '#FFFFFF',
         accent: '#00703C',
@@ -1123,15 +1146,15 @@ const TEAM_BRANDING: Record<string, TeamBranding> = {
         logo: null,
     },
     MARIST: {
-        displayName: 'Marist',
+        displayName: 'Poughkeepsie',
         primary: '#C8102E',
         secondary: '#FFFFFF',
         accent: '#B2B2B2',
         headerText: '#FFFFFF',
         logo: null,
     },
-    MARQUETTE: {
-        displayName: 'Marquette',
+    MARQUETTE: { // TRACKED TEAM
+        displayName: 'Milwaukee',
         primary: '#003366',
         secondary: '#FFB81C',
         accent: '#FFFFFF',
@@ -1139,15 +1162,15 @@ const TEAM_BRANDING: Record<string, TeamBranding> = {
         logo: null,
     },
     MARSHALL: {
-        displayName: 'Marshall',
+        displayName: 'Huntington',
         primary: '#00B140',
         secondary: '#27251F',
         accent: '#FFFFFF',
         headerText: '#FFFFFF',
         logo: null,
     },
-    MARYLAND: {
-        displayName: 'Maryland',
+    MARYLAND: { // TRACKED TEAM
+        displayName: 'College Park',
         primary: '#E03A3E',
         secondary: '#FFD520',
         accent: '#000000',
@@ -1155,14 +1178,14 @@ const TEAM_BRANDING: Record<string, TeamBranding> = {
         logo: null,
     },
     MCNEESE: {
-        displayName: 'McNeese',
+        displayName: 'Lake Charles',
         primary: '#00529B',
         secondary: '#FFD204',
         accent: '#FFFFFF',
         headerText: '#FFFFFF',
         logo: null,
     },
-    MEMPHIS: {
+    MEMPHIS: { // TRACKED TEAM
         displayName: 'Memphis',
         primary: '#003087',
         secondary: '#9EA2A2',
@@ -1171,7 +1194,7 @@ const TEAM_BRANDING: Record<string, TeamBranding> = {
         logo: null,
     },
     MERCER: {
-        displayName: 'Mercer',
+        displayName: 'Macon',
         primary: '#F76800',
         secondary: '#000000',
         accent: '#FFFFFF',
@@ -1179,7 +1202,7 @@ const TEAM_BRANDING: Record<string, TeamBranding> = {
         logo: null,
     },
     MERRIMACK: {
-        displayName: 'Merrimack',
+        displayName: 'North Andover',
         primary: '#003768',
         secondary: '#FDB813',
         accent: '#FFFFFF',
@@ -1187,7 +1210,7 @@ const TEAM_BRANDING: Record<string, TeamBranding> = {
         logo: null,
     },
     MIAMI: {
-        displayName: 'Miami',
+        displayName: 'Coral Gables',
         primary: '#005030',
         secondary: '#F47321',
         accent: '#FFFFFF',
@@ -1195,23 +1218,23 @@ const TEAM_BRANDING: Record<string, TeamBranding> = {
         logo: null,
     },
     MIAMI_OH: {
-        displayName: 'Miami (OH)',
+        displayName: 'Oxford',
         primary: '#B61E2E',
         secondary: '#000000',
         accent: '#FFFFFF',
         headerText: '#FFFFFF',
         logo: null,
     },
-    MICHIGAN: {
-        displayName: 'Michigan',
+    MICHIGAN: { // TRACKED TEAM
+        displayName: 'Ann Arbor',
         primary: '#00274C',
         secondary: '#FFCB05',
         accent: '#1D1D1D',
         headerText: '#FFFFFF',
         logo: null,
     },
-    MICHIGAN_STATE: {
-        displayName: 'Michigan State',
+    MICHIGAN_STATE: { // TRACKED TEAM
+        displayName: 'East Lansing',
         primary: '#18453B',
         secondary: '#FFFFFF',
         accent: '#B2B4B2',
@@ -1219,7 +1242,7 @@ const TEAM_BRANDING: Record<string, TeamBranding> = {
         logo: null,
     },
     MIDDLE_TENNESSEE: {
-        displayName: 'Middle Tennessee',
+        displayName: 'Murfreesboro',
         primary: '#0066CC',
         secondary: '#000000',
         accent: '#69B3E7',
@@ -1227,7 +1250,7 @@ const TEAM_BRANDING: Record<string, TeamBranding> = {
         logo: null,
     },
     MINNESOTA: {
-        displayName: 'Minnesota',
+        displayName: 'Minneapolis',
         primary: '#7A0019',
         secondary: '#FFCC33',
         accent: '#FFFFFF',
@@ -1235,15 +1258,15 @@ const TEAM_BRANDING: Record<string, TeamBranding> = {
         logo: null,
     },
     MISSISSIPPI_STATE: {
-        displayName: 'Mississippi State',
+        displayName: 'Starkville',
         primary: '#5D1725',
         secondary: '#FFFFFF',
         accent: '#C1C6C8',
         headerText: '#FFFFFF',
         logo: null,
     },
-    MISSOURI: {
-        displayName: 'Missouri',
+    MISSOURI: { // TRACKED TEAM
+        displayName: 'Columbia',
         primary: '#000000',
         secondary: '#F1B82D',
         accent: '#FFFFFF',
@@ -1251,7 +1274,7 @@ const TEAM_BRANDING: Record<string, TeamBranding> = {
         logo: null,
     },
     MISSOURI_STATE: {
-        displayName: 'Missouri State',
+        displayName: 'Springfield',
         primary: '#5E0009',
         secondary: '#FFFFFF',
         accent: '#000000',
@@ -1259,7 +1282,7 @@ const TEAM_BRANDING: Record<string, TeamBranding> = {
         logo: null,
     },
     MONMOUTH: {
-        displayName: 'Monmouth',
+        displayName: 'West Long Branch',
         primary: '#002D56',
         secondary: '#B2B2B2',
         accent: '#FFFFFF',
@@ -1267,7 +1290,7 @@ const TEAM_BRANDING: Record<string, TeamBranding> = {
         logo: null,
     },
     MONTANA: {
-        displayName: 'Montana',
+        displayName: 'Missoula',
         primary: '#630031',
         secondary: '#999999',
         accent: '#FFFFFF',
@@ -1275,7 +1298,7 @@ const TEAM_BRANDING: Record<string, TeamBranding> = {
         logo: null,
     },
     MONTANA_STATE: {
-        displayName: 'Montana State',
+        displayName: 'Bozeman',
         primary: '#00205B',
         secondary: '#B9975B',
         accent: '#FFFFFF',
@@ -1283,7 +1306,7 @@ const TEAM_BRANDING: Record<string, TeamBranding> = {
         logo: null,
     },
     MOREHEAD_STATE: {
-        displayName: 'Morehead State',
+        displayName: 'Morehead',
         primary: '#005EB8',
         secondary: '#FFCF00',
         accent: '#FFFFFF',
@@ -1291,7 +1314,7 @@ const TEAM_BRANDING: Record<string, TeamBranding> = {
         logo: null,
     },
     MORGAN_STATE: {
-        displayName: 'Morgan State',
+        displayName: 'Baltimore',
         primary: '#1B4383',
         secondary: '#F47937',
         accent: '#FFFFFF',
@@ -1299,7 +1322,7 @@ const TEAM_BRANDING: Record<string, TeamBranding> = {
         logo: null,
     },
     MT_ST_MARYS: {
-        displayName: 'Mount St. Mary\'s',
+        displayName: 'Emmitsburg',
         primary: '#002855',
         secondary: '#84754E',
         accent: '#FFFFFF',
@@ -1307,7 +1330,7 @@ const TEAM_BRANDING: Record<string, TeamBranding> = {
         logo: null,
     },
     MURRAY_STATE: {
-        displayName: 'Murray State',
+        displayName: 'Murray',
         primary: '#002144',
         secondary: '#ECAC00',
         accent: '#FFFFFF',
@@ -1315,7 +1338,7 @@ const TEAM_BRANDING: Record<string, TeamBranding> = {
         logo: null,
     },
     NAVY: {
-        displayName: 'Navy',
+        displayName: 'Annapolis',
         primary: '#00205B',
         secondary: '#C5B783',
         accent: '#FFFFFF',
@@ -1323,7 +1346,7 @@ const TEAM_BRANDING: Record<string, TeamBranding> = {
         logo: null,
     },
     NC_STATE: {
-        displayName: 'NC State',
+        displayName: 'Raleigh',
         primary: '#CC0000',
         secondary: '#FFFFFF',
         accent: '#000000',
@@ -1331,7 +1354,7 @@ const TEAM_BRANDING: Record<string, TeamBranding> = {
         logo: null,
     },
     NCATU: {
-        displayName: 'North Carolina A&T',
+        displayName: 'Greensboro',
         primary: '#003D6D',
         secondary: '#F3B237',
         accent: '#FFFFFF',
@@ -1339,7 +1362,7 @@ const TEAM_BRANDING: Record<string, TeamBranding> = {
         logo: null,
     },
     NDSU: {
-        displayName: 'North Dakota State',
+        displayName: 'Fargo',
         primary: '#0A5640',
         secondary: '#FFC72A',
         accent: '#FFFFFF',
@@ -1347,7 +1370,7 @@ const TEAM_BRANDING: Record<string, TeamBranding> = {
         logo: null,
     },
     NEBRASKA: {
-        displayName: 'Nebraska',
+        displayName: 'Lincoln',
         primary: '#D00000',
         secondary: '#F5F1E7',
         accent: '#C7C8CA',
@@ -1355,7 +1378,7 @@ const TEAM_BRANDING: Record<string, TeamBranding> = {
         logo: null,
     },
     NEVADA: {
-        displayName: 'Nevada',
+        displayName: 'Reno',
         primary: '#041E42',
         secondary: '#8A8D8F',
         accent: '#231F20',
@@ -1363,15 +1386,15 @@ const TEAM_BRANDING: Record<string, TeamBranding> = {
         logo: null,
     },
     NEW_HAMPSHIRE: {
-        displayName: 'New Hampshire',
+        displayName: 'Durham',
         primary: '#041e42',
         secondary: '#BBBCBC',
         accent: '#FFFFFF',
         headerText: '#FFFFFF',
         logo: null,
     },
-    NEW_MEXICO: {
-        displayName: 'New Mexico',
+    NEW_MEXICO: { // TRACKED TEAM
+        displayName: 'Albuquerque',
         primary: '#BA0C2F',
         secondary: '#63666A',
         accent: '#FFFFFF',
@@ -1379,7 +1402,7 @@ const TEAM_BRANDING: Record<string, TeamBranding> = {
         logo: null,
     },
     NEW_MEXICO_STATE: {
-        displayName: 'New Mexico State',
+        displayName: 'Las Cruces',
         primary: '#861F41',
         secondary: '#000000',
         accent: '#97999B',
@@ -1395,7 +1418,7 @@ const TEAM_BRANDING: Record<string, TeamBranding> = {
         logo: null,
     },
     NIAGARA: {
-        displayName: 'Niagara',
+        displayName: 'Lewiston',
         primary: '#582C83',
         secondary: '#FFFFFF',
         accent: '#000000',
@@ -1403,7 +1426,7 @@ const TEAM_BRANDING: Record<string, TeamBranding> = {
         logo: null,
     },
     NICHOLLS: {
-        displayName: 'Nicholls',
+        displayName: 'Thibodaux',
         primary: '#AE132A',
         secondary: '#72808A',
         accent: '#000000',
@@ -1411,7 +1434,7 @@ const TEAM_BRANDING: Record<string, TeamBranding> = {
         logo: null,
     },
     NIU: {
-        displayName: 'Northern Illinois',
+        displayName: 'DeKalb',
         primary: '#BA0C2F',
         secondary: '#000000',
         accent: '#FFFFFF',
@@ -1419,7 +1442,7 @@ const TEAM_BRANDING: Record<string, TeamBranding> = {
         logo: null,
     },
     NKU: {
-        displayName: 'Northern Kentucky',
+        displayName: 'Highland Heights',
         primary: '#000000',
         secondary: '#FFC72C',
         accent: '#FFFFFF',
@@ -1427,15 +1450,15 @@ const TEAM_BRANDING: Record<string, TeamBranding> = {
         logo: null,
     },
     NORFOLK_STATE: {
-        displayName: 'Norfolk State',
+        displayName: 'Norfolk',
         primary: '#007A53',
         secondary: '#F3D03E',
         accent: '#54585A',
         headerText: '#FFFFFF',
         logo: null,
     },
-    NORTH_CAROLINA: {
-        displayName: 'North Carolina',
+    NORTH_CAROLINA: { // TRACKED TEAM
+        displayName: 'Chapel Hill',
         primary: '#7BAFD4',
         secondary: '#FFFFFF',
         accent: '#13294B',
@@ -1443,7 +1466,7 @@ const TEAM_BRANDING: Record<string, TeamBranding> = {
         logo: null,
     },
     NORTH_DAKOTA: {
-        displayName: 'North Dakota',
+        displayName: 'Grand Forks',
         primary: '#009A44',
         secondary: '#AAAEAD',
         accent: '#000000',
@@ -1451,7 +1474,7 @@ const TEAM_BRANDING: Record<string, TeamBranding> = {
         logo: null,
     },
     NORTH_FLORIDA: {
-        displayName: 'North Florida',
+        displayName: 'Jacksonville',
         primary: '#002447',
         secondary: '#A5ACAF',
         accent: '#FFFFFF',
@@ -1459,7 +1482,7 @@ const TEAM_BRANDING: Record<string, TeamBranding> = {
         logo: null,
     },
     NORTH_TEXAS: {
-        displayName: 'North Texas',
+        displayName: 'Denton',
         primary: '#00853E',
         secondary: '#FFFFFF',
         accent: '#000000',
@@ -1467,7 +1490,7 @@ const TEAM_BRANDING: Record<string, TeamBranding> = {
         logo: null,
     },
     NORTHERN_ARIZONA: {
-        displayName: 'Northern Arizona',
+        displayName: 'Flagstaff',
         primary: '#003466',
         secondary: '#FFD200',
         accent: '#FFFFFF',
@@ -1475,15 +1498,15 @@ const TEAM_BRANDING: Record<string, TeamBranding> = {
         logo: null,
     },
     NORTHERN_IOWA: {
-        displayName: 'Northern Iowa',
+        displayName: 'Cedar Falls',
         primary: '#4B116F',
         secondary: '#FFCC00',
         accent: '#FFFFFF',
         headerText: '#FFFFFF',
         logo: null,
     },
-    NORTHWESTERN: {
-        displayName: 'Northwestern',
+    NORTHWESTERN: { // TRACKED TEAM
+        displayName: 'Evanston',
         primary: '#4E2A84',
         secondary: '#FFFFFF',
         accent: '#B6ACD1',
@@ -1491,15 +1514,15 @@ const TEAM_BRANDING: Record<string, TeamBranding> = {
         logo: null,
     },
     NORTHWESTERN_STATE: {
-        displayName: 'Northwestern State',
+        displayName: 'Natchitoches',
         primary: '#663399',
         secondary: '#FF6600',
         accent: '#FFFFFF',
         headerText: '#FFFFFF',
         logo: null,
     },
-    NOTRE_DAME: {
-        displayName: 'Notre Dame',
+    NOTRE_DAME: { // TRACKED TEAM
+        displayName: 'South Bend',
         primary: '#0C2340',
         secondary: '#C99700',
         accent: '#FFFFFF',
@@ -1507,7 +1530,7 @@ const TEAM_BRANDING: Record<string, TeamBranding> = {
         logo: null,
     },
     OAKLAND: {
-        displayName: 'Oakland',
+        displayName: 'Rochester',
         primary: '#B59A57',
         secondary: '#000000',
         accent: '#FFFFFF',
@@ -1515,31 +1538,31 @@ const TEAM_BRANDING: Record<string, TeamBranding> = {
         logo: null,
     },
     OHIO: {
-        displayName: 'Ohio',
+        displayName: 'Athens',
         primary: '#00694E',
         secondary: '#FFFFFF',
         accent: '#000000',
         headerText: '#FFFFFF',
         logo: null,
     },
-    OHIO_STATE: {
-        displayName: 'Ohio State',
+    OHIO_STATE: { // TRACKED TEAM
+        displayName: 'Columbus',
         primary: '#BB0000',
         secondary: '#666666',
         accent: '#FFFFFF',
         headerText: '#FFFFFF',
         logo: null,
     },
-    OKLAHOMA: {
-        displayName: 'Oklahoma',
+    OKLAHOMA: { // TRACKED TEAM
+        displayName: 'Norman',
         primary: '#841617',
         secondary: '#FDF9D8',
         accent: '#FFFFFF',
         headerText: '#FFFFFF',
         logo: null,
     },
-    OKLAHOMA_STATE: {
-        displayName: 'Oklahoma State',
+    OKLAHOMA_STATE: { // TRACKED TEAM
+        displayName: 'Stillwater',
         primary: '#FF7300',
         secondary: '#000000',
         accent: '#231F20',
@@ -1547,15 +1570,15 @@ const TEAM_BRANDING: Record<string, TeamBranding> = {
         logo: null,
     },
     OLD_DOMINION: {
-        displayName: 'Old Dominion',
+        displayName: 'Norfolk',
         primary: '#003057',
         secondary: '#7C878E',
         accent: '#0084A9',
         headerText: '#FFFFFF',
         logo: null,
     },
-    OLE_MISS: {
-        displayName: 'Ole Miss',
+    OLE_MISS: { // TRACKED TEAM
+        displayName: 'Oxford',
         primary: '#CE1126',
         secondary: '#14213D',
         accent: '#FFFFFF',
@@ -1563,15 +1586,15 @@ const TEAM_BRANDING: Record<string, TeamBranding> = {
         logo: null,
     },
     ORAL_ROBERTS: {
-        displayName: 'Oral Roberts',
+        displayName: 'Tulsa',
         primary: '#002F60',
         secondary: '#C5B783',
         accent: '#FFFFFF',
         headerText: '#FFFFFF',
         logo: null,
     },
-    OREGON: {
-        displayName: 'Oregon',
+    OREGON: { // TRACKED TEAM
+        displayName: 'Eugene',
         primary: '#154733',
         secondary: '#FEE123',
         accent: '#FFFFFF',
@@ -1579,7 +1602,7 @@ const TEAM_BRANDING: Record<string, TeamBranding> = {
         logo: null,
     },
     OREGON_STATE: {
-        displayName: 'Oregon State',
+        displayName: 'Corvallis',
         primary: '#D73F09',
         secondary: '#000000',
         accent: '#FFFFFF',
@@ -1587,7 +1610,7 @@ const TEAM_BRANDING: Record<string, TeamBranding> = {
         logo: null,
     },
     PACIFIC: {
-        displayName: 'Pacific',
+        displayName: 'Stockton',
         primary: '#FF671D',
         secondary: '#0F0F0F',
         accent: '#F4B223',
@@ -1595,15 +1618,15 @@ const TEAM_BRANDING: Record<string, TeamBranding> = {
         logo: null,
     },
     PENN: {
-        displayName: 'Penn',
+        displayName: 'Philadelphia',
         primary: '#990000',
         secondary: '#011F5B',
         accent: '#FFFFFF',
         headerText: '#FFFFFF',
         logo: null,
     },
-    PENN_STATE: {
-        displayName: 'Penn State',
+    PENN_STATE: { // TRACKED TEAM
+        displayName: 'State College',
         primary: '#041E42',
         secondary: '#FFFFFF',
         accent: '#A2AAAD',
@@ -1611,15 +1634,15 @@ const TEAM_BRANDING: Record<string, TeamBranding> = {
         logo: null,
     },
     PEPPERDINE: {
-        displayName: 'Pepperdine',
+        displayName: 'Malibu',
         primary: '#00205c',
         secondary: '#c25700',
         accent: '#FFFFFF',
         headerText: '#FFFFFF',
         logo: null,
     },
-    PITT: {
-        displayName: 'Pitt',
+    PITT: { // TRACKED TEAM
+        displayName: 'Pittsburgh',
         primary: '#003594',
         secondary: '#FFB81C',
         accent: '#FFFFFF',
@@ -1635,7 +1658,7 @@ const TEAM_BRANDING: Record<string, TeamBranding> = {
         logo: null,
     },
     PORTLAND_STATE: {
-        displayName: 'Portland State',
+        displayName: 'Portland',
         primary: '#154734',
         secondary: '#FFFFFF',
         accent: '#A5ACAF',
@@ -1650,7 +1673,7 @@ const TEAM_BRANDING: Record<string, TeamBranding> = {
         headerText: '#FFFFFF',
         logo: null,
     },
-    PROVIDENCE: {
+    PROVIDENCE: { // TRACKED TEAM
         displayName: 'Providence',
         primary: '#000000',
         secondary: '#8A8D8F',
@@ -1658,8 +1681,8 @@ const TEAM_BRANDING: Record<string, TeamBranding> = {
         headerText: '#FFFFFF',
         logo: null,
     },
-    PURDUE: {
-        displayName: 'Purdue',
+    PURDUE: { // TRACKED TEAM
+        displayName: 'West Lafayette',
         primary: '#000000',
         secondary: '#CFB991',
         accent: '#FFFFFF',
@@ -1675,7 +1698,7 @@ const TEAM_BRANDING: Record<string, TeamBranding> = {
         logo: null,
     },
     RHODE_ISLAND: {
-        displayName: 'Rhode Island',
+        displayName: 'Kingston',
         primary: '#002147',
         secondary: '#68ABE8',
         accent: '#FFFFFF',
@@ -1683,7 +1706,7 @@ const TEAM_BRANDING: Record<string, TeamBranding> = {
         logo: null,
     },
     RICE: {
-        displayName: 'Rice',
+        displayName: 'Houston',
         primary: '#00205B',
         secondary: '#C1C6C8',
         accent: '#FFFFFF',
@@ -1699,15 +1722,15 @@ const TEAM_BRANDING: Record<string, TeamBranding> = {
         logo: null,
     },
     ROBERT_MORRIS: {
-        displayName: 'Robert Morris',
+        displayName: 'Moon Township',
         primary: '#14234B',
         secondary: '#A6192E',
         accent: '#B2B1AE',
         headerText: '#FFFFFF',
         logo: null,
     },
-    RUTGERS: {
-        displayName: 'Rutgers',
+    RUTGERS: { // TRACKED TEAM
+        displayName: 'New Brunswick',
         primary: '#CC0033',
         secondary: '#5F6A72',
         accent: '#FFFFFF',
@@ -1715,7 +1738,7 @@ const TEAM_BRANDING: Record<string, TeamBranding> = {
         logo: null,
     },
     SACRAMENTO_STATE: {
-        displayName: 'Sacramento State',
+        displayName: 'Sacramento',
         primary: '#043927',
         secondary: '#C4B581',
         accent: '#000000',
@@ -1723,7 +1746,7 @@ const TEAM_BRANDING: Record<string, TeamBranding> = {
         logo: null,
     },
     SAINT_FRANCIS: {
-        displayName: 'Saint Francis',
+        displayName: 'Loretto',
         primary: '#BD1F25',
         secondary: '#000000',
         accent: '#8E908F',
@@ -1731,7 +1754,7 @@ const TEAM_BRANDING: Record<string, TeamBranding> = {
         logo: null,
     },
     SAINT_JOSEPHS: {
-        displayName: 'Saint Joseph\'s',
+        displayName: 'Philadelphia',
         primary: '#9E1B32',
         secondary: '#6C6F70',
         accent: '#000000',
@@ -1739,7 +1762,7 @@ const TEAM_BRANDING: Record<string, TeamBranding> = {
         logo: null,
     },
     SAINT_LOUIS: {
-        displayName: 'Saint Louis',
+        displayName: 'St. Louis',
         primary: '#003DA5',
         secondary: '#FFFFFF',
         accent: '#C8C9C7',
@@ -1747,7 +1770,7 @@ const TEAM_BRANDING: Record<string, TeamBranding> = {
         logo: null,
     },
     SAINT_MARYS: {
-        displayName: 'Saint Mary\'s',
+        displayName: 'Moraga',
         primary: '#143257',
         secondary: '#D82732',
         accent: '#81959B',
@@ -1755,7 +1778,7 @@ const TEAM_BRANDING: Record<string, TeamBranding> = {
         logo: null,
     },
     SAM_HOUSTON: {
-        displayName: 'Sam Houston',
+        displayName: 'Huntsville',
         primary: '#FE5100',
         secondary: '#FFFFFF',
         accent: '#000000',
@@ -1763,7 +1786,7 @@ const TEAM_BRANDING: Record<string, TeamBranding> = {
         logo: null,
     },
     SAMFORD: {
-        displayName: 'Samford',
+        displayName: 'Homewood',
         primary: '#002649',
         secondary: '#C4161D',
         accent: '#FFFFFF',
@@ -1778,8 +1801,8 @@ const TEAM_BRANDING: Record<string, TeamBranding> = {
         headerText: '#FFFFFF',
         logo: null,
     },
-    SAN_DIEGO_STATE: {
-        displayName: 'San Diego State',
+    SAN_DIEGO_STATE: { // TRACKED TEAM
+        displayName: 'San Diego',
         primary: '#A6192E',
         secondary: '#000000',
         accent: '#FFFFFF',
@@ -1795,7 +1818,7 @@ const TEAM_BRANDING: Record<string, TeamBranding> = {
         logo: null,
     },
     SAN_JOSE_STATE: {
-        displayName: 'San Jose State',
+        displayName: 'San Jose',
         primary: '#0055A2',
         secondary: '#E5A823',
         accent: '#939597',
@@ -1811,7 +1834,7 @@ const TEAM_BRANDING: Record<string, TeamBranding> = {
         logo: null,
     },
     SDSU: {
-        displayName: 'South Dakota State',
+        displayName: 'Brookings',
         primary: '#0033A0',
         secondary: '#FFD100',
         accent: '#FFFFFF',
@@ -1819,7 +1842,7 @@ const TEAM_BRANDING: Record<string, TeamBranding> = {
         logo: null,
     },
     SE_LOUISIANA: {
-        displayName: 'SE Louisiana',
+        displayName: 'Hammond',
         primary: '#006341',
         secondary: '#EAAA00',
         accent: '#000000',
@@ -1835,15 +1858,15 @@ const TEAM_BRANDING: Record<string, TeamBranding> = {
         logo: null,
     },
     SEMO: {
-        displayName: 'SEMO',
+        displayName: 'Cape Girardeau',
         primary: '#C8102E',
         secondary: '#000000',
         accent: '#FFFFFF',
         headerText: '#FFFFFF',
         logo: null,
     },
-    SETON_HALL: {
-        displayName: 'Seton Hall',
+    SETON_HALL: { // TRACKED TEAM
+        displayName: 'South Orange',
         primary: '#003A70',
         secondary: '#A7A8AA',
         accent: '#FFFFFF',
@@ -1851,7 +1874,7 @@ const TEAM_BRANDING: Record<string, TeamBranding> = {
         logo: null,
     },
     SIENA: {
-        displayName: 'Siena',
+        displayName: 'Loudonville',
         primary: '#006747',
         secondary: '#FFC72C',
         accent: '#FFFFFF',
@@ -1859,7 +1882,7 @@ const TEAM_BRANDING: Record<string, TeamBranding> = {
         logo: null,
     },
     SMU: {
-        displayName: 'SMU',
+        displayName: 'Dallas',
         primary: '#354Ca1',
         secondary: '#CC0035',
         accent: '#262626',
@@ -1867,7 +1890,7 @@ const TEAM_BRANDING: Record<string, TeamBranding> = {
         logo: null,
     },
     SOUTH_ALABAMA: {
-        displayName: 'South Alabama',
+        displayName: 'Mobile',
         primary: '#BF0D3E',
         secondary: '#00205B',
         accent: '#A2AAAD',
@@ -1875,7 +1898,7 @@ const TEAM_BRANDING: Record<string, TeamBranding> = {
         logo: null,
     },
     SOUTH_CAROLINA: {
-        displayName: 'South Carolina',
+        displayName: 'Columbia',
         primary: '#73000A',
         secondary: '#000000',
         accent: '#FFFFFF',
@@ -1883,7 +1906,7 @@ const TEAM_BRANDING: Record<string, TeamBranding> = {
         logo: null,
     },
     SOUTH_FLORIDA: {
-        displayName: 'South Florida',
+        displayName: 'Tampa',
         primary: '#006747',
         secondary: '#CFC493',
         accent: '#000000',
@@ -1891,7 +1914,7 @@ const TEAM_BRANDING: Record<string, TeamBranding> = {
         logo: null,
     },
     SOUTHERN: {
-        displayName: 'Southern',
+        displayName: 'Baton Rouge',
         primary: '#58B6E7',
         secondary: '#FFCE34',
         accent: '#FFFFFF',
@@ -1899,7 +1922,7 @@ const TEAM_BRANDING: Record<string, TeamBranding> = {
         logo: null,
     },
     SOUTHERN_ILLINOIS: {
-        displayName: 'Southern Illinois',
+        displayName: 'Carbondale',
         primary: '#720000',
         secondary: '#FFFFFF',
         accent: '#000000',
@@ -1907,7 +1930,7 @@ const TEAM_BRANDING: Record<string, TeamBranding> = {
         logo: null,
     },
     SOUTHERN_MISS: {
-        displayName: 'Southern Miss',
+        displayName: 'Hattiesburg',
         primary: '#FFAB00',
         secondary: '#000000',
         accent: '#FFFFFF',
@@ -1915,7 +1938,7 @@ const TEAM_BRANDING: Record<string, TeamBranding> = {
         logo: null,
     },
     SOUTHERN_UTAH: {
-        displayName: 'Southern Utah',
+        displayName: 'Cedar City',
         primary: '#C41425',
         secondary: '#000000',
         accent: '#FFFFFF',
@@ -1931,7 +1954,7 @@ const TEAM_BRANDING: Record<string, TeamBranding> = {
         logo: null,
     },
     ST_FRANCIS_COLLEGE: {
-        displayName: 'St. Francis College',
+        displayName: 'Brooklyn',
         primary: '#004C97',
         secondary: '#E03A3E',
         accent: '#FFFFFF',
@@ -1939,7 +1962,7 @@ const TEAM_BRANDING: Record<string, TeamBranding> = {
         logo: null,
     },
     ST_JOHNS: {
-        displayName: "St. John's",
+        displayName: 'Queens',
         primary: '#BA0C2F',
         secondary: '#041C2C',
         accent: '#808285',
@@ -1947,7 +1970,7 @@ const TEAM_BRANDING: Record<string, TeamBranding> = {
         logo: null,
     },
     ST_PETERS: {
-        displayName: "St. Peter's",
+        displayName: 'Jersey City',
         primary: '#003C71',
         secondary: '#A59C94',
         accent: '#0072CE',
@@ -1955,7 +1978,7 @@ const TEAM_BRANDING: Record<string, TeamBranding> = {
         logo: null,
     },
     STANFORD: {
-        displayName: 'Stanford',
+        displayName: 'Palo Alto',
         primary: '#8C1515',
         secondary: '#FFFFFF',
         accent: '#53565A',
@@ -1963,7 +1986,7 @@ const TEAM_BRANDING: Record<string, TeamBranding> = {
         logo: null,
     },
     STEPHEN_F_AUSTIN: {
-        displayName: 'Stephen F. Austin',
+        displayName: 'Nacogdoches',
         primary: '#613393',
         secondary: '#FFFFFF',
         accent: '#000000',
@@ -1971,7 +1994,7 @@ const TEAM_BRANDING: Record<string, TeamBranding> = {
         logo: null,
     },
     STETSON: {
-        displayName: 'Stetson',
+        displayName: 'DeLand',
         primary: '#00523E',
         secondary: '#FFFFFF',
         accent: '#86898C',
@@ -1986,7 +2009,7 @@ const TEAM_BRANDING: Record<string, TeamBranding> = {
         headerText: '#FFFFFF',
         logo: null,
     },
-    SYRACUSE: {
+    SYRACUSE: { // TRACKED TEAM
         displayName: 'Syracuse',
         primary: '#D44500',
         secondary: '#0C2340',
@@ -1995,7 +2018,7 @@ const TEAM_BRANDING: Record<string, TeamBranding> = {
         logo: null,
     },
     TARLETON_STATE: {
-        displayName: 'Tarleton State',
+        displayName: 'Stephenville',
         primary: '#4F2D7F',
         secondary: '#FFFFFF',
         accent: '#6D6E71',
@@ -2003,23 +2026,23 @@ const TEAM_BRANDING: Record<string, TeamBranding> = {
         logo: null,
     },
     TCU: {
-        displayName: 'TCU',
+        displayName: 'Fort Worth',
         primary: '#4D1979',
         secondary: '#FFFFFF',
         accent: '#A3A9AC',
         headerText: '#FFFFFF',
         logo: null,
     },
-    TEMPLE: {
-        displayName: 'Temple',
+    TEMPLE: { // TRACKED TEAM
+        displayName: 'Philadelphia',
         primary: '#9D2235',
         secondary: '#FFFFFF',
         accent: '#8A8D8F',
         headerText: '#FFFFFF',
         logo: null,
     },
-    TENNESSEE: {
-        displayName: 'Tennessee',
+    TENNESSEE: { // TRACKED TEAM
+        displayName: 'Knoxville',
         primary: '#FF8200',
         secondary: '#FFFFFF',
         accent: '#58595B',
@@ -2027,23 +2050,23 @@ const TEAM_BRANDING: Record<string, TeamBranding> = {
         logo: null,
     },
     TENNESSEE_TECH: {
-        displayName: 'Tennessee Tech',
+        displayName: 'Cookeville',
         primary: '#4F2984',
         secondary: '#FFDD00',
         accent: '#FFFFFF',
         headerText: '#FFFFFF',
         logo: null,
     },
-    TEXAS: {
-        displayName: 'Texas',
+    TEXAS: { // TRACKED TEAM
+        displayName: 'Austin',
         primary: '#BF5700',
         secondary: '#FFFFFF',
         accent: '#333F48',
         headerText: '#FFFFFF',
         logo: null,
     },
-    TEXAS_AM: {
-        displayName: 'Texas A&M',
+    TEXAS_AM: { // TRACKED TEAM
+        displayName: 'College Station',
         primary: '#500000',
         secondary: '#FFFFFF',
         accent: '#332C2C',
@@ -2051,7 +2074,7 @@ const TEAM_BRANDING: Record<string, TeamBranding> = {
         logo: null,
     },
     TEXAS_AM_CC: {
-        displayName: 'Texas A&M-CC',
+        displayName: 'Corpus Christi',
         primary: '#0067C5',
         secondary: '#007F3E',
         accent: '#9EA2A4',
@@ -2059,7 +2082,7 @@ const TEAM_BRANDING: Record<string, TeamBranding> = {
         logo: null,
     },
     TEXAS_SOUTHERN: {
-        displayName: 'Texas Southern',
+        displayName: 'Houston',
         primary: '#7C183E',
         secondary: '#9DA6AB',
         accent: '#FFFFFF',
@@ -2067,15 +2090,15 @@ const TEAM_BRANDING: Record<string, TeamBranding> = {
         logo: null,
     },
     TEXAS_STATE: {
-        displayName: 'Texas State',
+        displayName: 'San Marcos',
         primary: '#501214',
         secondary: '#AC9155',
         accent: '#FFFFFF',
         headerText: '#FFFFFF',
         logo: null,
     },
-    TEXAS_TECH: {
-        displayName: 'Texas Tech',
+    TEXAS_TECH: { // TRACKED TEAM
+        displayName: 'Lubbock',
         primary: '#CC0000',
         secondary: '#000000',
         accent: '#FFFFFF',
@@ -2083,7 +2106,7 @@ const TEAM_BRANDING: Record<string, TeamBranding> = {
         logo: null,
     },
     THE_CITADEL: {
-        displayName: 'The Citadel',
+        displayName: 'Charleston',
         primary: '#3975B7',
         secondary: '#1F3A60',
         accent: '#FFFFFF',
@@ -2115,7 +2138,7 @@ const TEAM_BRANDING: Record<string, TeamBranding> = {
         logo: null,
     },
     TULANE: {
-        displayName: 'Tulane',
+        displayName: 'New Orleans',
         primary: '#006747',
         secondary: '#418FDE',
         accent: '#000000',
@@ -2131,7 +2154,7 @@ const TEAM_BRANDING: Record<string, TeamBranding> = {
         logo: null,
     },
     UAB: {
-        displayName: 'UAB',
+        displayName: 'Birmingham',
         primary: '#006341',
         secondary: '#CC8A00',
         accent: '#000000',
@@ -2139,7 +2162,7 @@ const TEAM_BRANDING: Record<string, TeamBranding> = {
         logo: null,
     },
     UC_DAVIS: {
-        displayName: 'UC Davis',
+        displayName: 'Davis',
         primary: '#002855',
         secondary: '#B3A369',
         accent: '#FFFFFF',
@@ -2147,7 +2170,7 @@ const TEAM_BRANDING: Record<string, TeamBranding> = {
         logo: null,
     },
     UC_IRVINE: {
-        displayName: 'UC Irvine',
+        displayName: 'Irvine',
         primary: '#0C2340',
         secondary: '#FFD200',
         accent: '#FFFFFF',
@@ -2155,7 +2178,7 @@ const TEAM_BRANDING: Record<string, TeamBranding> = {
         logo: null,
     },
     UC_RIVERSIDE: {
-        displayName: 'UC Riverside',
+        displayName: 'Riverside',
         primary: '#003066',
         secondary: '#F1AB00',
         accent: '#2D6CC0',
@@ -2163,23 +2186,23 @@ const TEAM_BRANDING: Record<string, TeamBranding> = {
         logo: null,
     },
     UCF: {
-        displayName: 'UCF',
+        displayName: 'Orlando',
         primary: '#BA9B37',
         secondary: '#000000',
         accent: '#FFFFFF',
         headerText: '#000000',
         logo: null,
     },
-    UCLA: {
-        displayName: 'UCLA',
+    UCLA: { // TRACKED TEAM
+        displayName: 'Los Angeles',
         primary: '#2774AE',
         secondary: '#FFD100',
         accent: '#FFFFFF',
         headerText: '#FFFFFF',
         logo: null,
     },
-    UCONN: {
-        displayName: 'UConn',
+    UCONN: { // TRACKED TEAM
+        displayName: 'Storrs',
         primary: '#000E2F',
         secondary: '#FFFFFF',
         accent: '#E4002B',
@@ -2187,7 +2210,7 @@ const TEAM_BRANDING: Record<string, TeamBranding> = {
         logo: null,
     },
     UCSB: {
-        displayName: 'UCSB',
+        displayName: 'Santa Barbara',
         primary: '#003660',
         secondary: '#FEBC11',
         accent: '#FFFFFF',
@@ -2195,7 +2218,7 @@ const TEAM_BRANDING: Record<string, TeamBranding> = {
         logo: null,
     },
     UIC: {
-        displayName: 'UIC',
+        displayName: 'Chicago',
         primary: '#AC1E2D',
         secondary: '#041E42',
         accent: '#FACC09',
@@ -2203,7 +2226,7 @@ const TEAM_BRANDING: Record<string, TeamBranding> = {
         logo: null,
     },
     UL_LAFAYETTE: {
-        displayName: 'UL Lafayette',
+        displayName: 'Lafayette',
         primary: '#CE181E',
         secondary: '#000000',
         accent: '#FFFFFF',
@@ -2211,7 +2234,7 @@ const TEAM_BRANDING: Record<string, TeamBranding> = {
         logo: null,
     },
     UL_MONROE: {
-        displayName: 'UL Monroe',
+        displayName: 'Monroe',
         primary: '#840029',
         secondary: '#FDB913',
         accent: '#646469',
@@ -2219,7 +2242,7 @@ const TEAM_BRANDING: Record<string, TeamBranding> = {
         logo: null,
     },
     UMASS: {
-        displayName: 'UMass',
+        displayName: 'Amherst',
         primary: '#881240',
         secondary: '#000000',
         accent: '#A2AAAD',
@@ -2227,7 +2250,7 @@ const TEAM_BRANDING: Record<string, TeamBranding> = {
         logo: null,
     },
     UMASS_LOWELL: {
-        displayName: 'UMass Lowell',
+        displayName: 'Lowell',
         primary: '#0067B1',
         secondary: '#C8102E',
         accent: '#FFFFFF',
@@ -2235,7 +2258,7 @@ const TEAM_BRANDING: Record<string, TeamBranding> = {
         logo: null,
     },
     UMBC: {
-        displayName: 'UMBC',
+        displayName: 'Baltimore',
         primary: '#000000',
         secondary: '#FFC20E',
         accent: '#E0121A',
@@ -2243,7 +2266,7 @@ const TEAM_BRANDING: Record<string, TeamBranding> = {
         logo: null,
     },
     UMES: {
-        displayName: 'UMES',
+        displayName: 'Princess Anne',
         primary: '#862633',
         secondary: '#888B8D',
         accent: '#000000',
@@ -2251,7 +2274,7 @@ const TEAM_BRANDING: Record<string, TeamBranding> = {
         logo: null,
     },
     UMKC: {
-        displayName: 'UMKC',
+        displayName: 'Kansas City',
         primary: '#005293',
         secondary: '#FECB00',
         accent: '#000000',
@@ -2259,7 +2282,7 @@ const TEAM_BRANDING: Record<string, TeamBranding> = {
         logo: null,
     },
     UNC_ASHEVILLE: {
-        displayName: 'UNC Asheville',
+        displayName: 'Asheville',
         primary: '#003DA5',
         secondary: '#FFFFFF',
         accent: '#808285',
@@ -2267,7 +2290,7 @@ const TEAM_BRANDING: Record<string, TeamBranding> = {
         logo: null,
     },
     UNCG: {
-        displayName: 'UNCG',
+        displayName: 'Greensboro',
         primary: '#0F2044',
         secondary: '#FFB71B',
         accent: '#BEC0C2',
@@ -2275,23 +2298,23 @@ const TEAM_BRANDING: Record<string, TeamBranding> = {
         logo: null,
     },
     UNCW: {
-        displayName: 'UNCW',
+        displayName: 'Wilmington',
         primary: '#006666',
         secondary: '#003366',
         accent: '#FFD600',
         headerText: '#FFFFFF',
         logo: null,
     },
-    UNLV: {
-        displayName: 'UNLV',
+    UNLV: { // TRACKED TEAM
+        displayName: 'Las Vegas',
         primary: '#CF0A2C',
         secondary: '#000000',
         accent: '#8D9093',
         headerText: '#FFFFFF',
         logo: null,
     },
-    USC: {
-        displayName: 'USC',
+    USC: { // TRACKED TEAM
+        displayName: 'Los Angeles',
         primary: '#990000',
         secondary: '#FFCC00',
         accent: '#FFFFFF',
@@ -2299,7 +2322,7 @@ const TEAM_BRANDING: Record<string, TeamBranding> = {
         logo: null,
     },
     USC_UPSTATE: {
-        displayName: 'USC Upstate',
+        displayName: 'Spartanburg',
         primary: '#00703C',
         secondary: '#000000',
         accent: '#FFFFFF',
@@ -2307,7 +2330,7 @@ const TEAM_BRANDING: Record<string, TeamBranding> = {
         logo: null,
     },
     UT_MARTIN: {
-        displayName: 'UT Martin',
+        displayName: 'Martin',
         primary: '#F79728',
         secondary: '#002A5B',
         accent: '#FFFFFF',
@@ -2315,15 +2338,15 @@ const TEAM_BRANDING: Record<string, TeamBranding> = {
         logo: null,
     },
     UTAH: {
-        displayName: 'Utah',
+        displayName: 'Salt Lake City',
         primary: '#CC0000',
         secondary: '#000000',
         accent: '#2F2F2F',
         headerText: '#FFFFFF',
         logo: null,
     },
-    UTAH_STATE: {
-        displayName: 'Utah State',
+    UTAH_STATE: { // TRACKED TEAM
+        displayName: 'Logan',
         primary: '#0F2439',
         secondary: '#FFFFFF',
         accent: '#A7A8AA',
@@ -2331,7 +2354,7 @@ const TEAM_BRANDING: Record<string, TeamBranding> = {
         logo: null,
     },
     UTAH_VALLEY: {
-        displayName: 'Utah Valley',
+        displayName: 'Orem',
         primary: '#275D38',
         secondary: '#000000',
         accent: '#8E8C89',
@@ -2339,7 +2362,7 @@ const TEAM_BRANDING: Record<string, TeamBranding> = {
         logo: null,
     },
     UTEP: {
-        displayName: 'UTEP',
+        displayName: 'El Paso',
         primary: '#FF8200',
         secondary: '#041E42',
         accent: '#B1B3B3',
@@ -2347,7 +2370,7 @@ const TEAM_BRANDING: Record<string, TeamBranding> = {
         logo: null,
     },
     UTSA: {
-        displayName: 'UTSA',
+        displayName: 'San Antonio',
         primary: '#0C2340',
         secondary: '#F15A22',
         accent: '#FFFFFF',
@@ -2370,8 +2393,8 @@ const TEAM_BRANDING: Record<string, TeamBranding> = {
         headerText: '#FFFFFF',
         logo: null,
     },
-    VANDERBILT: {
-        displayName: 'Vanderbilt',
+    VANDERBILT: { // TRACKED TEAM
+        displayName: 'Nashville',
         primary: '#000000',
         secondary: '#866D4B',
         accent: '#FFFFFF',
@@ -2379,7 +2402,7 @@ const TEAM_BRANDING: Record<string, TeamBranding> = {
         logo: null,
     },
     VCU: {
-        displayName: 'VCU',
+        displayName: 'Richmond',
         primary: '#FFB300',
         secondary: '#000000',
         accent: '#FFFFFF',
@@ -2387,14 +2410,14 @@ const TEAM_BRANDING: Record<string, TeamBranding> = {
         logo: null,
     },
     VERMONT: {
-        displayName: 'Vermont',
+        displayName: 'Burlington',
         primary: '#004C36',
         secondary: '#FFC72C',
         accent: '#FFFFFF',
         headerText: '#FFFFFF',
         logo: null,
     },
-    VILLANOVA: {
+    VILLANOVA: { // TRACKED TEAM
         displayName: 'Villanova',
         primary: '#00205B',
         secondary: '#13B5EA',
@@ -2402,16 +2425,16 @@ const TEAM_BRANDING: Record<string, TeamBranding> = {
         headerText: '#FFFFFF',
         logo: null,
     },
-    VIRGINIA: {
-        displayName: 'Virginia',
+    VIRGINIA: { // TRACKED TEAM
+        displayName: 'Charlottesville',
         primary: '#232D4B',
         secondary: '#F84C1E',
         accent: '#FFFFFF',
         headerText: '#FFFFFF',
         logo: null,
     },
-    VIRGINIA_TECH: {
-        displayName: 'Virginia Tech',
+    VIRGINIA_TECH: { // TRACKED TEAM
+        displayName: 'Blacksburg',
         primary: '#630031',
         secondary: '#CF4420',
         accent: '#FFFFFF',
@@ -2419,7 +2442,7 @@ const TEAM_BRANDING: Record<string, TeamBranding> = {
         logo: null,
     },
     VMI: {
-        displayName: 'VMI',
+        displayName: 'Lexington City',
         primary: '#A31236',
         secondary: '#FFB300',
         accent: '#FFFFFF',
@@ -2427,23 +2450,23 @@ const TEAM_BRANDING: Record<string, TeamBranding> = {
         logo: null,
     },
     WAGNER: {
-        displayName: 'Wagner',
+        displayName: 'Staten Island',
         primary: '#00483A',
         secondary: '#FFFFFF',
         accent: '#B9BBBD',
         headerText: '#FFFFFF',
         logo: null,
     },
-    WAKE_FOREST: {
-        displayName: 'Wake Forest',
+    WAKE_FOREST: { // TRACKED TEAM
+        displayName: 'Winston-Salem',
         primary: '#000000',
         secondary: '#9E7E38',
         accent: '#FFFFFF',
         headerText: '#FFFFFF',
         logo: null,
     },
-    WASHINGTON: {
-        displayName: 'Washington',
+    WASHINGTON: { // TRACKED TEAM
+        displayName: 'Seattle',
         primary: '#4B2E83',
         secondary: '#B7A57A',
         accent: '#FFFFFF',
@@ -2451,7 +2474,7 @@ const TEAM_BRANDING: Record<string, TeamBranding> = {
         logo: null,
     },
     WASHINGTON_STATE: {
-        displayName: 'Washington State',
+        displayName: 'Pullman',
         primary: '#A60F2D',
         secondary: '#4D4D4D',
         accent: '#FFFFFF',
@@ -2459,15 +2482,15 @@ const TEAM_BRANDING: Record<string, TeamBranding> = {
         logo: null,
     },
     WEBER_STATE: {
-        displayName: 'Weber State',
+        displayName: 'Ogden',
         primary: '#4B2682',
         secondary: '#A1A1A4',
         accent: '#FFFFFF',
         headerText: '#FFFFFF',
         logo: null,
     },
-    WEST_VIRGINIA: {
-        displayName: 'West Virginia',
+    WEST_VIRGINIA: { // TRACKED TEAM
+        displayName: 'Morgantown',
         primary: '#002855',
         secondary: '#EAAA00',
         accent: '#FFFFFF',
@@ -2475,7 +2498,7 @@ const TEAM_BRANDING: Record<string, TeamBranding> = {
         logo: null,
     },
     WESTERN_CAROLINA: {
-        displayName: 'Western Carolina',
+        displayName: 'Cullowhee',
         primary: '#592C88',
         secondary: '#C1A875',
         accent: '#FFFFFF',
@@ -2483,7 +2506,7 @@ const TEAM_BRANDING: Record<string, TeamBranding> = {
         logo: null,
     },
     WESTERN_ILLINOIS: {
-        displayName: 'Western Illinois',
+        displayName: 'Macomb',
         primary: '#663399',
         secondary: '#FFCC00',
         accent: '#FFFFFF',
@@ -2491,7 +2514,7 @@ const TEAM_BRANDING: Record<string, TeamBranding> = {
         logo: null,
     },
     WESTERN_MICHIGAN: {
-        displayName: 'Western Michigan',
+        displayName: 'Kalamazoo',
         primary: '#634923',
         secondary: '#B5985A',
         accent: '#000000',
@@ -2499,7 +2522,7 @@ const TEAM_BRANDING: Record<string, TeamBranding> = {
         logo: null,
     },
     WICHITA_STATE: {
-        displayName: 'Wichita State',
+        displayName: 'Wichita',
         primary: '#000000',
         secondary: '#FFDB00',
         accent: '#FFFFFF',
@@ -2507,7 +2530,7 @@ const TEAM_BRANDING: Record<string, TeamBranding> = {
         logo: null,
     },
     WILLIAM_MARY: {
-        displayName: 'William & Mary',
+        displayName: 'Williamsburg',
         primary: '#115740',
         secondary: '#F0B323',
         accent: '#D8DCDB',
@@ -2515,15 +2538,15 @@ const TEAM_BRANDING: Record<string, TeamBranding> = {
         logo: null,
     },
     WINTHROP: {
-        displayName: 'Winthrop',
+        displayName: 'Rock Hill',
         primary: '#660000',
         secondary: '#F0B323',
         accent: '#FFFFFF',
         headerText: '#FFFFFF',
         logo: null,
     },
-    WISCONSIN: {
-        displayName: 'Wisconsin',
+    WISCONSIN: { // TRACKED TEAMS
+        displayName: 'Madison',
         primary: '#C5050C',
         secondary: '#FFFFFF',
         accent: '#9B9B9B',
@@ -2531,7 +2554,7 @@ const TEAM_BRANDING: Record<string, TeamBranding> = {
         logo: null,
     },
     WKU: {
-        displayName: 'Western Kentucky',
+        displayName: 'Bowling Green',
         primary: '#C60C30',
         secondary: '#000000',
         accent: '#A2A4A3',
@@ -2539,7 +2562,7 @@ const TEAM_BRANDING: Record<string, TeamBranding> = {
         logo: null,
     },
     WOFFORD: {
-        displayName: 'Wofford',
+        displayName: 'Spartanburg',
         primary: '#886E4C',
         secondary: '#000000',
         accent: '#C7B37F',
@@ -2547,7 +2570,7 @@ const TEAM_BRANDING: Record<string, TeamBranding> = {
         logo: null,
     },
     WRIGHT_STATE: {
-        displayName: 'Wright State',
+        displayName: 'Fairborn',
         primary: '#004035',
         secondary: '#B29D6C',
         accent: '#FFFFFF',
@@ -2555,15 +2578,15 @@ const TEAM_BRANDING: Record<string, TeamBranding> = {
         logo: null,
     },
     WYOMING: {
-        displayName: 'Wyoming',
+        displayName: 'Laramie',
         primary: '#492F24',
         secondary: '#FFC425',
         accent: '#FFFFFF',
         headerText: '#FFFFFF',
         logo: null,
     },
-    XAVIER: {
-        displayName: 'Xavier',
+    XAVIER: { // TRACKED TEAM
+        displayName: 'Cincinnati',
         primary: '#0C2340',
         secondary: '#9EA2A2',
         accent: '#FFFFFF',
@@ -2571,7 +2594,7 @@ const TEAM_BRANDING: Record<string, TeamBranding> = {
         logo: null,
     },
     YALE: {
-        displayName: 'Yale',
+        displayName: 'New Haven',
         primary: '#00356B',
         secondary: '#FFFFFF',
         accent: '#FFFFFF',
@@ -2579,7 +2602,7 @@ const TEAM_BRANDING: Record<string, TeamBranding> = {
         logo: null,
     },
     YOUNGSTOWN_STATE: {
-        displayName: 'Youngstown State',
+        displayName: 'Youngstown',
         primary: '#D21034',
         secondary: '#FFFFFF',
         accent: '#000000',
@@ -2597,18 +2620,44 @@ const FALLBACK_BRANDING: TeamBranding = {
     logo: null,
 };
 
-export function getTeamBranding(teamId?: string | null): TeamBranding {
+// 1. Keep this at the top level
+let realismEnabled = false;
+AsyncStorage.getItem('has_custom_logos').then(val => {
+    realismEnabled = val === 'true';
+});
+
+// 2. Use this robust function
+export function getTeamBranding(teamId?: string | null, apiName?: string | null): TeamBranding {
     if (!teamId) return FALLBACK_BRANDING;
 
     const normalized = String(teamId).trim().toUpperCase();
-    const base =
-        TEAM_BRANDING[normalized] ?? {
-            ...FALLBACK_BRANDING,
-            displayName: normalized.replace(/_/g, ' '),
-        };
+
+    // Look for your authored entry (e.g. ALABAMA -> Tuscaloosa)
+    const authored = TEAM_BRANDING[normalized];
+
+    const base = authored ?? {
+        ...FALLBACK_BRANDING,
+        displayName: normalized.replace(/_/g, ' '),
+    };
+
+    let finalDisplayName = base.displayName;
+
+    if (realismEnabled) {
+        // 1. Priority 1: Use the downloaded MasterIndex JSON name (Best quality)
+        // 2. Priority 2: Use the name provided by the specific API screen
+        // 3. Priority 3: ID-based Title Case fallback
+        const fallbackName = normalized
+            .toLowerCase()
+            .split('_')
+            .map(word => (word.length <= 3 ? word.toUpperCase() : word.charAt(0).toUpperCase() + word.slice(1)))
+            .join(' ');
+
+        finalDisplayName = realismNamesMap[normalized] || apiName || fallbackName;
+    }
 
     return {
         ...base,
+        displayName: finalDisplayName,
         logo: getTeamLogo(normalized),
     };
 }

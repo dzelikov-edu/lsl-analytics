@@ -65,7 +65,8 @@ export default function TournamentMap({ isMock = false, overrideBracketData, onR
         }
     }
 
-    const champName = champTeamId ? (teamNames[champTeamId] || champTeamId) : null;
+    // Note: We use the already-gated teamNames map we just created in loadData
+    const champName = champTeamId ? (teamNames[champTeamId] || getTeamBranding(champTeamId, null).displayName) : null;
     const champSeed = champTeamId ? (teamSeeds[champTeamId] || 0) : 0;
 
     let champLine: string | null = null;
@@ -123,17 +124,29 @@ export default function TournamentMap({ isMock = false, overrideBracketData, onR
             if (!token) { setLoading(false); return; }
             const cb = Date.now();
 
-            // 1. Parallel Launch: always use /bracket for base structure
-            const [bracketsRes, mainDataRes, seedsRes, namesRes] = await Promise.all([
+            // 1. Parallel Launch
+            const responses = await Promise.all([
                 fetch(`${API_BASE_URL}/api/tournament/brackets?season=2036&cb=${cb}`, { headers: { Authorization: `Bearer ${token}` } }),
                 fetch(`${API_BASE_URL}/api/tournament/bracket?season=2036&cb=${cb}`, { headers: { Authorization: `Bearer ${token}` } }),
                 fetch(`${API_BASE_URL}/api/tournament/seeds?season=2036&cb=${cb}`, { headers: { Authorization: `Bearer ${token}` } }),
                 fetch(`${API_BASE_URL}/api/tournament/team-names?cb=${cb}`, { headers: { Authorization: `Bearer ${token}` } })
             ]);
 
-            // Parse all JSON in parallel
+            // Helper to prevent JSON parsing crashes on HTML error pages
+            const safeJson = async (res: Response, label: string) => {
+                const contentType = res.headers.get("content-type");
+                if (res.ok && contentType && contentType.includes("application/json")) {
+                    return res.json();
+                }
+                console.error(`[MAP ERROR] ${label} failed: ${res.status} (${res.statusText})`);
+                return label === "team-names" ? {} : [];
+            };
+
             const [brackets, apiBracketData, seedListData, namesData] = await Promise.all([
-                bracketsRes.json(), mainDataRes.json(), seedsRes.json(), namesRes.json()
+                safeJson(responses[0], "brackets"),
+                safeJson(responses[1], "main-bracket"),
+                safeJson(responses[2], "seeds"),
+                safeJson(responses[3], "team-names")
             ]);
 
             // Use override data if provided (personal sim), otherwise use API data
@@ -141,8 +154,13 @@ export default function TournamentMap({ isMock = false, overrideBracketData, onR
                 ? overrideBracketData
                 : apiBracketData;
 
-            // 2. Process Team Names and Stats immediately
-            setTeamNames(namesData);
+            // 2. Process Team Names and Stats immediately using the Branding Gate
+            const gatedNames: Record<string, string> = {};
+            Object.keys(namesData).forEach(tid => {
+                // We pass the real name from the API into branding
+                gatedNames[tid] = getTeamBranding(tid, namesData[tid]).displayName;
+            });
+            setTeamNames(gatedNames);
             const statsMap: Record<string, any> = {};
             (seedListData || []).forEach((row: any) => {
                 statsMap[row.team_id] = {
@@ -618,7 +636,7 @@ export default function TournamentMap({ isMock = false, overrideBracketData, onR
                                                             elevation: 5,
                                                         }}
                                                     >
-                                                        {/* Top stripe (like the Final Four header band) */}
+                                                        {/* Top stripe (like a championship header band) */}
                                                         <View
                                                             style={{
                                                                 paddingVertical: 6,

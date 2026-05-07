@@ -10,6 +10,7 @@ const CONF_LOGO_DIR = `${docDir}conference-logos/`;
 // Ensure these match your actual repo structure and username!
 const GITHUB_TEAMS_BASE = "https://raw.githubusercontent.com/dzelikov-edu/lsl-realism-mods/main/team-logos/";
 const GITHUB_CONFS_BASE = "https://raw.githubusercontent.com/dzelikov-edu/lsl-realism-mods/main/conference-logos/";
+const GITHUB_NAMES_URL = "https://raw.githubusercontent.com/dzelikov-edu/lsl-realism-mods/main/team_names.json";
 
 // Hardcoded list of your 9 conferences to ensure they sync
 const CONFERENCES = ["AAC", "ACC", "B10", "B12", "BE", "MW", "P12", "SEC", "WCC"];
@@ -84,7 +85,16 @@ export async function importLogoPack(teamIds: string[], onProgress?: (current: n
             if (onProgress) onProgress(successCount + failCount, totalFiles);
         }
 
-        // 4. Mark that custom logos are now available
+        // 4. Download the Team Name Mapping File
+        const namesPath = `${FileSystem.documentDirectory}team_names.json`;
+        try {
+            await FileSystem.downloadAsync(GITHUB_NAMES_URL, namesPath);
+            console.log("[SYNC] ✅ Team names mapping downloaded.");
+        } catch (e) {
+            console.log("[SYNC] ⚠️ Team names download failed.");
+        }
+
+        // 5. Mark that custom logos are now available
         await AsyncStorage.setItem('has_custom_logos', 'true');
         console.log(`[SYNC] ✅ Finished. Success: ${successCount}, Fail: ${failCount}`);
         return true;
