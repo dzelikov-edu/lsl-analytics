@@ -34,15 +34,15 @@ export default function RegisterScreen() {
         }
 
         // 2. Identity Validation (Matches Backend)
-        if (usernameTrimmed.length < 3 || usernameTrimmed.length > 16) {
-            Alert.alert('Invalid Username', 'Username must be between 3 and 16 characters.');
+        if (usernameTrimmed.length < 3 || usernameTrimmed.length > 20) {
+            Alert.alert('Invalid Username', 'Username must be between 3 and 20 characters.');
             return;
         }
 
         // 3. Character Check (Alphanumeric/Underscore only)
-        const usernameRegex = /^[a-zA-Z0-9_]+$/;
+        const usernameRegex = /^[a-zA-Z0-9_\.]+$/;
         if (!usernameRegex.test(usernameTrimmed)) {
-            Alert.alert('Invalid Username', 'Usernames can only contain letters, numbers, and underscores.');
+            Alert.alert('Invalid Username', 'Usernames can only contain letters, numbers, underscores, and periods.');
             return;
         }
 

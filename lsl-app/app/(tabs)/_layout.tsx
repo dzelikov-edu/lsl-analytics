@@ -1,13 +1,49 @@
-import { Tabs } from 'expo-router';
-import React from 'react';
-
+import { Tabs, router } from 'expo-router';
+import React, { useEffect, useState } from 'react';
 import { HapticTab } from '@/components/haptic-tab';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 
+// --- ADDED IMPORTS FOR THE GATE ---
+import { getToken } from '@/lib/auth-storage';
+import { API_BASE_URL } from '@/lib/api';
+
 export default function TabLayout() {
   const colorScheme = useColorScheme();
+  const [isVerifying, setIsVerifying] = useState(true);
+
+  // --- IDENTITY GATEKEEPER LOGIC ---
+  useEffect(() => {
+    async function checkIdentity() {
+      try {
+        const token = await getToken();
+        if (!token) {
+          // No token means they aren't logged in, login screen will handle them
+          setIsVerifying(false);
+          return;
+        }
+
+        const res = await fetch(`${API_BASE_URL}/auth/me`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+
+        if (res.ok) {
+          const userData = await res.json();
+          // THE GATE: If username is missing (null or empty), redirect
+          if (!userData.username) {
+            router.replace('/auth/claim-identity');
+          }
+        }
+      } catch (error) {
+        console.log("Gatekeeper Error:", error);
+      } finally {
+        setIsVerifying(false);
+      }
+    }
+
+    checkIdentity();
+  }, []);
 
   return (
     <Tabs

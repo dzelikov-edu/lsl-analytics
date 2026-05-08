@@ -161,34 +161,42 @@ async def update_username(
 
 
 @router.post("/forgot-password")
-async def forgot_password(payload: LoginRequest): 
+async def forgot_password(payload: PasswordResetRequest): # Use your existing Schema
+    debug_token: Optional[str] = None
+    identifier = payload.email.lower()
+
     async with AsyncSessionLocal() as session:
-        # 1. Find User (using Flexible Identity logic we built)
-        identifier = payload.email.lower()
+        # 1. Find User (Flexible Identity)
         q = select(User).where(or_(User.email == identifier, User.username == identifier))
         res = await session.exec(q)
         user = res.one_or_none()
 
-        if not user:
-            # Silent fail for security
-            return {"message": "If account exists, a code has been sent."}
+        if user:
+            # 2. Generate 6-digit numeric code
+            reset_code = ''.join(random.choices("0123456789", k=6))
+            expires = datetime.utcnow() + timedelta(minutes=15)
 
-        # 2. Generate 6-digit numeric code
-        reset_code = ''.join(random.choices("0123456789", k=6))
-        expires = datetime.utcnow() + timedelta(minutes=15)
+            new_token = PasswordResetToken(
+                user_id=user.id,
+                token=reset_code,
+                expires_at=expires,
+                used=False
+            )
+            session.add(new_token)
+            await session.commit()
 
-        new_token = PasswordResetToken(
-            user_id=user.id,
-            token=reset_code,
-            expires_at=expires
-        )
-        session.add(new_token)
-        await session.commit()
+            # 3. Fire Email (Will still try to send, but won't block us)
+            send_reset_code_email(user.email, reset_code)
 
-        # 3. Fire Email
-        send_reset_code_email(user.email, reset_code)
-        
-        return {"message": "Verification code sent to your email."}
+            # 4. BETA BYPASS: Expose code in response ONLY for NON-admins
+            if not user.is_admin:
+                debug_token = reset_code
+
+    return {
+        "ok": True,
+        "message": "If account exists, a verification code has been sent.",
+        "token": debug_token # This allows you to "paste" the code without email
+    }
     
 
 @router.post(

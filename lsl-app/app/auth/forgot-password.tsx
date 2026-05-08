@@ -18,6 +18,8 @@ export default function ForgotPasswordScreen() {
             Alert.alert('Missing email', 'Please enter your email address.');
             return;
         }
+
+        // Strict email check as requested
         if (!emailTrimmed.includes('@') || !emailTrimmed.includes('.')) {
             Alert.alert('Invalid email', 'Please enter a valid email address.');
             return;
@@ -27,7 +29,8 @@ export default function ForgotPasswordScreen() {
         setLoading(true);
 
         try {
-            const resp = await fetch(`${API_BASE_URL}/auth/request-password-reset`, {
+            // Pointing to the new 6-digit code endpoint
+            const resp = await fetch(`${API_BASE_URL}/auth/forgot-password`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ email: emailTrimmed }),
@@ -37,30 +40,30 @@ export default function ForgotPasswordScreen() {
 
             if (resp.ok) {
                 if (data?.token) {
-                    // Beta: we got a reset token directly
-                    Alert.alert('Reset link created', 'A reset token was issued for this account.');
+                    // BETA BYPASS: This retrieves the 6-digit code for your non-admin account
+                    Alert.alert('Identity Verified', 'Beta bypass active. Reset code issued.');
                     router.push({
                         pathname: '/auth/reset-password',
-                        params: { token: data.token },
+                        params: { token: data.token }, // Passes the code to the next screen
                     });
                 } else {
+                    // Production behavior: user must check their actual email
                     Alert.alert(
                         'Check your email',
-                        'If this email exists, a reset link has been created.'
+                        'If this email exists, a 6-digit verification code has been sent.'
                     );
-                    router.back();
+                    router.push('/auth/reset-password');
                 }
             } else {
-                Alert.alert('Error', data?.detail || 'Unable to create reset request. Please try again.');
+                Alert.alert('Error', data?.detail || 'Unable to process request.');
             }
         } catch (e) {
             console.error(e);
-            Alert.alert('Network error', 'Could not connect to the server. Please try again.');
+            Alert.alert('Network error', 'Could not connect to the server.');
         } finally {
             setLoading(false);
         }
     };
-
 
     return (
         <View style={[styles.container, { backgroundColor: theme.background }]}>
