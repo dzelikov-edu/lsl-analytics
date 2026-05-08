@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { View, Text, TextInput, Pressable, StyleSheet, ActivityIndicator, Alert, ScrollView } from 'react-native';
+import { useState, useEffect } from 'react';
+import { View, Text, TextInput, Pressable, StyleSheet, ActivityIndicator, Alert, ScrollView, Image } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { AppColors } from '@/constants/app-colors';
@@ -10,6 +10,7 @@ export default function ResetPasswordScreen() {
     const params = useLocalSearchParams<{ token?: string }>();
     const [token, setToken] = useState(params.token ?? '');
     const [password, setPassword] = useState('');
+    const [newPassword, setNewPassword] = useState('');
     const [confirm, setConfirm] = useState('');
     const [loading, setLoading] = useState(false);
     const [showPassword, setShowPassword] = useState(false);
@@ -17,6 +18,12 @@ export default function ResetPasswordScreen() {
 
     const colorScheme = useColorScheme() ?? 'light';
     const theme = AppColors[colorScheme];
+
+    useEffect(() => {
+        if (typeof params.token === 'string') {
+            setToken(params.token);
+        }
+    }, [params.token]);
 
     const handleReset = async () => {
         const tokenTrimmed = token.trim();
@@ -67,6 +74,11 @@ export default function ResetPasswordScreen() {
 
     return (
         <ScrollView contentContainerStyle={[styles.container, { backgroundColor: theme.background }]}>
+            <Image
+                source={require('@/assets/images/index_header_icon.png')}
+                style={styles.logo}
+                resizeMode="contain"
+            />
             <Text style={[styles.title, { color: theme.text }]}>Set a New Password</Text>
             <Text style={[styles.subtitle, { color: theme.mutedText }]}>
                 Paste the reset token you received, then choose a new password.
@@ -77,7 +89,7 @@ export default function ResetPasswordScreen() {
                     styles.input,
                     { borderColor: theme.border, color: theme.text, height: 48 },
                 ]}
-                placeholder="Reset token"
+                placeholder="Reset Code"
                 placeholderTextColor={theme.mutedText}
                 value={token}
                 onChangeText={setToken}
@@ -191,6 +203,7 @@ export default function ResetPasswordScreen() {
 
 const styles = StyleSheet.create({
     container: { flexGrow: 1, justifyContent: 'center', padding: 20 },
+    logo: { width: 150, height: 60, alignSelf: 'center', marginBottom: 12 },
     title: { fontSize: 24, fontWeight: 'bold', marginBottom: 12, textAlign: 'center' },
     subtitle: { fontSize: 14, textAlign: 'center', marginBottom: 16 },
     input: { borderWidth: 1, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 10, marginBottom: 15 },

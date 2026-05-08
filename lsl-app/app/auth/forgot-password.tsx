@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { View, Text, TextInput, Pressable, StyleSheet, ActivityIndicator, Alert } from 'react-native';
+import { View, Text, TextInput, Pressable, StyleSheet, ActivityIndicator, Alert, Image } from 'react-native';
 import { router } from 'expo-router';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { AppColors } from '@/constants/app-colors';
@@ -67,6 +67,11 @@ export default function ForgotPasswordScreen() {
 
     return (
         <View style={[styles.container, { backgroundColor: theme.background }]}>
+            <Image
+                source={require('@/assets/images/index_header_icon.png')}
+                style={styles.logo}
+                resizeMode="contain"
+            />
             <Text style={[styles.title, { color: theme.text }]}>Reset Password</Text>
             <Text style={[styles.subtitle, { color: theme.mutedText }]}>
                 Enter the email you used for Legends CBB. If it exists, we’ll create a reset link.
@@ -103,8 +108,9 @@ export default function ForgotPasswordScreen() {
 
 const styles = StyleSheet.create({
     container: { flex: 1, justifyContent: 'center', padding: 20 },
-    title: { fontSize: 24, fontWeight: 'bold', marginBottom: 12, textAlign: 'center' },
+    title: { fontSize: 24, fontWeight: 'bold', marginBottom: 8, textAlign: 'center' },
     subtitle: { fontSize: 14, textAlign: 'center', marginBottom: 16 },
     input: { borderWidth: 1, borderRadius: 8, padding: 12, marginBottom: 15 },
     button: { padding: 15, borderRadius: 8, alignItems: 'center', minHeight: 50, justifyContent: 'center' },
+    logo: { width: 150, height: 60, alignSelf: 'center', marginBottom: 10, marginTop: 20 },
 });

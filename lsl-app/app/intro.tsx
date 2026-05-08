@@ -1,4 +1,4 @@
-import { View, Text, StyleSheet, Pressable, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, Pressable, ScrollView, Image } from 'react-native';
 import * as Linking from 'expo-linking';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { AppColors } from '@/constants/app-colors';
@@ -16,9 +16,15 @@ export default function IntroScreen() {
 
     return (
         <ScrollView contentContainerStyle={[styles.container, { backgroundColor: theme.background }]}>
-            <Text style={[styles.title, { color: theme.text }]}>Legends CBB</Text>
+            <Image
+                source={require('@/assets/images/index_header_icon.png')}
+                style={styles.logo}
+                resizeMode="contain"
+            />
 
-            <Text style={[styles.body, { color: theme.text, marginTop: 8 }]}>
+            <Text style={[styles.title, { color: theme.text }]}>LEGENDS CBB</Text>
+
+            <Text style={[styles.body, { color: theme.text, marginTop: 0 }]}>
                 Welcome to a{' '}
                 <Text style={{ fontWeight: '700' }}>completely simulated basketball universe</Text>.
                 This is a fictional simulation engine designed for league management and analytics.
@@ -36,7 +42,7 @@ export default function IntroScreen() {
                     • <Text style={{ fontWeight: '600' }}>Full Simulation:</Text> Detailed box scores and individual player stat averages.
                 </Text>
                 <Text style={[styles.bullet, { color: theme.text }]}>
-                    • <Text style={{ fontWeight: '600' }}>Tournament Mode:</Text> Follow the evolving LCAA Tournament at‑large picture as the season progresses.
+                    • <Text style={{ fontWeight: '600' }}>Tournament Mode:</Text> Follow the evolving LCAA Tournament at‑large picture as the season progresses, with timely bracketology updates.
                 </Text>
             </View>
 
@@ -92,4 +98,7 @@ const styles = StyleSheet.create({
         shadowRadius: 4,
         elevation: 3,
     },
+    logo: { width: 150, height: 60, alignSelf: 'center', marginBottom: 10, marginTop: 20 },
+    headerTitle: { fontSize: 24, fontWeight: '800', textAlign: 'center', marginBottom: 6 },
+    headerSubtitle: { fontSize: 14, textAlign: 'center', marginBottom: 24, lineHeight: 20 },
 });

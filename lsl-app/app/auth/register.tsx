@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { View, Text, TextInput, Pressable, StyleSheet, ActivityIndicator, Alert, ScrollView } from 'react-native';
+import { View, Text, TextInput, Pressable, StyleSheet, ActivityIndicator, Alert, ScrollView, Image } from 'react-native';
 import { router } from 'expo-router';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { AppColors } from '@/constants/app-colors';
@@ -102,6 +102,11 @@ export default function RegisterScreen() {
 
     return (
         <ScrollView contentContainerStyle={[styles.container, { backgroundColor: theme.background }]}>
+            <Image
+                source={require('@/assets/images/index_header_icon.png')}
+                style={styles.logo}
+                resizeMode="contain"
+            />
             <Text style={[styles.title, { color: theme.text }]}>Create Account</Text>
 
             <View style={{ marginBottom: 16 }}>
@@ -250,7 +255,8 @@ export default function RegisterScreen() {
 
 const styles = StyleSheet.create({
     container: { flexGrow: 1, justifyContent: 'center', padding: 20 },
-    title: { fontSize: 24, fontWeight: 'bold', marginBottom: 20, textAlign: 'center' },
+    title: { fontSize: 24, fontWeight: 'bold', marginBottom: 8, textAlign: 'center' },
     input: { borderWidth: 1, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 10, marginBottom: 15 },
     button: { padding: 15, borderRadius: 8, alignItems: 'center', minHeight: 50, justifyContent: 'center' },
+    logo: { width: 150, height: 60, alignSelf: 'center', marginBottom: 10, marginTop: 20 },
 });

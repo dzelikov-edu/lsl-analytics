@@ -59,9 +59,9 @@ export default function ClaimIdentityScreen() {
                 style={styles.logo}
                 resizeMode="contain"
             />
-            <Text style={[styles.title, { color: theme.text }]}>Claim Your Legend ID</Text>
+            <Text style={[styles.title, { color: theme.text }]}>Set your Legends Universe ID</Text>
             <Text style={[styles.subtitle, { color: theme.mutedText }]}>
-                Existing accounts are now required to set a unique username to continue in the simulation universe.
+                Existing accounts are now required to set a unique username to continue in the simulation universe. Once you do this, you'll never see this screen again.
             </Text>
 
             <TextInput
@@ -87,7 +87,7 @@ export default function ClaimIdentityScreen() {
 
 const styles = StyleSheet.create({
     container: { flex: 1, justifyContent: 'center', padding: 30 },
-    logo: { width: 150, height: 60, alignSelf: 'center', marginBottom: 20 },
+    logo: { width: 150, height: 60, alignSelf: 'center', marginBottom: 12 },
     title: { fontSize: 24, fontWeight: '800', textAlign: 'center', marginBottom: 10 },
     subtitle: { fontSize: 14, textAlign: 'center', marginBottom: 30, lineHeight: 20 },
     input: { height: 50, borderWidth: 1, borderRadius: 10, paddingHorizontal: 15, marginBottom: 20, fontSize: 16 },

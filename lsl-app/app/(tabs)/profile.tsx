@@ -510,7 +510,7 @@ export default function ProfileScreen() {
                     <ActivityIndicator size="small" color={theme.text} style={{ marginTop: 15 }} />
                 ) : user ? (
                     <View style={{
-                        marginTop: 6,
+                        marginTop: 4,
                         alignItems: 'center'
                     }}>
                         {/* PRIMARY IDENTITY: USERNAME */}
@@ -738,7 +738,7 @@ export default function ProfileScreen() {
                 <Text style={styles.buttonText}>Log Out</Text>
             </Pressable>
 
-            <View style={{ marginTop: 20, padding: 15, backgroundColor: theme.card, borderRadius: 12, borderStyle: 'dashed', borderWidth: 1, borderColor: theme.border }}>
+            <View style={{ marginTop: 20, marginBottom: -10, padding: 15, backgroundColor: theme.card, borderRadius: 12, borderStyle: 'dashed', borderWidth: 1, borderColor: theme.border }}>
                 <Text style={[styles.sectionTitle, { fontSize: 16, marginBottom: 8 }]}>Simulation Engine</Text>
                 <Text style={{ color: theme.mutedText, fontSize: 13, lineHeight: 18 }}>
                     Legends CBB results are generated using the <Text style={{ fontWeight: '700' }}>Legacy Simulation Engine</Text>.

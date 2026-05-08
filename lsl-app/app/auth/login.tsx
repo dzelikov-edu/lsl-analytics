@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { View, Text, TextInput, Pressable, StyleSheet, ActivityIndicator, Alert } from 'react-native';
+import { View, Text, TextInput, Pressable, StyleSheet, ActivityIndicator, Alert, Image } from 'react-native';
 import { router } from 'expo-router';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { AppColors } from '@/constants/app-colors';
@@ -69,6 +69,12 @@ export default function LoginScreen() {
 
     return (
         <View style={[styles.container, { backgroundColor: theme.background }]}>
+            <Image
+                source={require('@/assets/images/index_header_icon.png')}
+                style={styles.logo}
+                resizeMode="contain"
+            />
+
             <Text style={[styles.title, { color: theme.text }]}>Legends CBB Login</Text>
 
             <View style={{ marginBottom: 16 }}>
@@ -166,7 +172,10 @@ export default function LoginScreen() {
 
 export const styles = StyleSheet.create({
     container: { flex: 1, justifyContent: 'center', padding: 20 },
-    title: { fontSize: 24, fontWeight: 'bold', marginBottom: 20, textAlign: 'center' },
+    title: { fontSize: 24, fontWeight: 'bold', marginBottom: 12, textAlign: 'center' },
     input: { borderWidth: 1, borderRadius: 8, padding: 12, paddingVertical: 10, marginBottom: 15 },
     button: { padding: 15, borderRadius: 8, alignItems: 'center', minHeight: 50, justifyContent: 'center' },
+    logo: { width: 150, height: 60, alignSelf: 'center', marginBottom: 10, marginTop: 20 },
+    headerTitle: { fontSize: 24, fontWeight: '800', textAlign: 'center', marginBottom: 6 },
+    headerSubtitle: { fontSize: 14, textAlign: 'center', marginBottom: 24, lineHeight: 20 },
 });
