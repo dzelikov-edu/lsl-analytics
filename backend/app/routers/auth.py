@@ -19,6 +19,7 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 
 class RegisterRequest(BaseModel):
     email: EmailStr
+    username: str
     password: str
 
 
@@ -41,20 +42,40 @@ class PasswordResetConfirm(BaseModel):
     new_password: str
 
 
+import re
+
 @router.post("/register", response_model=TokenResponse, dependencies=[Depends(RateLimiter(times=5, minutes=1))])
 async def register_user(payload: RegisterRequest):
-    async with AsyncSessionLocal() as session:
-        q = select(User).where(User.email == payload.email)
-        res = await session.exec(q)
-        existing = res.one_or_none()
-        if existing:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Email already registered",
-            )
+    # 1. Identity Validation (3-16 chars, Alphanumeric/Underscore)
+    username = payload.username.strip().lower()
+    if not (3 <= len(username) <= 16):
+        raise HTTPException(status_code=400, detail="Username must be 3-16 characters.")
+    
+    if not re.match(r"^[a-zA-Z0-9_]+$", username):
+        raise HTTPException(status_code=400, detail="Username can only contain letters, numbers, and underscores.")
 
+    # 2. Legends "Lore-Gate" Blacklist
+    blacklist = ["admin", "system", "lcaa", "official", "commissioner"]
+    if any(forbidden in username for forbidden in blacklist):
+        raise HTTPException(status_code=400, detail="This username is reserved for league operations.")
+
+    async with AsyncSessionLocal() as session:
+        # 3. Check for existing Email
+        q_email = select(User).where(User.email == payload.email)
+        res_email = await session.exec(q_email)
+        if res_email.one_or_none():
+            raise HTTPException(status_code=400, detail="Email already registered")
+
+        # 4. Check for existing Username
+        q_user = select(User).where(User.username == username)
+        res_user = await session.exec(q_user)
+        if res_user.one_or_none():
+            raise HTTPException(status_code=400, detail="Username already taken")
+
+        # 5. Create the User with Identity
         user = User(
             email=payload.email,
+            username=username, # Added
             hashed_password=hash_password(payload.password),
         )
         session.add(user)

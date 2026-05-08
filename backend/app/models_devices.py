@@ -6,7 +6,8 @@ from sqlmodel import Field, SQLModel
 class User(SQLModel, table=True):
     id: str = Field(default_factory=lambda: str(uuid4()), primary_key=True)
     email: Optional[str] = None
-    hashed_password: Optional[str] = None  # NEW
+    username: Optional[str] = Field(default=None, index=True, unique=True)
+    hashed_password: Optional[str] = None
     created_at: datetime = Field(default_factory=datetime.utcnow)
     is_admin: bool = False
     

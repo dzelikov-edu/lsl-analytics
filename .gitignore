@@ -11,6 +11,8 @@ backend/.venv/
 
 # Local databases
 backend/*.db
+backend/dev.db.backup
+backend/migrate_usernames.py
 
 # Expo/Node backups and temporary files
 lsl-app/app.json.bak
