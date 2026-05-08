@@ -4,7 +4,7 @@ import secrets
 
 from fastapi import APIRouter, HTTPException, status, Depends
 from pydantic import BaseModel, EmailStr
-from sqlmodel import select
+from sqlmodel import select, or_
 
 from app.auth import create_access_token, hash_password, verify_password
 from app.db import AsyncSessionLocal
@@ -46,13 +46,13 @@ import re
 
 @router.post("/register", response_model=TokenResponse, dependencies=[Depends(RateLimiter(times=5, minutes=1))])
 async def register_user(payload: RegisterRequest):
-    # 1. Identity Validation (3-16 chars, Alphanumeric/Underscore)
+    # 1. Identity Validation (3-20 chars, Alphanumeric/Underscore/Period)
     username = payload.username.strip().lower()
-    if not (3 <= len(username) <= 16):
-        raise HTTPException(status_code=400, detail="Username must be 3-16 characters.")
+    if not (3 <= len(username) <= 20):
+        raise HTTPException(status_code=400, detail="Username must be 3-20 characters.")
     
-    if not re.match(r"^[a-zA-Z0-9_]+$", username):
-        raise HTTPException(status_code=400, detail="Username can only contain letters, numbers, and underscores.")
+    if not re.match(r"^[a-zA-Z0-9_\.]+$", username):
+        raise HTTPException(status_code=400, detail="Username can only contain letters, numbers, underscores, and periods.")
 
     # 2. Legends "Lore-Gate" Blacklist
     blacklist = ["admin", "system", "lcaa", "official", "commissioner"]
@@ -89,9 +89,20 @@ async def register_user(payload: RegisterRequest):
 @router.post("/login", response_model=TokenResponse, dependencies=[Depends(RateLimiter(times=10, minutes=1))])
 async def login_user(payload: LoginRequest):
     async with AsyncSessionLocal() as session:
-        q = select(User).where(User.email == payload.email)
+        # We lowercase the input to match our lowercase storage policy
+        identifier = payload.email.lower() 
+
+        # SURGICAL CHANGE: Check both email AND username columns
+        q = select(User).where(
+            or_(
+                User.email == identifier,
+                User.username == identifier
+            )
+        )
+        
         res = await session.exec(q)
         user = res.one_or_none()
+
         if not user or not user.hashed_password:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
@@ -104,6 +115,7 @@ async def login_user(payload: LoginRequest):
                 detail="Invalid credentials",
             )
 
+        # Token logic remains the same
         token = create_access_token(subject=user.id, expires_delta=timedelta(minutes=60 * 24))
         return TokenResponse(access_token=token)
     

@@ -14,6 +14,7 @@ export default function RegisterScreen() {
     const [loading, setLoading] = useState(false);
     const [showPassword, setShowPassword] = useState(false);
     const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+    const [username, setUsername] = useState('');
 
     const colorScheme = useColorScheme() ?? 'light';
     const theme = AppColors[colorScheme];
@@ -24,9 +25,24 @@ export default function RegisterScreen() {
         const emailTrimmed = email.trim();
         const passwordTrimmed = password.trim();
         const confirmTrimmed = confirmPassword.trim();
+        const usernameTrimmed = username.trim().toLowerCase(); // Normalize to lowercase
 
-        if (!emailTrimmed || !passwordTrimmed || !confirmTrimmed) {
+        // 1. Basic Field Check
+        if (!emailTrimmed || !passwordTrimmed || !confirmTrimmed || !usernameTrimmed) {
             Alert.alert('Missing info', 'Please fill in all fields.');
+            return;
+        }
+
+        // 2. Identity Validation (Matches Backend)
+        if (usernameTrimmed.length < 3 || usernameTrimmed.length > 16) {
+            Alert.alert('Invalid Username', 'Username must be between 3 and 16 characters.');
+            return;
+        }
+
+        // 3. Character Check (Alphanumeric/Underscore only)
+        const usernameRegex = /^[a-zA-Z0-9_]+$/;
+        if (!usernameRegex.test(usernameTrimmed)) {
+            Alert.alert('Invalid Username', 'Usernames can only contain letters, numbers, and underscores.');
             return;
         }
 
@@ -52,7 +68,12 @@ export default function RegisterScreen() {
             const response = await fetch(`${backendUrl}/auth/register`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ email: emailTrimmed, password: passwordTrimmed }),
+                // UPDATED PAYLOAD: Include the username
+                body: JSON.stringify({
+                    email: emailTrimmed,
+                    password: passwordTrimmed,
+                    username: usernameTrimmed
+                }),
             });
 
             let data: any = {};
@@ -67,19 +88,17 @@ export default function RegisterScreen() {
                 Alert.alert('Account created', 'Welcome to Legends CBB.');
                 router.replace('/(tabs)');
             } else {
-                const detail =
-                    data?.detail ||
-                    'Could not create account. If you already have an account, try logging in instead.';
+                // This will now catch the Backend "Lore-Gate" (Blacklist) errors
+                const detail = data?.detail || 'Could not create account.';
                 Alert.alert('Registration failed', detail);
             }
         } catch (error) {
             console.error(error);
-            Alert.alert('Network error', 'Could not connect to the server. Please try again.');
+            Alert.alert('Network error', 'Could not connect to the server.');
         } finally {
             setLoading(false);
         }
     };
-
 
     return (
         <ScrollView contentContainerStyle={[styles.container, { backgroundColor: theme.background }]}>
@@ -107,6 +126,19 @@ export default function RegisterScreen() {
                 onChangeText={setEmail}
                 autoCapitalize="none"
                 keyboardType="email-address"
+            />
+
+            <TextInput
+                style={[
+                    styles.input,
+                    { borderColor: theme.border, color: theme.text, height: 48, marginBottom: 15 },
+                ]}
+                placeholder="Username"
+                placeholderTextColor={theme.mutedText}
+                value={username}
+                onChangeText={setUsername}
+                autoCapitalize="none"
+                autoCorrect={false}
             />
 
             <View style={{ marginBottom: 15 }}>

@@ -84,12 +84,12 @@ export default function LoginScreen() {
 
             <TextInput
                 style={[styles.input, { borderColor: theme.border, color: theme.text, height: 48 }]}
-                placeholder="Email"
+                placeholder="Email or Username"
                 placeholderTextColor={theme.mutedText}
                 value={email}
                 onChangeText={setEmail}
                 autoCapitalize="none"
-                keyboardType="email-address"
+                keyboardType="default"
             />
 
             <View style={{ marginBottom: 15 }}>
