@@ -1,6 +1,8 @@
 import { getTeamLogo } from '@/lib/teamLogos';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Platform } from 'react-native';
 import * as FileSystem from 'expo-file-system/legacy';
+import { realismEnabledCache, setRealismEnabled } from './nameMasking';
 
 let realismNamesMap: Record<string, string> = {};
 
@@ -2620,15 +2622,16 @@ const FALLBACK_BRANDING: TeamBranding = {
     logo: null,
 };
 
-// 1. Keep this at the top level
-let realismEnabled = false;
-AsyncStorage.getItem('has_custom_logos').then(val => {
-    realismEnabled = val === 'true';
-});
-
 // 2. Use this robust function
 export function getTeamBranding(teamId?: string | null, apiName?: string | null): TeamBranding {
     if (!teamId) return FALLBACK_BRANDING;
+
+    // Guard against SSR/Web build crashes
+    if (realismEnabledCache === null && Platform.OS !== 'web') {
+        AsyncStorage.getItem('has_custom_logos').then(val => {
+            setRealismEnabled(val === 'true'); // THE FIX
+        });
+    }
 
     const normalized = String(teamId).trim().toUpperCase();
 
@@ -2642,7 +2645,7 @@ export function getTeamBranding(teamId?: string | null, apiName?: string | null)
 
     let finalDisplayName = base.displayName;
 
-    if (realismEnabled) {
+    if (realismEnabledCache === true) {
         // 1. Priority 1: Use the downloaded MasterIndex JSON name (Best quality)
         // 2. Priority 2: Use the name provided by the specific API screen
         // 3. Priority 3: ID-based Title Case fallback

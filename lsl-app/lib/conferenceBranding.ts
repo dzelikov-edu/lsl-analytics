@@ -1,4 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Platform } from 'react-native';
+import { realismEnabledCache, setRealismEnabled } from './nameMasking';
 
 export type ConferenceBranding = {
     displayName: string;
@@ -121,17 +123,17 @@ const CONFERENCE_BRANDING: Record<string, ConferenceBranding> = {
     },
 };
 
-// Track realism status
-let realismEnabled = false;
-AsyncStorage.getItem('has_custom_logos').then(val => {
-    realismEnabled = val === 'true';
-});
-
 export function getConferenceBranding(confId?: string | null, apiName?: string | null): ConferenceBranding {
     if (!confId) return FALLBACK_CONFERENCE_BRANDING;
-    const normalized = String(confId).trim().toUpperCase();
 
-    // Look for your authored entry (e.g. BE -> Metropolitan Conference)
+    // Guard against SSR/Web build crashes
+    if (realismEnabledCache === null && Platform.OS !== 'web') {
+        AsyncStorage.getItem('has_custom_logos').then(val => {
+            setRealismEnabled(val === 'true'); // THE FIX
+        });
+    }
+
+    const normalized = String(confId).trim().toUpperCase();
     const authored = CONFERENCE_BRANDING[normalized];
 
     const base = authored ?? {
@@ -140,9 +142,9 @@ export function getConferenceBranding(confId?: string | null, apiName?: string |
         headerTitle: normalized,
     };
 
-    // LOGIC: Use real MasterIndex name from backend only if pack flag is true
-    const finalName = (realismEnabled && apiName) ? apiName : base.displayName;
-    const finalTitle = (realismEnabled && apiName) ? apiName : base.headerTitle;
+    // LOGIC: Use real MasterIndex name only if cache is confirmed true
+    const finalName = (realismEnabledCache === true && apiName) ? apiName : base.displayName;
+    const finalTitle = (realismEnabledCache === true && apiName) ? apiName : base.headerTitle;
 
     return {
         ...base,

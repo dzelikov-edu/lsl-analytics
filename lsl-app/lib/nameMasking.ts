@@ -1,12 +1,23 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Platform } from 'react-native';
 
 const DEV_FORCE_REALISM = false; // set to false for store builds
 
-let realismEnabledCache: boolean | null = null;
+// 1. Export the cache so branding files can read it instantly
+export let realismEnabledCache: boolean | null = null;
+
+// 2. Export a setter so logoManager can trigger the "Flip"
+export function setRealismEnabled(val: boolean) {
+    realismEnabledCache = val;
+}
 
 async function checkRealismEnabled(): Promise<boolean> {
     if (DEV_FORCE_REALISM) return true;
     if (realismEnabledCache !== null) return realismEnabledCache;
+
+    // Guard against Web/SSR builds
+    if (Platform.OS === 'web') return false;
+
     try {
         const flag = await AsyncStorage.getItem('has_custom_logos');
         realismEnabledCache = flag === 'true';
@@ -15,6 +26,9 @@ async function checkRealismEnabled(): Promise<boolean> {
     }
     return realismEnabledCache;
 }
+
+// Initial check on load
+checkRealismEnabled();
 
 // Async masking helpers for hooks/components that can handle state
 export async function getDisplayTeamName(rawName?: string | null, teamId?: string | null): Promise<string> {

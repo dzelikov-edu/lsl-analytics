@@ -96,6 +96,11 @@ export async function importLogoPack(teamIds: string[], onProgress?: (current: n
 
         // 5. Mark that custom logos are now available
         await AsyncStorage.setItem('has_custom_logos', 'true');
+
+        // Import and trigger the global name gate
+        const { setRealismEnabled } = require('./nameMasking');
+        setRealismEnabled(true);
+
         console.log(`[SYNC] ✅ Finished. Success: ${successCount}, Fail: ${failCount}`);
         return true;
 
