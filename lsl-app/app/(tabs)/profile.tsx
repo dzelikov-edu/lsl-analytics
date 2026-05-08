@@ -50,9 +50,10 @@ export default function ProfileScreen() {
 
             if (userRes.ok) {
                 const userData = await userRes.json();
+                console.log("FETCHED_USER_DATA:", userData); // Add this temporarily to verify
                 setUser({
                     email: userData.email,
-                    username: userData.username, // ADDED
+                    username: userData.username, // Ensure this key matches your Backend return
                     is_admin: userData.is_admin
                 });
             }
@@ -509,7 +510,7 @@ export default function ProfileScreen() {
                     <ActivityIndicator size="small" color={theme.text} style={{ marginTop: 15 }} />
                 ) : user ? (
                     <View style={{
-                        marginTop: 12,
+                        marginTop: 6,
                         alignItems: 'center'
                     }}>
                         {/* PRIMARY IDENTITY: USERNAME */}
@@ -579,7 +580,7 @@ export default function ProfileScreen() {
                 onPress={() => {
                     Alert.prompt(
                         "Change Username",
-                        "Enter a new Legend ID (3-20 characters, alphanumeric and periods only).",
+                        "Enter your new Legends ID (3-20 characters, alphanumeric and periods only).",
                         [
                             { text: "Cancel", style: "cancel" },
                             {
