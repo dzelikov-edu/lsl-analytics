@@ -19,19 +19,17 @@ export default function LoginScreen() {
     const handleLogin = async () => {
         if (loading) return;
 
-        const emailTrimmed = email.trim();
+        // 'email' variable now represents the Identity (Email or Username)
+        const identifierTrimmed = email.trim();
         const passwordTrimmed = password.trim();
 
-        if (!emailTrimmed || !passwordTrimmed) {
-            Alert.alert('Missing info', 'Please enter both email and password.');
+        if (!identifierTrimmed || !passwordTrimmed) {
+            Alert.alert('Missing info', 'Please enter both your identity and password.');
             return;
         }
 
-        // Very simple email sanity check
-        if (!emailTrimmed.includes('@') || !emailTrimmed.includes('.')) {
-            Alert.alert('Invalid email', 'Please enter a valid email address.');
-            return;
-        }
+        // SURGICAL REMOVAL: The email .includes('@') check is gone 
+        // to allow usernames to pass through.
 
         setLoading(true);
         const backendUrl = API_BASE_URL;
@@ -40,7 +38,9 @@ export default function LoginScreen() {
             const response = await fetch(`${backendUrl}/auth/login`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ email: emailTrimmed, password: passwordTrimmed }),
+                // We still send the key as 'email' because that's what the 
+                // backend LoginRequest schema expects.
+                body: JSON.stringify({ email: identifierTrimmed, password: passwordTrimmed }),
             });
 
             let data: any = {};
@@ -55,17 +55,17 @@ export default function LoginScreen() {
                 Alert.alert('Welcome back', 'You are now logged in.');
                 router.replace('/(tabs)');
             } else {
-                const detail = data?.detail || 'Email or password is incorrect.';
+                // Updated error message to be more generic for usernames
+                const detail = data?.detail || 'Identity or password is incorrect.';
                 Alert.alert('Login failed', detail);
             }
         } catch (error) {
             console.error(error);
-            Alert.alert('Network error', 'Could not connect to the server. Please try again.');
+            Alert.alert('Network error', 'Could not connect to the server.');
         } finally {
             setLoading(false);
         }
     };
-
 
     return (
         <View style={[styles.container, { backgroundColor: theme.background }]}>

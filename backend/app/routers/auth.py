@@ -5,6 +5,8 @@ import secrets
 from fastapi import APIRouter, HTTPException, status, Depends
 from pydantic import BaseModel, EmailStr
 from sqlmodel import select, or_
+import random # For code generation
+from app.utils_mail import send_welcome_email, send_reset_code_email
 
 from app.auth import create_access_token, hash_password, verify_password
 from app.db import AsyncSessionLocal
@@ -85,6 +87,7 @@ async def register_user(payload: RegisterRequest):
         session.add(user)
         await session.commit()
         await session.refresh(user)
+        send_welcome_email(user.email, user.username)
 
         token = create_access_token(subject=user.id)
         return TokenResponse(access_token=token)
@@ -155,6 +158,37 @@ async def update_username(
         await session.commit()
         
     return {"message": "Username updated"}
+
+
+@router.post("/forgot-password")
+async def forgot_password(payload: LoginRequest): 
+    async with AsyncSessionLocal() as session:
+        # 1. Find User (using Flexible Identity logic we built)
+        identifier = payload.email.lower()
+        q = select(User).where(or_(User.email == identifier, User.username == identifier))
+        res = await session.exec(q)
+        user = res.one_or_none()
+
+        if not user:
+            # Silent fail for security
+            return {"message": "If account exists, a code has been sent."}
+
+        # 2. Generate 6-digit numeric code
+        reset_code = ''.join(random.choices("0123456789", k=6))
+        expires = datetime.utcnow() + timedelta(minutes=15)
+
+        new_token = PasswordResetToken(
+            user_id=user.id,
+            token=reset_code,
+            expires_at=expires
+        )
+        session.add(new_token)
+        await session.commit()
+
+        # 3. Fire Email
+        send_reset_code_email(user.email, reset_code)
+        
+        return {"message": "Verification code sent to your email."}
     
 
 @router.post(

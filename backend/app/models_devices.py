@@ -14,7 +14,7 @@ class User(SQLModel, table=True):
 class PasswordResetToken(SQLModel, table=True):
     id: str = Field(default_factory=lambda: str(uuid4()), primary_key=True)
     user_id: str = Field(foreign_key="user.id", index=True)
-    token: str = Field(index=True, unique=True)
+    token: str = Field(index=True, unique=True, max_length=6)
     created_at: datetime = Field(default_factory=datetime.utcnow)
     expires_at: datetime
     used: bool = Field(default=False)
