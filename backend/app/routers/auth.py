@@ -42,6 +42,10 @@ class PasswordResetConfirm(BaseModel):
     new_password: str
 
 
+class UsernameUpdateRequest(BaseModel):
+    username: str
+
+
 import re
 
 @router.post("/register", response_model=TokenResponse, dependencies=[Depends(RateLimiter(times=5, minutes=1))])
@@ -118,6 +122,39 @@ async def login_user(payload: LoginRequest):
         # Token logic remains the same
         token = create_access_token(subject=user.id, expires_delta=timedelta(minutes=60 * 24))
         return TokenResponse(access_token=token)
+    
+
+@router.patch("/username")
+async def update_username(
+    payload: UsernameUpdateRequest, # Using the new schema
+    current_user: User = Depends(get_current_user) # Ensure you use your auth dependency
+):
+    new_username = payload.username.strip().lower()
+
+    # 1. Validation (Same as Registration)
+    if not (3 <= len(new_username) <= 20) or not re.match(r"^[a-zA-Z0-9_\.]+$", new_username):
+        raise HTTPException(status_code=400, detail="Invalid username format.")
+    
+    # 2. Blacklist check
+    blacklist = ["admin", "system", "lcaa", "official", "commissioner"]
+    if any(forbidden in new_username for forbidden in blacklist):
+        raise HTTPException(status_code=400, detail="Reserved username.")
+
+    async with AsyncSessionLocal() as session:
+        # 3. Check if taken
+        q = select(User).where(User.username == new_username)
+        res = await session.exec(q)
+        if res.one_or_none():
+            raise HTTPException(status_code=400, detail="Username already taken.")
+
+        # 4. Update and Commit
+        # We fetch the actual object from the session to ensure it's tracked
+        db_user = await session.get(User, current_user.id)
+        db_user.username = new_username
+        session.add(db_user)
+        await session.commit()
+        
+    return {"message": "Username updated"}
     
 
 @router.post(

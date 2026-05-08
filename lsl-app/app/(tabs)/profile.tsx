@@ -23,7 +23,7 @@ export default function ProfileScreen() {
     const { width } = useWindowDimensions();
     const isTablet = width >= 768; // Standard breakpoint for iPad
 
-    const [user, setUser] = useState<{ email?: string; is_admin?: boolean } | null>(null);
+    const [user, setUser] = useState<{ email?: string; username?: string; is_admin?: boolean } | null>(null);
     const [favorites, setFavorites] = useState<string[]>([]);
     const [teamNames, setTeamNames] = useState<Record<string, string>>({}); // ID -> Name map
     const [allTeamIds, setAllTeamIds] = useState<string[]>([]);
@@ -50,7 +50,11 @@ export default function ProfileScreen() {
 
             if (userRes.ok) {
                 const userData = await userRes.json();
-                setUser({ email: userData.email, is_admin: userData.is_admin });
+                setUser({
+                    email: userData.email,
+                    username: userData.username, // ADDED
+                    is_admin: userData.is_admin
+                });
             }
 
             if (favsRes.ok) {
@@ -126,6 +130,50 @@ export default function ProfileScreen() {
             }
         } catch (e) {
             console.log('Error syncing notifications:', e);
+        }
+    };
+
+    const handleUpdateUsername = async (newName: string | undefined) => {
+        if (!newName) return;
+
+        const sanitizedName = newName.trim().toLowerCase();
+
+        // 1. Frontend Validation (Matches your rules)
+        const usernameRegex = /^[a-zA-Z0-9_\.]+$/;
+        if (sanitizedName.length < 3 || sanitizedName.length > 20) {
+            Alert.alert("Invalid Length", "Username must be 3-20 characters.");
+            return;
+        }
+        if (!usernameRegex.test(sanitizedName)) {
+            Alert.alert("Invalid Characters", "Use only letters, numbers, underscores, and periods.");
+            return;
+        }
+
+        setLoading(true);
+        try {
+            const token = await getToken();
+            const res = await fetch(`${API_BASE_URL}/auth/username`, {
+                method: 'PATCH',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ username: sanitizedName })
+            });
+
+            const data = await res.json();
+
+            if (res.ok) {
+                Alert.alert("Success", "Legend ID updated successfully.");
+                // Update local state so the UI flips immediately
+                setUser(prev => prev ? { ...prev, username: sanitizedName } : null);
+            } else {
+                Alert.alert("Update Failed", data.detail || "Could not update username.");
+            }
+        } catch (e) {
+            Alert.alert("Error", "Network error. Please try again.");
+        } finally {
+            setLoading(false);
         }
     };
 
@@ -434,12 +482,12 @@ export default function ProfileScreen() {
             {/* --- BRANDED PROFILE HEADER --- */}
             <View style={{
                 alignItems: 'center',
-                marginBottom: 15,
+                marginBottom: 10,
                 marginTop: isTablet
-                    ? -38 // <--- ADJUST THIS NUMBER FOR IPAD (Try 40, 60, or 80)
+                    ? -38
                     : insets.top > 0
-                        ? insets.top - 42 // Your iPhone Sweet Spot
-                        : 30 // Standard Small Phone
+                        ? insets.top - 42
+                        : 30
             }}>
                 <Image
                     source={require('@/assets/images/index_header_icon.png')}
@@ -462,16 +510,34 @@ export default function ProfileScreen() {
                 ) : user ? (
                     <View style={{
                         marginTop: 12,
-                        paddingHorizontal: 12,
-                        paddingVertical: 4,
-                        backgroundColor: theme.card,
-                        borderRadius: 8,
-                        borderWidth: 1,
-                        borderColor: theme.border
+                        alignItems: 'center'
                     }}>
-                        <Text style={{ fontSize: 13, fontWeight: '700', color: theme.text }}>
-                            {user.email}{user.is_admin ? ' • ADMIN' : ''}
+                        {/* PRIMARY IDENTITY: USERNAME */}
+                        <Text style={{
+                            fontSize: 22,
+                            fontWeight: '800',
+                            color: theme.text,
+                            letterSpacing: -0.5
+                        }}>
+                            {user.username ? `@${user.username}` : 'Set Username'}
                         </Text>
+
+                        {/* SECONDARY IDENTITY: EMAIL + ADMIN TAG */}
+                        <View style={{
+                            flexDirection: 'row',
+                            alignItems: 'center',
+                            marginTop: 4,
+                            paddingHorizontal: 8,
+                            paddingVertical: 2,
+                            backgroundColor: theme.card,
+                            borderRadius: 6,
+                            borderWidth: 1,
+                            borderColor: theme.border
+                        }}>
+                            <Text style={{ fontSize: 12, fontWeight: '600', color: theme.mutedText }}>
+                                {user.email}{user.is_admin ? ' • ADMIN' : ''}
+                            </Text>
+                        </View>
                     </View>
                 ) : null}
             </View>
@@ -506,6 +572,34 @@ export default function ProfileScreen() {
                     theme={theme}
                 />
             )}
+
+            {/* --- IDENTITY SETTINGS --- */}
+            <Pressable
+                style={styles.settingRow}
+                onPress={() => {
+                    Alert.prompt(
+                        "Change Username",
+                        "Enter a new Legend ID (3-20 characters, alphanumeric and periods only).",
+                        [
+                            { text: "Cancel", style: "cancel" },
+                            {
+                                text: "Update",
+                                onPress: (newName?: string) => handleUpdateUsername(newName)
+                            }
+                        ],
+                        "plain-text",
+                        user?.username || ""
+                    );
+                }}
+            >
+                <View style={{ flex: 1 }}>
+                    <Text style={styles.settingLabel}>Edit Legends ID</Text>
+                    <Text style={{ color: theme.mutedText, fontSize: 13, marginTop: 2 }}>
+                        Change your public identity within the simulation universe.
+                    </Text>
+                </View>
+                <Text style={{ color: '#007AFF', fontWeight: '600' }}>Edit</Text>
+            </Pressable>
 
             {/* --- NOTIFICATION TOGGLE (Sim-League Style) --- */}
             <View style={styles.settingRow}>
