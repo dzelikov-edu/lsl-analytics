@@ -1,42 +1,42 @@
 import os
-import random
-import string
-from sendgrid import SendGridAPIClient
-from sendgrid.helpers.mail import Mail
+import resend
 
-SENDGRID_API_KEY = os.environ.get("SENDGRID_API_KEY")
-# Use a generic domain for now until you verify a custom one in SendGrid
-FROM_EMAIL = "auth@legendscbb.com" 
+# We will set RESEND_API_KEY in Render Environment Variables
+resend.api_key = os.environ.get("RESEND_API_KEY")
+
+# For Beta/Testing, Resend allows 'onboarding@resend.dev' 
+# until you verify a custom domain.
+FROM_EMAIL = "Legends CBB <onboarding@resend.dev>"
 
 def send_legends_email(to_email: str, subject: str, html_content: str):
-    if not SENDGRID_API_KEY:
-        print("!!! MAIL_ERROR: SENDGRID_API_KEY not set. Check Render Env Vars.")
+    if not resend.api_key:
+        print("!!! MAIL_ERROR: RESEND_API_KEY not set. Check Render Env Vars.")
         return False
 
-    message = Mail(
-        from_email=FROM_EMAIL,
-        to_emails=to_email,
-        subject=subject,
-        html_content=html_content
-    )
     try:
-        sg = SendGridAPIClient(SENDGRID_API_KEY)
-        sg.send(message)
+        params = {
+            "from": FROM_EMAIL,
+            "to": [to_email],
+            "subject": subject,
+            "html": html_content,
+        }
+        resend.Emails.send(params)
         return True
     except Exception as e:
-        print(f"!!! SENDGRID_FAILURE: {e}")
+        print(f"!!! RESEND_FAILURE: {e}")
         return False
 
 def send_welcome_email(to_email: str, username: str):
     subject = "Welcome to the Legends Universe"
-    # Simple, branded HTML template
     content = f"""
-    <div style="font-family: sans-serif; color: #333;">
-        <h2>Welcome to the League, @{username}!</h2>
+    <div style="font-family: sans-serif; color: #333; padding: 20px;">
+        <h2 style="color: #007AFF;">Welcome to the League, @{username}!</h2>
         <p>Your identity has been successfully registered in the <b>Legends CBB Simulation Universe</b>.</p>
         <p>You can now create brackets, follow programs, and track sim results in real-time.</p>
-        <hr/>
-        <p style="font-size: 12px; color: #888;">Legends CBB v1.0 • Legacy Simulation Engine</p>
+        <hr style="border: 0; border-top: 1px solid #eee; margin: 20px 0;" />
+        <p style="font-size: 11px; color: #888; text-align: center;">
+            Legends CBB v1.0 • Powered by the Legacy Simulation Engine
+        </p>
     </div>
     """
     return send_legends_email(to_email, subject, content)
@@ -44,10 +44,11 @@ def send_welcome_email(to_email: str, username: str):
 def send_reset_code_email(to_email: str, code: str):
     subject = "Legends CBB: Password Reset Code"
     content = f"""
-    <div style="font-family: sans-serif; text-align: center;">
-        <h1>{code}</h1>
-        <p>Enter this 6-digit code in the app to reset your password.</p>
-        <p style="color: #666;">This code will expire in 15 minutes.</p>
+    <div style="font-family: sans-serif; text-align: center; padding: 20px;">
+        <p style="font-size: 16px; color: #555;">Use the code below to reset your password:</p>
+        <h1 style="font-size: 48px; letter-spacing: 5px; color: #007AFF; margin: 20px 0;">{code}</h1>
+        <p style="color: #888; font-size: 13px;">This code will expire in 15 minutes.</p>
+        <p style="color: #888; font-size: 11px; margin-top: 30px;">If you didn't request this, you can safely ignore this email.</p>
     </div>
     """
     return send_legends_email(to_email, subject, content)
