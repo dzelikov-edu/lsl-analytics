@@ -24,7 +24,7 @@ class RegisterRequest(BaseModel):
 
 
 class LoginRequest(BaseModel):
-    email: EmailStr
+    email: str
     password: str
 
 
@@ -94,7 +94,7 @@ async def register_user(payload: RegisterRequest):
 async def login_user(payload: LoginRequest):
     async with AsyncSessionLocal() as session:
         # We lowercase the input to match our lowercase storage policy
-        identifier = payload.email.lower() 
+        identifier = payload.email.strip().lower() # Add .strip() to be safe against accidental spaces
 
         # SURGICAL CHANGE: Check both email AND username columns
         q = select(User).where(
