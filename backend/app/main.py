@@ -15,6 +15,7 @@ from app.ingest import (
     load_conferences_map,
     load_records_snapshot,
     load_conf_games_snapshot,
+    load_team_map_names_cached,
     load_week_phase_map,
 )
 
@@ -39,7 +40,6 @@ from app.models_devices import User
 from sqlmodel import select, or_  # Ensure or_ is here
 from sqlalchemy import text # Add this to your sqlalchemy/sqlmodel imports
 from app.ingest import save_games_to_db
-
 
 from app.routers.devices_favorites import router as devices_favorites_router
 from app.routers.auth import router as auth_router
@@ -681,7 +681,7 @@ def _cached_all_team_ids() -> list[str]:
     Loads all team IDs from the TeamMap sheet (including non-tracked opponents).
     Used for bulk operations like logo sync.
     """
-    all_names_map = load_team_map_names()
+    all_names_map = load_team_map_names_cached()
     return list(all_names_map.keys())
 
 
@@ -1340,8 +1340,6 @@ def _release_refresh_lock():
             pass
 
 
-from app.ingest import load_team_map_names  # add to your existing ingest imports at top
-
 def _team_name_map(active_only: bool = False) -> dict:
     """
     Returns {TEAM_ID: Team Name}.
@@ -1351,7 +1349,8 @@ def _team_name_map(active_only: bool = False) -> dict:
       3) fallback to TEAM_ID
     """
     # Start with TeamMap so external teams get names too
-    out = {k.strip().upper(): v for k, v in load_team_map_names().items()}
+    base_map = load_team_map_names_cached()
+    out = {k.strip().upper(): v for k, v in base_map.items()}
 
     teams = load_teams_index()
     if active_only:

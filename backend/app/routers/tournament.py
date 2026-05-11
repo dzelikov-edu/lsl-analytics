@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlmodel import select, delete
-from sqlalchemy import func
+from sqlalchemy import func, asc
 from app.db import AsyncSessionLocal
 from app.models_devices import (
     TournamentBracket,
@@ -18,7 +18,9 @@ from typing import List
 
 from app.bracket_constants import REGION_MAP
 from app.deps_auth import get_current_user
-from app.ingest import load_team_map_names  # existing
+from app.ingest import load_team_map_names_cached
+from fastapi_limiter.depends import RateLimiter
+from app.tournament_sync import refresh_official_tournament
 from datetime import datetime
 from pydantic import BaseModel
 import string
@@ -36,7 +38,29 @@ class BracketPicksPayload(BaseModel):
 @router.get("/team-names")
 async def get_all_team_names():
     """Returns {TEAM_ID: display_name} for all 322+ teams."""
-    return load_team_map_names()
+    return load_team_map_names_cached()
+
+@router.post(
+    "/admin/sync-official",
+    dependencies=[Depends(RateLimiter(times=1, minutes=5))],  # adjust window as you like
+)
+async def admin_sync_official_tournament(
+    season: int = 2036,
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Admin-only trigger to refresh the official LCAA tournament bracket + seeds
+    from Google Sheets into Postgres.
+
+    - Clears existing TournamentBracket + TournamentSeedList for this season.
+    - Rebuilds the official field via sync_official_tournament.
+    - Protected by JWT auth (User.is_admin) and rate limiting.
+    """
+    if not current_user.is_admin:
+        raise HTTPException(status_code=403, detail="Admin access required.")
+
+    result = await refresh_official_tournament(season=season)
+    return {"ok": True, "season": season, "details": result}
 
 @router.get("/bracket")
 async def get_bracket(season: int = 2036):
@@ -44,7 +68,11 @@ async def get_bracket(season: int = 2036):
     Returns the full bracket structure for the infinite map.
     """
     async with AsyncSessionLocal() as session:
-        statement = select(TournamentBracket).where(TournamentBracket.season == season)
+        statement = (
+            select(TournamentBracket)
+            .where(TournamentBracket.season == season)
+            .order_by(TournamentBracket.region, TournamentBracket.round, TournamentBracket.game_slot)
+        )
         results = await session.exec(statement)
         return results.all()
 
@@ -54,7 +82,11 @@ async def get_seeds(season: int = 2036):
     Returns the 1-80 Seed List (The S-Curve).
     """
     async with AsyncSessionLocal() as session:
-        statement = select(TournamentSeedList).where(TournamentSeedList.season == season)
+        statement = (
+            select(TournamentSeedList)
+            .where(TournamentSeedList.season == season)
+            .order_by(TournamentSeedList.overall_rank)
+        )
         results = await session.exec(statement)
         return results.all()
     

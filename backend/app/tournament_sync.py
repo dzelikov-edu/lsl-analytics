@@ -3,6 +3,7 @@ from app.settings import settings
 from app.models_devices import TournamentBracket, TournamentSeedList, UserBracketPick  # ADD UserBracketPick
 from app.db import AsyncSessionLocal
 from sqlmodel import delete, select  # ADD select
+from typing import Optional
 import uuid
 
 from app.bracket_constants import REGION_MAP
@@ -97,3 +98,21 @@ async def sync_official_tournament(season: int, region_order: list[str]):
 
         await session.commit()
     return {"status": "Symmetric Outline Synced Successfully"}
+
+async def refresh_official_tournament(
+    season: int,
+    region_order: Optional[list[str]] = None,
+) -> dict:
+    """
+    Thin wrapper around sync_official_tournament used by admin/cron paths.
+
+    - Keeps bracket-building logic in one place.
+    - Lets us standardize region_order from config or a default.
+    """
+    # If no custom region order provided, use your current logical default.
+    default_region_order = ["West", "Midwest", "East", "South"]
+    use_regions = region_order or default_region_order
+
+    result = await sync_official_tournament(season=season, region_order=use_regions)
+    # Ensure we always return a simple JSON-serializable dict
+    return result or {"status": "ok"}

@@ -123,7 +123,7 @@ async def login_user(payload: LoginRequest):
             )
 
         # Token logic remains the same
-        token = create_access_token(subject=user.id, expires_delta=timedelta(minutes=60 * 24))
+        token = create_access_token(subject=user.id, expires_delta=timedelta(minutes=60 * 168))
         return TokenResponse(access_token=token)
     
 
@@ -296,7 +296,7 @@ async def reset_password(payload: PasswordResetConfirm):
         await session.commit()
 
         # Issue new access token
-        token = create_access_token(subject=user.id, expires_delta=timedelta(minutes=60 * 24))
+        token = create_access_token(subject=user.id, expires_delta=timedelta(minutes=60 * 168))
         return TokenResponse(access_token=token)
 
 

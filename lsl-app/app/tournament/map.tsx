@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { StyleSheet, View, Dimensions, Text, ActivityIndicator, Pressable, Alert, useWindowDimensions } from 'react-native';
+import { StyleSheet, View, Dimensions, Text, ActivityIndicator, Pressable, Alert, useWindowDimensions, Platform } from 'react-native';
 import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
 import Animated, { useSharedValue, useAnimatedStyle } from 'react-native-reanimated';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -29,10 +29,17 @@ export default function TournamentMap({ isMock = false, overrideBracketData, onR
     const insets = useSafeAreaInsets();
     const { width } = useWindowDimensions();
     const isTablet = width >= 768;
+    const isAndroid = Platform.OS === 'android';
 
     // --- DYNAMIC FORCEFIELD LOGIC ---
-    // iPad stays at your original -1035. iPhone gets the extra travel to -1200.
-    const maxY = isTablet ? -1035 : -1250;
+    // iPad: keep original. (-1035)
+    // iPhone: keep current behavior. (-1250)
+    // Android phones: allow much more travel so bottom of bracket is reachable.
+    const maxY = isTablet
+        ? -1035
+        : isAndroid
+            ? -1328  // more negative → can pan further down into the bracket
+            : -1250; // iPhone (unchanged)
     // iPad stays at your original -85 top limit. iPhone gets more room at -20.
     const minY = isTablet ? -85 : -60;
 

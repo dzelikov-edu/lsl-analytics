@@ -91,6 +91,37 @@ def load_team_map_names() -> dict:
     return out
 
 
+from datetime import datetime, timedelta
+
+# --- SIMPLE IN-PROCESS CACHE FOR TEAM MAP NAMES ---
+_TEAM_MAP_CACHE: dict[str, object] = {
+    "data": None,
+    "expires_at": None,
+}
+_TEAM_MAP_TTL = timedelta(minutes=15)
+
+
+def load_team_map_names_cached() -> dict:
+    """
+    Thin wrapper around load_team_map_names() with a short in-process TTL cache.
+
+    - On cache hit: returns the cached dict.
+    - On miss/expiry: calls load_team_map_names() exactly as today.
+    - If load_team_map_names() raises, the exception is propagated (no behavior change).
+    """
+    now = datetime.utcnow()
+    data = _TEAM_MAP_CACHE.get("data")
+    expires_at = _TEAM_MAP_CACHE.get("expires_at")
+
+    if data is not None and isinstance(expires_at, datetime) and expires_at > now:
+        return data
+
+    fresh = load_team_map_names()
+    _TEAM_MAP_CACHE["data"] = fresh
+    _TEAM_MAP_CACHE["expires_at"] = now + _TEAM_MAP_TTL
+    return fresh
+
+
 def load_polls() -> list[dict]:
     """
     Reads Polls tab from MASTER sheet and returns a list of rows.
