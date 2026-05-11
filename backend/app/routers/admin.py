@@ -8,9 +8,11 @@ from app.models_devices import (
     User, 
     TournamentState, 
     TournamentSeedList, 
-    MockBracketResult
+    MockBracketResult,
+    PlayerSnapshot,
 )
 from app.workers.push_sender import notify_team
+from app.players_sync import refresh_players_snapshot_cache
 
 from sqlmodel import select, delete
 from app.db import AsyncSessionLocal
@@ -348,3 +350,18 @@ async def patch_seedlist_columns(current_user: User = Depends(get_current_user))
         await session.commit()
 
     return {"status": "ok", "message": "sos and form columns ensured on tournamentseedlist"}
+
+@router.post("/players/sync")
+async def admin_sync_players(
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Admin-only: refreshes the PlayerSnapshot table from the PlayersSnapshot sheet.
+    - Clears existing PlayerSnapshot rows.
+    - Inserts a fresh snapshot from Google Sheets.
+    """
+    if not current_user.is_admin:
+        raise HTTPException(status_code=403, detail="Admin only.")
+
+    result = await refresh_players_snapshot_cache()
+    return {"status": "success", **result}

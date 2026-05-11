@@ -193,3 +193,50 @@ class MockBracketResult(SQLModel, table=True):
     game_id: str = Field(index=True) # e.g. mock_r64_1_1
     winner_id: str
     created_at: datetime = Field(default_factory=datetime.utcnow)
+
+class PlayerSnapshot(SQLModel, table=True):
+    """
+    Snapshot of player data from the PlayersSnapshot tab.
+    Updated via an admin-only sync; read-only for all other endpoints.
+    """
+    id: str = Field(default_factory=lambda: str(uuid4()), primary_key=True)
+
+    team_id: str = Field(index=True)
+    player_id: str = Field(index=True)
+    player_name: str
+
+    jersey_number: str | None = None
+    primary_position: str | None = None
+    secondary_position: str | None = None
+    height: str | None = None
+    weight: str | None = None
+    player_class: str | None = Field(default=None)  # mirrors "class" column
+    home_city: str | None = None
+    home_state_region: str | None = None
+    home_country: str | None = None
+    prev_team_id: str | None = None
+    prev_team_name: str | None = None
+
+    games_played: float | None = None
+    ppg: float | None = None
+    rpg: float | None = None
+    apg: float | None = None
+    spg: float | None = None
+    bpg: float | None = None
+    fg_pct: float | None = None
+    three_pct: float | None = None
+    ft_pct: float | None = None
+
+    prev_games_played: float | None = None
+    prev_ppg: float | None = None
+    prev_rpg: float | None = None
+    prev_apg: float | None = None
+    prev_spg: float | None = None
+    prev_bpg: float | None = None
+    prev_fg_pct: float | None = None
+    prev_three_pct: float | None = None
+    prev_ft_pct: float | None = None
+
+    notes: str | None = None
+
+    updated_at: datetime = Field(default_factory=datetime.utcnow)

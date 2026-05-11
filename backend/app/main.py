@@ -37,8 +37,9 @@ from app.db import AsyncSessionLocal
 from app.deps_auth import get_current_user
 from app.models_devices import Game
 from app.models_devices import User
+from app.models_devices import PlayerSnapshot
 from sqlmodel import select, or_  # Ensure or_ is here
-from sqlalchemy import text # Add this to your sqlalchemy/sqlmodel imports
+from sqlalchemy import text, func # Add this to your sqlalchemy/sqlmodel imports
 from app.ingest import save_games_to_db
 
 from app.routers.devices_favorites import router as devices_favorites_router
@@ -811,13 +812,16 @@ def _team_analytics_summary(team_id: str, week: int | None = None) -> dict:
     return summary
 
 
-def _team_roster_count(team_id: str) -> int:
+async def _team_roster_count(team_id: str) -> int:
     tid = str(team_id).strip().upper()
-    try:
-        rows = load_players_snapshot()
-        return sum(1 for r in rows if str(r.get("team_id", "")).strip().upper() == tid)
-    except Exception:
-        return 0
+    async with AsyncSessionLocal() as session:
+        stmt = (
+            select(func.count())
+            .select_from(PlayerSnapshot)
+            .where(PlayerSnapshot.team_id == tid)
+        )
+        res = await session.exec(stmt)
+        return res.one() or 0
     
 
 def _phase_display_name(
@@ -1030,7 +1034,7 @@ def _team_list_analytics_map(week: int | None = None) -> dict[str, dict]:
 
 
 @app.get("/teams/{team_id}")
-def get_team(team_id: str, week: int | None = None):
+async def get_team(team_id: str, week: int | None = None):
     """
     Team card (from TeamsIndex) + useful links + poll badges (LSL primary, LCAA secondary).
     If week not provided, uses latest poll week present in Polls sheet.
@@ -1190,7 +1194,7 @@ def get_team(team_id: str, week: int | None = None):
         "analytics": _team_analytics_summary(tid, week),
 
         "roster_summary": {
-            "players_count": _team_roster_count(tid),
+            "players_count": await _team_roster_count(tid),
         },
 
         "links": {
@@ -4433,7 +4437,7 @@ async def team_results(team_id: str, phase: Optional[str] = None):
 
 
 @app.get("/teams/{team_id}/roster")
-def team_roster(team_id: str):
+async def team_roster(team_id: str):
     tid = team_id.strip().upper()
 
     teams = load_teams_index()
@@ -4441,8 +4445,48 @@ def team_roster(team_id: str):
     if not match:
         raise HTTPException(status_code=404, detail=f"Team '{tid}' not found")
 
-    rows = load_players_snapshot()
-    roster = [r for r in rows if r["team_id"] == tid]
+    async with AsyncSessionLocal() as session:
+        stmt = select(PlayerSnapshot).where(PlayerSnapshot.team_id == tid)
+        roster_rows = (await session.exec(stmt)).all()
+
+    # Preserve your existing response shape as closely as possible
+    roster = []
+    for p in roster_rows:
+        roster.append({
+            "team_id": p.team_id,
+            "player_id": p.player_id,
+            "player_name": p.player_name,
+            "jersey_number": p.jersey_number,
+            "primary_position": p.primary_position,
+            "secondary_position": p.secondary_position,
+            "height": p.height,
+            "weight": p.weight,
+            "class": p.player_class,
+            "home_city": p.home_city,
+            "home_state_region": p.home_state_region,
+            "home_country": p.home_country,
+            "prev_team_id": p.prev_team_id,
+            "prev_team_name": p.prev_team_name,
+            "games_played": p.games_played,
+            "ppg": p.ppg,
+            "rpg": p.rpg,
+            "apg": p.apg,
+            "spg": p.spg,
+            "bpg": p.bpg,
+            "fg_pct": p.fg_pct,
+            "three_pct": p.three_pct,
+            "ft_pct": p.ft_pct,
+            "prev_games_played": p.prev_games_played,
+            "prev_ppg": p.prev_ppg,
+            "prev_rpg": p.prev_rpg,
+            "prev_apg": p.prev_apg,
+            "prev_spg": p.prev_spg,
+            "prev_bpg": p.prev_bpg,
+            "prev_fg_pct": p.prev_fg_pct,
+            "prev_three_pct": p.prev_three_pct,
+            "prev_ft_pct": p.prev_ft_pct,
+            "notes": p.notes,
+        })
 
     roster_sorted = roster
 
@@ -4460,16 +4504,17 @@ def team_roster(team_id: str):
 
 
 @app.get("/players/{player_id}")
-def get_player(player_id: str):
+async def get_player(player_id: str):
     pid = player_id.strip().upper()
 
-    rows = load_players_snapshot()
-    match = next((r for r in rows if str(r.get("player_id", "")).strip().upper() == pid), None)
+    async with AsyncSessionLocal() as session:
+        stmt = select(PlayerSnapshot).where(PlayerSnapshot.player_id == pid)
+        match = (await session.exec(stmt)).one_or_none()
 
     if not match:
         raise HTTPException(status_code=404, detail=f"Player '{pid}' not found")
 
-    team_id = str(match.get("team_id", "")).strip().upper()
+    team_id = str(match.team_id).strip().upper()
     team_name = None
 
     try:
@@ -4480,16 +4525,50 @@ def get_player(player_id: str):
     except Exception:
         team_name = None
 
-    return {
-        **match,
-        "team_name": team_name,
-        "links": {
-            "team": f"/teams/{team_id}",
-            "roster": f"/teams/{team_id}/roster",
-            "schedule": f"/teams/{team_id}/schedule",
-            "results": f"/teams/{team_id}/results",
-        },
-    }
+    # Build response dict similar to old structure
+        payload = {
+            "team_id": match.team_id,
+            "player_id": match.player_id,
+            "player_name": match.player_name,
+            "jersey_number": match.jersey_number,
+            "primary_position": match.primary_position,
+            "secondary_position": match.secondary_position,
+            "height": match.height,
+            "weight": match.weight,
+            "class": match.player_class,
+            "home_city": match.home_city,
+            "home_state_region": match.home_state_region,
+            "home_country": match.home_country,
+            "prev_team_id": match.prev_team_id,
+            "prev_team_name": match.prev_team_name,
+            "games_played": match.games_played,
+            "ppg": match.ppg,
+            "rpg": match.rpg,
+            "apg": match.apg,
+            "spg": match.spg,
+            "bpg": match.bpg,
+            "fg_pct": match.fg_pct,
+            "three_pct": match.three_pct,
+            "ft_pct": match.ft_pct,
+            "prev_games_played": match.prev_games_played,
+            "prev_ppg": match.prev_ppg,
+            "prev_rpg": match.prev_rpg,
+            "prev_apg": match.prev_apg,
+            "prev_spg": match.prev_spg,
+            "prev_bpg": match.prev_bpg,
+            "prev_fg_pct": match.prev_fg_pct,
+            "prev_three_pct": match.prev_three_pct,
+            "prev_ft_pct": match.prev_ft_pct,
+            "notes": match.notes,
+            "team_name": team_name,
+            "links": {
+                "team": f"/teams/{team_id}",
+                "roster": f"/teams/{team_id}/roster",
+                "schedule": f"/teams/{team_id}/schedule",
+                "results": f"/teams/{team_id}/results",
+            },
+        }
+        return payload
 
 
 @app.get("/teams/{team_id}/upcoming")
