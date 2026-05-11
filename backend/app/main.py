@@ -4509,12 +4509,13 @@ async def get_player(player_id: str):
 
     async with AsyncSessionLocal() as session:
         stmt = select(PlayerSnapshot).where(PlayerSnapshot.player_id == pid)
-        match = (await session.exec(stmt)).one_or_none()
+        result = await session.exec(stmt)
+        match = result.one_or_none()
 
     if not match:
         raise HTTPException(status_code=404, detail=f"Player '{pid}' not found")
 
-    team_id = str(match.team_id).strip().upper()
+    team_id = str(match.team_id or "").strip().upper()
     team_name = None
 
     try:
@@ -4526,49 +4527,49 @@ async def get_player(player_id: str):
         team_name = None
 
     # Build response dict similar to old structure
-        payload = {
-            "team_id": match.team_id,
-            "player_id": match.player_id,
-            "player_name": match.player_name,
-            "jersey_number": match.jersey_number,
-            "primary_position": match.primary_position,
-            "secondary_position": match.secondary_position,
-            "height": match.height,
-            "weight": match.weight,
-            "class": match.player_class,
-            "home_city": match.home_city,
-            "home_state_region": match.home_state_region,
-            "home_country": match.home_country,
-            "prev_team_id": match.prev_team_id,
-            "prev_team_name": match.prev_team_name,
-            "games_played": match.games_played,
-            "ppg": match.ppg,
-            "rpg": match.rpg,
-            "apg": match.apg,
-            "spg": match.spg,
-            "bpg": match.bpg,
-            "fg_pct": match.fg_pct,
-            "three_pct": match.three_pct,
-            "ft_pct": match.ft_pct,
-            "prev_games_played": match.prev_games_played,
-            "prev_ppg": match.prev_ppg,
-            "prev_rpg": match.prev_rpg,
-            "prev_apg": match.prev_apg,
-            "prev_spg": match.prev_spg,
-            "prev_bpg": match.prev_bpg,
-            "prev_fg_pct": match.prev_fg_pct,
-            "prev_three_pct": match.prev_three_pct,
-            "prev_ft_pct": match.prev_ft_pct,
-            "notes": match.notes,
-            "team_name": team_name,
-            "links": {
-                "team": f"/teams/{team_id}",
-                "roster": f"/teams/{team_id}/roster",
-                "schedule": f"/teams/{team_id}/schedule",
-                "results": f"/teams/{team_id}/results",
-            },
-        }
-        return payload
+    payload = {
+        "team_id": match.team_id,
+        "player_id": match.player_id,
+        "player_name": match.player_name,
+        "jersey_number": match.jersey_number,
+        "primary_position": match.primary_position,
+        "secondary_position": match.secondary_position,
+        "height": match.height,
+        "weight": match.weight,
+        "class": match.player_class,
+        "home_city": match.home_city,
+        "home_state_region": match.home_state_region,
+        "home_country": match.home_country,
+        "prev_team_id": match.prev_team_id,
+        "prev_team_name": match.prev_team_name,
+        "games_played": match.games_played,
+        "ppg": match.ppg,
+        "rpg": match.rpg,
+        "apg": match.apg,
+        "spg": match.spg,
+        "bpg": match.bpg,
+        "fg_pct": match.fg_pct,
+        "three_pct": match.three_pct,
+        "ft_pct": match.ft_pct,
+        "prev_games_played": match.prev_games_played,
+        "prev_ppg": match.prev_ppg,
+        "prev_rpg": match.prev_rpg,
+        "prev_apg": match.prev_apg,
+        "prev_spg": match.prev_spg,
+        "prev_bpg": match.prev_bpg,
+        "prev_fg_pct": match.prev_fg_pct,
+        "prev_three_pct": match.prev_three_pct,
+        "prev_ft_pct": match.prev_ft_pct,
+        "notes": match.notes,
+        "team_name": team_name,
+        "links": {
+            "team": f"/teams/{team_id}",
+            "roster": f"/teams/{team_id}/roster",
+            "schedule": f"/teams/{team_id}/schedule",
+            "results": f"/teams/{team_id}/results",
+        },
+    }
+    return payload
 
 
 @app.get("/teams/{team_id}/upcoming")
