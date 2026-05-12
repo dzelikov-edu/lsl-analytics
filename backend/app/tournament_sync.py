@@ -42,41 +42,41 @@ async def sync_official_tournament(season: int, region_order: list[str]):
         await session.execute(delete(TournamentBracket).where(TournamentBracket.season == season))
         await session.execute(delete(TournamentSeedList).where(TournamentSeedList.season == season))
 
-        # --- ADD THIS LOOP ---
-        for row in field:
-            # Enhanced helper to catch parsing issues
-            def get_stat(idx):
+        # --- UPDATED ROBUST STATS LOOP ---
+        for f in field:
+            # Safer helper: checks row length before accessing
+            def get_s(idx):
                 try:
-                    if idx >= len(row): return 0.0
-                    val = str(row[idx]).strip().replace('%', '').replace(',', '')
-                    return float(val) if val else 0.0
-                except: return 0.0
+                    # Check if the row actually has this column
+                    if idx >= len(f['stats']): 
+                        return 0.0
+                    v = str(f['stats'][idx]).strip().replace('%', '').replace(',', '')
+                    return float(v) if v else 0.0
+                except: 
+                    return 0.0
 
-            seed_entry = TournamentSeedList(
+            session.add(TournamentSeedList(
                 season=season,
-                team_id=str(row[0]).strip().upper(),
-                overall_rank=int(row[1]),
-                seed=((int(row[1])-1)//5)+1,
-                is_autobid=str(row[2]).strip().upper() == "TRUE",
-                # CORRECTED STATS MAPPING (Zero-based indices)
-                ppg=get_stat(3),       # Col D
-                rpg=get_stat(4),       # Col E
-                apg=get_stat(5),       # Col F
-                spg=get_stat(6),       # Col G
-                bpg=get_stat(7),       # Col H
-                fg_pct=get_stat(8),    # Col I
-                three_pct=get_stat(9), # Col J
-                ft_pct=get_stat(10),   # Col K
-                oppg=get_stat(11),     # Col L
-                topg=get_stat(12),     # Col M
-                fpg=get_stat(13),      # Col N
+                team_id=f['tid'],
+                overall_rank=f['rank'],
+                seed=((f['rank']-1)//5)+1,
+                is_autobid=f['auto'],
+                # MAPPING COLUMNS D-N WITH SAFETY
+                ppg=get_s(3),
+                rpg=get_s(4),
+                apg=get_s(5),
+                spg=get_s(6),
+                bpg=get_s(7),
+                fg_pct=get_s(8),
+                three_pct=get_s(9),
+                ft_pct=get_s(10),
+                oppg=get_s(11),
+                topg=get_s(12),
+                fpg=get_s(13),
                 resume_score=0.0,
-                power_value=0.0,
-                sos=0.0,
-                form=0.0
-            )
-            session.add(seed_entry)
-        # ---------------------
+                power_value=0.0
+            ))
+        # ---------------------------------
 
         # 1. FINAL FOUR SKELETON
         champ_id = str(uuid.uuid4())
