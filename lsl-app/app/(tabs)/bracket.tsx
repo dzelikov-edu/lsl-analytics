@@ -313,13 +313,16 @@ export default function BracketTab() {
 
     // 2. Map View (If a bracket is selected)
     if (selectedBracketId) {
+        // Find if this bracket belongs to the current user
+        const isMyBracket = brackets.some(b => b.id === selectedBracketId);
+
         return (
             <View style={{ flex: 1, backgroundColor: theme.background }}>
-                {/* Manual header removed. TournamentMap now handles its own Close/Back button */}
                 <TournamentMap
                     isMock={false}
                     initialBracketId={selectedBracketId}
-                    onClose={handleCloseMap} // Passing handleCloseMap so the X works
+                    onClose={handleCloseMap}
+                    viewOnly={!isMyBracket} // If it's not mine, I can only view it
                 />
             </View>
         );
@@ -341,31 +344,31 @@ export default function BracketTab() {
                 </Text>
 
                 {leaderboard.map((row, index) => (
-                    <View key={index} style={{
-                        backgroundColor: theme.card,
-                        padding: 16,
-                        borderRadius: 15,
-                        marginBottom: 10,
-                        borderWidth: index === 0 ? 2 : 1,
-                        borderColor: index === 0 ? '#FFD700' : theme.border
-                    }}>
+                    <Pressable
+                        key={index}
+                        onPress={() => setSelectedBracketId(row.bracket_id)} // THE PEEK
+                        style={({ pressed }) => [{
+                            backgroundColor: theme.card,
+                            padding: 16,
+                            borderRadius: 15,
+                            marginBottom: 10,
+                            borderWidth: index === 0 ? 2 : 1,
+                            borderColor: index === 0 ? '#FFD700' : theme.border,
+                            opacity: pressed ? 0.7 : 1
+                        }]}
+                    >
                         <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                            {/* Rank */}
                             <Text style={{ color: theme.text, fontSize: 18, fontWeight: '900', width: 35 }}>{index + 1}</Text>
-
-                            {/* User Info */}
                             <View style={{ flex: 1 }}>
                                 <Text style={{ color: theme.text, fontWeight: '800', fontSize: 16 }}>{row.user_name}</Text>
                                 <Text style={{ color: theme.mutedText, fontSize: 11 }}>{row.bracket_name}</Text>
                             </View>
-
-                            {/* Scores */}
                             <View style={{ alignItems: 'flex-end' }}>
                                 <Text style={{ color: theme.text, fontSize: 22, fontWeight: '900' }}>{row.score}</Text>
                                 <Text style={{ color: theme.mutedText, fontSize: 10, fontWeight: '700' }}>{row.pts_rem} REM</Text>
                             </View>
                         </View>
-                    </View>
+                    </Pressable>
                 ))}
             </ScrollView>
         );

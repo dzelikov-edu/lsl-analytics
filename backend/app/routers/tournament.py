@@ -854,6 +854,7 @@ async def get_group_leaderboard(
             leaderboard.append({
                 "user_name": username or "Unknown Legend", # Return the real username
                 "bracket_name": bracket_name,
+                "bracket_id": bracket_id,
                 "score": current_score,
                 "pts_rem": points_rem
             })

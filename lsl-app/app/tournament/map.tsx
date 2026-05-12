@@ -19,12 +19,14 @@ const MAP_SIZE = 5000;
 
 type TournamentMapProps = {
     isMock?: boolean;
-    overrideBracketData?: any[]; initialBracketId?: string | null;
+    viewOnly?: boolean;
+    overrideBracketData?: any[];
+    initialBracketId?: string | null;
     onRunPersonalSim?: () => void;       // handler for bottom-bar button
     onClose?: () => void;
 };
 
-export default function TournamentMap({ isMock = false, overrideBracketData, onRunPersonalSim, initialBracketId, onClose }: TournamentMapProps) {
+export default function TournamentMap({ isMock = false, viewOnly = false, overrideBracketData, onRunPersonalSim, initialBracketId, onClose }: TournamentMapProps) {
     const colorScheme = useColorScheme() ?? 'light';
     const theme = AppColors[colorScheme];
     const insets = useSafeAreaInsets();
@@ -32,6 +34,7 @@ export default function TournamentMap({ isMock = false, overrideBracketData, onR
     const isTablet = width >= 768;
     const isAndroid = Platform.OS === 'android';
     const navigation = useNavigation();
+    const [phase, setPhase] = useState<string | null>(null);
 
     useLayoutEffect(() => {
         // ONLY hide the header if this is the pushed Official Bracket screen
@@ -39,6 +42,17 @@ export default function TournamentMap({ isMock = false, overrideBracketData, onR
             navigation.setOptions({ headerShown: false });
         }
     }, [navigation, isMock]);
+
+    // FETCH THE PHASE INSIDE MAP.TSX (Add this useEffect block)
+    useEffect(() => {
+        (async () => {
+            try {
+                const res = await fetch(`${API_BASE_URL}/api/tournament/state?season=2036`);
+                const data = await res.json();
+                setPhase(data.phase);
+            } catch (e) { console.log(e); }
+        })();
+    }, []);
 
     // --- DYNAMIC FORCEFIELD LOGIC ---
     // iPad: keep original. (-1035)
@@ -328,7 +342,7 @@ export default function TournamentMap({ isMock = false, overrideBracketData, onR
     };
 
     const handlePick = (gameId: string, teamId: string) => {
-        if (isMock) return; // <--- ADD THIS LINE: Completely disables manual picking in mock mode
+        if (isMock || viewOnly || phase === 'LIVE') return; // LOCK THE GATES
         if (teamId === "TBD") return;
         const isDeselecting = picks[gameId] === teamId;
         const newWinnerId = isDeselecting ? "" : teamId;
@@ -896,21 +910,49 @@ export default function TournamentMap({ isMock = false, overrideBracketData, onR
                     </Animated.View>
                 </View>
 
-                <View style={[styles.bottomBar, { backgroundColor: theme.card }]}>
-                    {isMock ? (
-                        <>
+                {/* BOTTOM BAR: Only visible in Official Mode AND if predictions are OPEN AND not in View-Only mode */}
+                {!isMock && phase === 'SELECTION_SUNDAY' && !viewOnly ? (
+                    <View style={[styles.bottomBar, { backgroundColor: theme.card }]}>
+                        <View style={{ flex: 1, justifyContent: 'center' }}>
+                            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ maxHeight: 18 }}>
+                                <Text style={{ color: theme.text, fontSize: 9, fontWeight: '700' }}>
+                                    S16: {getPickCount("Survival_16")}/16  •
+                                    R64: {getPickCount("Round_64")}/32  •
+                                    R32: {getPickCount("Round_32")}/16  •
+                                    S16: {getPickCount("Sweet_16")}/8  •
+                                    E8: {getPickCount("Elite_8")}/4  •
+                                    F4: {getPickCount("National Semifinals")}/2  •
+                                    CHAMP: {getPickCount("Championship")}/1
+                                </Text>
+                            </ScrollView>
+                            <Text style={{ color: theme.mutedText, fontSize: 8, fontWeight: '600', marginTop: 1 }}>
+                                {getPickCount("Survival_16") + getPickCount("Round_64") + getPickCount("Round_32") + getPickCount("Sweet_16") + getPickCount("Elite_8") + getPickCount("National Semifinals") + getPickCount("Championship")} / 79 TOTAL
+                            </Text>
+                        </View>
+                        <Pressable
+                            onPress={handleLockBracket}
+                            style={{
+                                paddingHorizontal: 16,
+                                paddingVertical: 8,
+                                borderRadius: 8,
+                                backgroundColor: locking ? theme.border : '#34C759',
+                                marginLeft: 8
+                            }}
+                        >
+                            <Text style={{ color: '#fff', fontSize: 11, fontWeight: '900' }}>
+                                {locking ? 'SAVING...' : 'SAVE PICKS'}
+                            </Text>
+                        </Pressable>
+                    </View>
+                ) : (
+                    /* Mock Mode Bottom Bar (Your existing Bracketology logic) */
+                    isMock ? (
+                        <View style={[styles.bottomBar, { backgroundColor: theme.card }]}>
                             <View style={{ flex: 1 }}>
                                 <Text style={{ color: theme.text, fontSize: 10, fontWeight: '600' }}>
                                     Bracketology: seeded field. Run an AI sim to see one possible tournament path.
                                 </Text>
-                                <Text
-                                    style={{
-                                        color: '#FF9500',
-                                        fontSize: 9,
-                                        fontWeight: '800',
-                                        marginTop: 2,
-                                    }}
-                                >
+                                <Text style={{ color: '#FF9500', fontSize: 9, fontWeight: '800', marginTop: 2 }}>
                                     PRESEASON • V1.0
                                 </Text>
                             </View>
@@ -930,43 +972,9 @@ export default function TournamentMap({ isMock = false, overrideBracketData, onR
                                     </Text>
                                 </Pressable>
                             )}
-                        </>
-                    ) : (
-                        /* --- CHALLENGE MODE BOTTOM BAR --- */
-                        <>
-                            <View style={{ flex: 1, justifyContent: 'center' }}>
-                                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ maxHeight: 18 }}>
-                                    <Text style={{ color: theme.text, fontSize: 9, fontWeight: '700' }}>
-                                        S16: {getPickCount("Survival_16")}/16  •
-                                        R64: {getPickCount("Round_64")}/32  •
-                                        R32: {getPickCount("Round_32")}/16  •
-                                        S16: {getPickCount("Sweet_16")}/8  •
-                                        E8: {getPickCount("Elite_8")}/4  •
-                                        F4: {getPickCount("National Semifinals")}/2  •
-                                        CHAMP: {getPickCount("Championship")}/1
-                                    </Text>
-                                </ScrollView>
-                                <Text style={{ color: theme.mutedText, fontSize: 8, fontWeight: '600', marginTop: 1 }}>
-                                    {getPickCount("Survival_16") + getPickCount("Round_64") + getPickCount("Round_32") + getPickCount("Sweet_16") + getPickCount("Elite_8") + getPickCount("National Semifinals") + getPickCount("Championship")} / 79 TOTAL
-                                </Text>
-                            </View>
-                            <Pressable
-                                onPress={handleLockBracket}
-                                style={{
-                                    paddingHorizontal: 16,
-                                    paddingVertical: 8,
-                                    borderRadius: 8,
-                                    backgroundColor: locking ? theme.border : '#34C759',
-                                    marginLeft: 8
-                                }}
-                            >
-                                <Text style={{ color: '#fff', fontSize: 11, fontWeight: '900' }}>
-                                    {locking ? 'SAVING...' : 'SAVE PICKS'}
-                                </Text>
-                            </Pressable>
-                        </>
-                    )}
-                </View>
+                        </View>
+                    ) : null /* Hidden entirely if LIVE or Peeking */
+                )}
 
                 {selectedMatchup && <ScoutingReport visible={modalVisible} onClose={() => setModalVisible(false)} teamA={{ ...selectedMatchup.teamA, name: teamNames[selectedMatchup.teamA.id] || selectedMatchup.teamA.id }} teamB={{ ...selectedMatchup.teamB, name: teamNames[selectedMatchup.teamB.id] || selectedMatchup.teamB.id }} />}
             </View>
