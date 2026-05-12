@@ -227,17 +227,17 @@ export default function TournamentMap({ isMock = false, overrideBracketData, onR
             const statsMap: Record<string, any> = {};
             (seedListData || []).forEach((row: any) => {
                 statsMap[row.team_id] = {
-                    ppg: row.ppg,
-                    rpg: row.rpg,
-                    apg: row.apg,
-                    spg: row.spg, // ADD THIS
-                    bpg: row.bpg, // ADD THIS
-                    fg_pct: row.fg_pct,
-                    three_pct: row.three_pct,
-                    ft_pct: row.ft_pct, // ADD THIS
-                    oppg: row.oppg,
-                    topg: row.topg,
-                    fpg: row.fpg,
+                    ppg: row.ppg ?? 0,
+                    rpg: row.rpg ?? 0,
+                    apg: row.apg ?? 0,
+                    spg: row.spg ?? 0,        // Ensures 0 shows up
+                    bpg: row.bpg ?? 0,        // Ensures 0 shows up
+                    fg_pct: row.fg_pct ?? 0,
+                    three_pct: row.three_pct ?? 0,
+                    ft_pct: row.ft_pct ?? 0,  // Ensures 0 shows up instead of undefined
+                    oppg: row.oppg ?? 0,
+                    topg: row.topg ?? 0,
+                    fpg: row.fpg ?? 0,
                     record: row.games_played > 0 ? `~${row.games_played} gp` : "—",
                 };
             });

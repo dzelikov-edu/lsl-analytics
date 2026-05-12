@@ -44,9 +44,9 @@ export default function ScoutingReport({ visible, onClose, teamA, teamB }: Scout
                         <StatRow label="Record" valueA={teamA.record} valueB={teamB.record} isCore />
                         <StatRow label="PPG" valueA={teamA.ppg} valueB={teamB.ppg} isCore />
                         <StatRow label="RPG" valueA={teamA.rpg} valueB={teamB.rpg} isCore />
-                        <StatRow label="FG%" valueA={`${teamA.fg_pct}%`} valueB={`${teamB.fg_pct}%`} isCore />
-                        <StatRow label="3PT%" valueA={`${teamA.three_pct}%`} valueB={`${teamB.three_pct}%`} isCore />
-                        <StatRow label="FT%" valueA={`${teamA.ft_pct}%`} valueB={`${teamB.ft_pct}%`} isCore />
+                        <StatRow label="FG%" valueA={`${teamA.fg_pct ?? 0}%`} valueB={`${teamB.fg_pct ?? 0}%`} isCore />
+                        <StatRow label="3PT%" valueA={`${teamA.three_pct ?? 0}%`} valueB={`${teamB.three_pct ?? 0}%`} isCore />
+                        <StatRow label="FT%" valueA={`${teamA.ft_pct ?? 0}%`} valueB={`${teamB.ft_pct ?? 0}%`} isCore />
 
                         {/* ADVANCED STATS (Conditional) */}
                         {isExpanded && (

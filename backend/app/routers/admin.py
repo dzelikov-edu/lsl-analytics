@@ -182,10 +182,11 @@ async def admin_sync_bracketology(
         await session.execute(delete(TournamentSeedList).where(TournamentSeedList.season == season))
 
         for row in field:
-            # Helper to safely parse stats from Sheet columns D-N
+            # Enhanced helper to catch parsing issues
             def get_stat(idx):
                 try:
-                    val = str(row[idx]).strip().replace('%', '')
+                    if idx >= len(row): return 0.0
+                    val = str(row[idx]).strip().replace('%', '').replace(',', '')
                     return float(val) if val else 0.0
                 except: return 0.0
 
@@ -195,15 +196,15 @@ async def admin_sync_bracketology(
                 overall_rank=int(row[1]),
                 seed=((int(row[1])-1)//5)+1,
                 is_autobid=str(row[2]).strip().upper() == "TRUE",
-                # STATS MAPPING (Based on your A-N layout)
-                ppg=get_stat(3),
-                rpg=get_stat(4),
-                apg=get_stat(5),
+                # CORRECTED STATS MAPPING (Zero-based indices)
+                ppg=get_stat(3),       # Col D
+                rpg=get_stat(4),       # Col E
+                apg=get_stat(5),       # Col F
                 spg=get_stat(6),       # Col G
                 bpg=get_stat(7),       # Col H
                 fg_pct=get_stat(8),    # Col I
                 three_pct=get_stat(9), # Col J
-                ft_pct=get_stat(10), # Now mapped!
+                ft_pct=get_stat(10),   # Col K
                 oppg=get_stat(11),     # Col L
                 topg=get_stat(12),     # Col M
                 fpg=get_stat(13),      # Col N
