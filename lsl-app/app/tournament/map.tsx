@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useLayoutEffect } from 'react';
-import { StyleSheet, View, Dimensions, Text, ActivityIndicator, Pressable, Alert, useWindowDimensions, Platform } from 'react-native';
+import { StyleSheet, View, Dimensions, Text, ActivityIndicator, Pressable, Alert, useWindowDimensions, Platform, ScrollView } from 'react-native';
 import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
 import Animated, { useSharedValue, useAnimatedStyle, withDecay, cancelAnimation } from 'react-native-reanimated';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -931,9 +931,22 @@ export default function TournamentMap({ isMock = false, overrideBracketData, onR
                     ) : (
                         /* --- CHALLENGE MODE BOTTOM BAR --- */
                         <>
-                            <Text style={{ color: theme.text, fontSize: 10, fontWeight: '700', flex: 1 }}>
-                                {getPickCount("Survival_16") + getPickCount("Round_64") + getPickCount("Round_32") + getPickCount("Sweet_16") + getPickCount("Elite_8") + getPickCount("National Semifinals") + getPickCount("Championship")} / 79 TOTAL PICKS MADE
-                            </Text>
+                            <View style={{ flex: 1, justifyContent: 'center' }}>
+                                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ maxHeight: 18 }}>
+                                    <Text style={{ color: theme.text, fontSize: 9, fontWeight: '700' }}>
+                                        S16: {getPickCount("Survival_16")}/16  •
+                                        R64: {getPickCount("Round_64")}/32  •
+                                        R32: {getPickCount("Round_32")}/16  •
+                                        S16: {getPickCount("Sweet_16")}/8  •
+                                        E8: {getPickCount("Elite_8")}/4  •
+                                        F4: {getPickCount("National Semifinals")}/2  •
+                                        CHAMP: {getPickCount("Championship")}/1
+                                    </Text>
+                                </ScrollView>
+                                <Text style={{ color: theme.mutedText, fontSize: 8, fontWeight: '600', marginTop: 1 }}>
+                                    {getPickCount("Survival_16") + getPickCount("Round_64") + getPickCount("Round_32") + getPickCount("Sweet_16") + getPickCount("Elite_8") + getPickCount("National Semifinals") + getPickCount("Championship")} / 79 TOTAL
+                                </Text>
+                            </View>
                             <Pressable
                                 onPress={handleLockBracket}
                                 style={{

@@ -24,6 +24,7 @@ export default function ProfileScreen() {
     const isTablet = width >= 768; // Standard breakpoint for iPad
 
     const [user, setUser] = useState<{ email?: string; username?: string; is_admin?: boolean } | null>(null);
+    const [phase, setPhase] = useState<string | null>(null);
     const [favorites, setFavorites] = useState<string[]>([]);
     const [teamNames, setTeamNames] = useState<Record<string, string>>({}); // ID -> Name map
     const [allTeamIds, setAllTeamIds] = useState<string[]>([]);
@@ -40,12 +41,13 @@ export default function ProfileScreen() {
             if (!token) return;
 
             // 1. Fetch User & Favorites in parallel
-            const [userRes, favsRes, teamsRes, deviceSettingsRes, allTeamIdsRes] = await Promise.all([
+            const [userRes, favsRes, teamsRes, deviceSettingsRes, allTeamIdsRes, stateRes] = await Promise.all([
                 fetch(`${API_BASE_URL}/auth/me`, { headers: { Authorization: `Bearer ${token}` } }),
                 fetch(`${API_BASE_URL}/api/favorites`, { headers: { Authorization: `Bearer ${token}` } }),
                 fetch(`${API_BASE_URL}/teams?week=0`, { headers: { Authorization: `Bearer ${token}` } }),
                 fetch(`${API_BASE_URL}/api/devices/settings`, { headers: { Authorization: `Bearer ${token}` } }),
-                fetch(`${API_BASE_URL}/teams/all-ids`, { headers: { Authorization: `Bearer ${token}` } }), // NEW FETCH
+                fetch(`${API_BASE_URL}/teams/all-ids`, { headers: { Authorization: `Bearer ${token}` } }),
+                fetch(`${API_BASE_URL}/api/tournament/state?season=2036`),
             ]);
 
             if (userRes.ok) {
@@ -79,6 +81,11 @@ export default function ProfileScreen() {
                 if (typeof settings?.notifications_enabled === 'boolean') {
                     setNotificationsEnabled(settings.notifications_enabled);
                 }
+            }
+
+            if (stateRes.ok) {
+                const stateData = await stateRes.json();
+                setPhase(stateData.phase); // STORE THE PHASE
             }
 
             // NEW BLOCK: Handle the allTeamIds response
@@ -345,7 +352,8 @@ export default function ProfileScreen() {
                                 headers: { Authorization: `Bearer ${token}` }
                             });
                             if (res.ok) {
-                                Alert.alert("Success", `Phase changed to ${newPhase}. Please restart the app.`);
+                                setPhase(newPhase); // ADD THIS: Instantly update the label in your console
+                                Alert.alert("Success", `Phase changed to ${newPhase}.`)
                             } else {
                                 Alert.alert("Error", "Failed to update phase.");
                             }
@@ -746,24 +754,41 @@ export default function ProfileScreen() {
                         </View>
                     </Pressable>
 
-                    {/* --- INSERT THIS NEW PHASE CONTROL BLOCK --- */}
-                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 10 }}>
-                        <Pressable
-                            style={[styles.settingRow, { flex: 1, marginRight: 5, backgroundColor: '#8E8E93', marginBottom: 0 }]}
-                            onPress={() => handleSetTournamentPhase('BRACKETOLOGY')}
-                        >
-                            <View style={{ alignItems: 'center', width: '100%' }}>
-                                <Text style={[styles.settingLabel, { color: '#fff', fontSize: 14 }]}>📅 Regular Season Mode</Text>
-                            </View>
-                        </Pressable>
-                        <Pressable
-                            style={[styles.settingRow, { flex: 1, marginLeft: 5, backgroundColor: '#FF9500', marginBottom: 0 }]}
-                            onPress={() => handleSetTournamentPhase('LIVE')}
-                        >
-                            <View style={{ alignItems: 'center', width: '100%' }}>
-                                <Text style={[styles.settingLabel, { color: '#fff', fontSize: 14 }]}>🟠 LCAA Tournament Mode</Text>
-                            </View>
-                        </Pressable>
+                    {/* --- TOURNAMENT PHASE CONTROL --- */}
+                    <View style={{ marginTop: 20, marginBottom: 10 }}>
+                        <Text style={[styles.sectionTitle, { fontSize: 16, marginBottom: 12 }]}>
+                            Global Tournament State: {phase?.replace('_', ' ')}
+                        </Text>
+                        <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                            {/* 1. BRACKETOLOGY (Regular Season) */}
+                            <Pressable
+                                style={[styles.settingRow, { flex: 1, marginRight: 4, backgroundColor: '#8E8E93', marginBottom: 0, paddingVertical: 12 }]}
+                                onPress={() => handleSetTournamentPhase('BRACKETOLOGY')}
+                            >
+                                <Text style={{ color: '#fff', fontSize: 11, fontWeight: '900', textAlign: 'center' }}>REGULAR SEASON</Text>
+                            </Pressable>
+
+                            {/* 2. SELECTION SUNDAY (Predictions Open) - This was your original Orange button logic */}
+                            <Pressable
+                                style={[styles.settingRow, { flex: 1, marginHorizontal: 2, backgroundColor: '#FF9500', marginBottom: 0, paddingVertical: 12 }]}
+                                onPress={() => handleSetTournamentPhase('SELECTION_SUNDAY')}
+                            >
+                                <Text style={{ color: '#fff', fontSize: 11, fontWeight: '900', textAlign: 'center' }}>OPEN PICKS</Text>
+                            </Pressable>
+
+                            {/* 3. LIVE (Tournament Tip-off / Locked) */}
+                            <Pressable
+                                style={[styles.settingRow, { flex: 1, marginLeft: 4, backgroundColor: '#FF3B30', marginBottom: 0, paddingVertical: 12 }]}
+                                onPress={() => handleSetTournamentPhase('LIVE')}
+                            >
+                                <Text style={{ color: '#fff', fontSize: 11, fontWeight: '900', textAlign: 'center' }}>🔒 LOCK ALL</Text>
+                            </Pressable>
+                        </View>
+                        <Text style={{ color: theme.mutedText, fontSize: 11, marginTop: 8, textAlign: 'center' }}>
+                            {phase === 'BRACKETOLOGY' ? 'Current Mode: Projections Only' :
+                                phase === 'SELECTION_SUNDAY' ? 'Current Mode: Users making picks' :
+                                    'Current Mode: Games active, brackets frozen'}
+                        </Text>
                     </View>
                     {/* ------------------------------------------- */}
 

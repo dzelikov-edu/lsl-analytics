@@ -10,10 +10,20 @@ from app.bracket_constants import REGION_MAP
 
 async def sync_official_tournament(season: int, region_order: list[str]):
     service = get_sheets_service(settings.GOOGLE_SERVICE_ACCOUNT_JSON)
-    values = read_range(service, settings.MASTER_SHEET_ID, "LCAA_Official_Field!A2:C81")
+    values = read_range(service, settings.MASTER_SHEET_ID, "LCAA_Official_Field!A2:K81")
     if not values: return {}
 
-    field = [{"tid": str(row[0]).strip().upper(), "rank": int(row[1]), "auto": str(row[2]).strip().upper() == "TRUE"} for row in values if len(row) >= 3]
+    # Update the field parsing logic
+    field = []
+    for row in values:
+        if len(row) < 3: continue
+        field.append({
+            "tid": str(row[0]).strip().upper(), 
+            "rank": int(row[1]), 
+            "auto": str(row[2]).strip().upper() == "TRUE",
+            "stats": row # keep row for the loop below
+        })
+    
     rank_map = {f['rank']: f['tid'] for f in field}
 
     async with AsyncSessionLocal() as session:
@@ -33,16 +43,28 @@ async def sync_official_tournament(season: int, region_order: list[str]):
 
         # --- ADD THIS LOOP ---
         for f in field:
+            def get_s(idx):
+                try:
+                    v = str(f['stats'][idx]).strip().replace('%', '')
+                    return float(v) if v else 0.0
+                except: return 0.0
+
             session.add(TournamentSeedList(
                 season=season,
                 team_id=f['tid'],
                 overall_rank=f['rank'],
                 seed=((f['rank']-1)//5)+1,
                 is_autobid=f['auto'],
+                ppg=get_s(3),
+                rpg=get_s(4),
+                apg=get_s(5),
+                fg_pct=get_s(6),
+                three_pct=get_s(7),
+                oppg=get_s(8),
+                topg=get_s(9),
+                fpg=get_s(10),
                 resume_score=0.0,
-                power_value=0.0,
-                sos=0.0,
-                form=0.0
+                power_value=0.0
             ))
         # ---------------------
 

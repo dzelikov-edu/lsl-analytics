@@ -165,27 +165,42 @@ async def admin_sync_bracketology(
     from sqlmodel import delete
 
     service = get_sheets_service(settings.GOOGLE_SERVICE_ACCOUNT_JSON)
-    # Target your SPECIFIC Bracketology tab
-    values = read_range(service, settings.MASTER_SHEET_ID, "LCAA_Bracketology!A2:C81")
+    # 1. Expand range to K to include all stats
+    values = read_range(service, settings.MASTER_SHEET_ID, "LCAA_Bracketology!A2:K81")
     
     if not values:
         raise HTTPException(status_code=404, detail="No data found in LCAA_Bracketology sheet.")
 
-    field = [{"tid": str(row[0]).strip().upper(), "rank": int(row[1]), "auto": str(row[2]).strip().upper() == "TRUE"} for row in values if len(row) >= 3]
-
     async with AsyncSessionLocal() as session:
-        # Only clear the Seeds for this season, don't touch the Official Bracket tables
         await session.execute(delete(TournamentSeedList).where(TournamentSeedList.season == season))
 
-        for f in field:
+        for row in values:
+            if len(row) < 3: continue
+            
+            # Helper to safely parse stats from Sheet columns D-K
+            def get_stat(idx):
+                try:
+                    val = str(row[idx]).strip().replace('%', '')
+                    return float(val) if val else 0.0
+                except: return 0.0
+
             seed_entry = TournamentSeedList(
                 season=season,
-                team_id=f['tid'],
-                overall_rank=f['rank'],
-                seed=((f['rank']-1)//5)+1,
-                is_autobid=f['auto'],
-                resume_score=0.0, # EXPLICITLY SET
-                power_value=0.0,  # EXPLICITLY SET
+                team_id=str(row[0]).strip().upper(),
+                overall_rank=int(row[1]),
+                seed=((int(row[1])-1)//5)+1,
+                is_autobid=str(row[2]).strip().upper() == "TRUE",
+                # STATS MAPPING
+                ppg=get_stat(3),
+                rpg=get_stat(4),
+                apg=get_stat(5),
+                fg_pct=get_stat(6),
+                three_pct=get_stat(7),
+                oppg=get_stat(8),
+                topg=get_stat(9),
+                fpg=get_stat(10),
+                resume_score=0.0,
+                power_value=0.0,
                 sos=0.0,
                 form=0.0
             )

@@ -428,7 +428,7 @@ export default function BracketTab() {
             {viewMode === 'BRACKETS' ? (
                 /* --- EXISTING BRACKETS LIST --- */
                 <>
-                    <Text style={{ color: theme.mutedText, fontSize: 16, marginBottom: 30 }}>Manage your 2036 Tournament bracket entries.</Text>
+                    <Text style={{ color: theme.mutedText, fontSize: 16, marginBottom: 30 }}>Manage your 2036 Tournament bracket entries. Press and hold down on a bracket you've made to change its name.</Text>
                     <Text style={{ color: theme.text, fontSize: 18, fontWeight: '700', marginBottom: 15 }}>My Brackets ({brackets.length}/10)</Text>
 
                     {brackets.map((b) => (
@@ -472,22 +472,33 @@ export default function BracketTab() {
                                 </View>
                             </View>
 
-                            <Pressable
-                                onPress={() => handleDeleteBracket(b.id)}
-                                style={{ padding: 10, marginLeft: 10 }}
-                            >
-                                <Text style={{ fontSize: 18 }}>🗑️</Text>
-                            </Pressable>
+                            {/* ONLY SHOW DELETE IF NOT LIVE */}
+                            {phase !== 'LIVE' && (
+                                <Pressable
+                                    onPress={() => handleDeleteBracket(b.id)}
+                                    style={{ padding: 10, marginLeft: 10 }}
+                                >
+                                    <Text style={{ fontSize: 18 }}>🗑️</Text>
+                                </Pressable>
+                            )}
                         </Pressable>
                     ))}
 
-                    {brackets.length < 10 && (
+                    {/* ONLY SHOW CREATE BUTTON IF PREDICTIONS ARE OPEN */}
+                    {phase === 'SELECTION_SUNDAY' && brackets.length < 10 && (
                         <Pressable
                             onPress={handleCreateBracket}
                             style={{ backgroundColor: '#007AFF', padding: 18, borderRadius: 15, alignItems: 'center', marginTop: 10 }}
                         >
                             <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 16 }}>+ Create New Bracket</Text>
                         </Pressable>
+                    )}
+
+                    {/* Show a "Locked" notice if the tournament has started */}
+                    {phase === 'LIVE' && (
+                        <View style={{ padding: 18, borderRadius: 15, backgroundColor: theme.card, borderWidth: 1, borderColor: theme.border, alignItems: 'center', marginTop: 10 }}>
+                            <Text style={{ color: theme.mutedText, fontWeight: '700' }}>🔒 Tournament Started: Entries Locked</Text>
+                        </View>
                     )}
                 </>
             ) : (
@@ -525,13 +536,15 @@ export default function BracketTab() {
                                         </Text>
                                     </Pressable>
 
-                                    {/* DYNAMIC ACTION: Delete for owner, Leave for member */}
-                                    <Pressable
-                                        onPress={() => isOwner ? handleDeleteGroup(g.id) : handleLeaveGroup(g.id)}
-                                        style={{ padding: 10, marginLeft: 10 }}
-                                    >
-                                        <Text style={{ fontSize: 18 }}>{isOwner ? '🗑️' : '🚪'}</Text>
-                                    </Pressable>
+                                    {/* DYNAMIC ACTION: Delete for owner, Leave for member (Only visible if NOT live)*/}
+                                    {phase !== 'LIVE' && (
+                                        <Pressable
+                                            onPress={() => isOwner ? handleDeleteGroup(g.id) : handleLeaveGroup(g.id)}
+                                            style={{ padding: 10, marginLeft: 10 }}
+                                        >
+                                            <Text style={{ fontSize: 18 }}>{isOwner ? '🗑️' : '🚪'}</Text>
+                                        </Pressable>
+                                    )}
                                 </View>
                             );
                         })
@@ -542,19 +555,24 @@ export default function BracketTab() {
                         </View>
                     )}
 
-                    <Pressable
-                        onPress={handleCreateGroup}
-                        style={{ backgroundColor: '#5856D6', padding: 16, borderRadius: 12, alignItems: 'center', marginTop: 10 }}
-                    >
-                        <Text style={{ color: '#fff', fontWeight: 'bold' }}>+ Create a Group</Text>
-                    </Pressable>
+                    {/* ONLY SHOW GROUP CONTROLS IF NOT LIVE */}
+                    {phase === 'SELECTION_SUNDAY' && (
+                        <>
+                            <Pressable
+                                onPress={handleCreateGroup}
+                                style={{ backgroundColor: '#5856D6', padding: 16, borderRadius: 12, alignItems: 'center', marginTop: 10 }}
+                            >
+                                <Text style={{ color: '#fff', fontWeight: 'bold' }}>+ Create a Group</Text>
+                            </Pressable>
 
-                    <Pressable
-                        onPress={handleJoinGroup} // Update this line
-                        style={{ borderWidth: 1, borderColor: '#5856D6', padding: 16, borderRadius: 12, alignItems: 'center', marginTop: 12 }}
-                    >
-                        <Text style={{ color: '#5856D6', fontWeight: 'bold' }}>Join with Code</Text>
-                    </Pressable>
+                            <Pressable
+                                onPress={handleJoinGroup}
+                                style={{ borderWidth: 1, borderColor: '#5856D6', padding: 16, borderRadius: 12, alignItems: 'center', marginTop: 12 }}
+                            >
+                                <Text style={{ color: '#5856D6', fontWeight: 'bold' }}>Join with Code</Text>
+                            </Pressable>
+                        </>
+                    )}
                 </>
             )}
         </ScrollView>

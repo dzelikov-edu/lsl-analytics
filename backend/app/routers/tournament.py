@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlmodel import select, delete
 from sqlalchemy import func, asc
 from app.db import AsyncSessionLocal
@@ -97,9 +97,19 @@ async def create_bracket(
 ):
     """
     Create a new bracket for the current user for a given season.
-    Enforces: max 10 brackets per user per season.
+    Enforces: max 10 brackets per user per season AND tournament not started.
     """
     async with AsyncSessionLocal() as session:
+        # --- SURGICAL LOCKDOWN CHECK ---
+        stmt_state = select(TournamentState).where(TournamentState.season == payload.season)
+        state = (await session.exec(stmt_state)).one_or_none()
+        if state and state.phase == "LIVE":
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN, 
+                detail="The tournament has tipped off. New bracket entries are now locked."
+            )
+        # -------------------------------
+
         # Count existing brackets for this user/season
         stmt = select(UserBracket).where(
             UserBracket.user_id == current_user.id,
@@ -703,6 +713,14 @@ async def join_bracket_group(
     """
     code = code.strip().upper()
     async with AsyncSessionLocal() as session:
+        # --- SURGICAL LOCKDOWN CHECK ---
+        # Assuming current season is 2036; we check the phase before allowing join
+        stmt_state = select(TournamentState).where(TournamentState.season == 2036)
+        state = (await session.exec(stmt_state)).one_or_none()
+        if state and state.phase == "LIVE":
+            raise HTTPException(status_code=403, detail="Tournament started. Joining groups is disabled.")
+        # -------------------------------
+
         # 1. Find the group
         stmt = select(BracketGroup).where(BracketGroup.join_code == code)
         group = (await session.exec(stmt)).one_or_none()
