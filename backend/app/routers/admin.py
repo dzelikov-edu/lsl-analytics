@@ -165,19 +165,24 @@ async def admin_sync_bracketology(
     from sqlmodel import delete
 
     service = get_sheets_service(settings.GOOGLE_SERVICE_ACCOUNT_JSON)
-    # 1. Expand range to K to include all stats
-    values = read_range(service, settings.MASTER_SHEET_ID, "LCAA_Bracketology!A2:K81")
+        # 1. Expand range to N to include all stats categories
+    values = read_range(service, settings.MASTER_SHEET_ID, "LCAA_Bracketology!A2:N81")
     
     if not values:
         raise HTTPException(status_code=404, detail="No data found in LCAA_Bracketology sheet.")
 
+    # 2. Parse the sheet into a 'field' list to fix the undefined error
+    field = []
+    for row in values:
+        if len(row) < 3: continue
+        field.append(row)
+
     async with AsyncSessionLocal() as session:
+        # Only clear the Seeds for this season
         await session.execute(delete(TournamentSeedList).where(TournamentSeedList.season == season))
 
-        for row in values:
-            if len(row) < 3: continue
-            
-            # Helper to safely parse stats from Sheet columns D-K
+        for row in field:
+            # Helper to safely parse stats from Sheet columns D-N
             def get_stat(idx):
                 try:
                     val = str(row[idx]).strip().replace('%', '')
@@ -190,15 +195,18 @@ async def admin_sync_bracketology(
                 overall_rank=int(row[1]),
                 seed=((int(row[1])-1)//5)+1,
                 is_autobid=str(row[2]).strip().upper() == "TRUE",
-                # STATS MAPPING
+                # STATS MAPPING (Based on your A-N layout)
                 ppg=get_stat(3),
                 rpg=get_stat(4),
                 apg=get_stat(5),
-                fg_pct=get_stat(6),
-                three_pct=get_stat(7),
-                oppg=get_stat(8),
-                topg=get_stat(9),
-                fpg=get_stat(10),
+                spg=get_stat(6),       # Col G
+                bpg=get_stat(7),       # Col H
+                fg_pct=get_stat(8),    # Col I
+                three_pct=get_stat(9), # Col J
+                ft_pct=get_stat(10), # Now mapped!
+                oppg=get_stat(11),     # Col L
+                topg=get_stat(12),     # Col M
+                fpg=get_stat(13),      # Col N
                 resume_score=0.0,
                 power_value=0.0,
                 sos=0.0,

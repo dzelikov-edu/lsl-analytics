@@ -10,7 +10,8 @@ from app.bracket_constants import REGION_MAP
 
 async def sync_official_tournament(season: int, region_order: list[str]):
     service = get_sheets_service(settings.GOOGLE_SERVICE_ACCOUNT_JSON)
-    values = read_range(service, settings.MASTER_SHEET_ID, "LCAA_Official_Field!A2:K81")
+    # 1. Expand range to N
+    values = read_range(service, settings.MASTER_SHEET_ID, "LCAA_Official_Field!A2:N81")
     if not values: return {}
 
     # Update the field parsing logic
@@ -55,14 +56,18 @@ async def sync_official_tournament(season: int, region_order: list[str]):
                 overall_rank=f['rank'],
                 seed=((f['rank']-1)//5)+1,
                 is_autobid=f['auto'],
+                # UPDATED STATS MAPPING (Columns D-N)
                 ppg=get_s(3),
                 rpg=get_s(4),
                 apg=get_s(5),
-                fg_pct=get_s(6),
-                three_pct=get_s(7),
-                oppg=get_s(8),
-                topg=get_s(9),
-                fpg=get_s(10),
+                spg=get_s(6),
+                bpg=get_s(7),
+                fg_pct=get_s(8),
+                three_pct=get_s(9),
+                ft_pct=get_s(10), # Now mapped!
+                oppg=get_s(11),
+                topg=get_s(12),
+                fpg=get_s(13),
                 resume_score=0.0,
                 power_value=0.0
             ))

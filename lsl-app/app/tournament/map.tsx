@@ -230,8 +230,11 @@ export default function TournamentMap({ isMock = false, overrideBracketData, onR
                     ppg: row.ppg,
                     rpg: row.rpg,
                     apg: row.apg,
+                    spg: row.spg, // ADD THIS
+                    bpg: row.bpg, // ADD THIS
                     fg_pct: row.fg_pct,
                     three_pct: row.three_pct,
+                    ft_pct: row.ft_pct, // ADD THIS
                     oppg: row.oppg,
                     topg: row.topg,
                     fpg: row.fpg,
