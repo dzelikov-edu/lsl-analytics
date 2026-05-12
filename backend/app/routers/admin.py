@@ -357,23 +357,23 @@ async def run_bracket_sim(season: int = 2036, current_user: User = Depends(get_c
 
 @router.post("/db/patch-seedlist-columns")
 async def patch_seedlist_columns(current_user: User = Depends(get_current_user)):
-    """
-    One-time migration: add sos and form columns to tournamentseedlist.
-    """
     if not current_user.is_admin:
         raise HTTPException(status_code=403, detail="Admin only.")
 
     async with AsyncSessionLocal() as session:
-        # We add both columns surgically
-        await session.execute(text(
-            "ALTER TABLE tournamentseedlist ADD COLUMN IF NOT EXISTS sos FLOAT DEFAULT 0.0"
-        ))
-        await session.execute(text(
-            "ALTER TABLE tournamentseedlist ADD COLUMN IF NOT EXISTS form FLOAT DEFAULT 0.0"
-        ))
+        # Existing patches
+        await session.execute(text("ALTER TABLE tournamentseedlist ADD COLUMN IF NOT EXISTS sos FLOAT DEFAULT 0.0"))
+        await session.execute(text("ALTER TABLE tournamentseedlist ADD COLUMN IF NOT EXISTS form FLOAT DEFAULT 0.0"))
+        
+        # --- ADD THESE THREE LINES ---
+        await session.execute(text("ALTER TABLE tournamentseedlist ADD COLUMN IF NOT EXISTS spg FLOAT DEFAULT 0.0"))
+        await session.execute(text("ALTER TABLE tournamentseedlist ADD COLUMN IF NOT EXISTS bpg FLOAT DEFAULT 0.0"))
+        await session.execute(text("ALTER TABLE tournamentseedlist ADD COLUMN IF NOT EXISTS ft_pct FLOAT DEFAULT 0.0"))
+        # -----------------------------
+        
         await session.commit()
 
-    return {"status": "ok", "message": "sos and form columns ensured on tournamentseedlist"}
+    return {"status": "ok", "message": "All stats columns ensured on tournamentseedlist"}
 
 @router.post("/players/sync")
 async def admin_sync_players(
