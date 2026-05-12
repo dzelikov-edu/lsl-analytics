@@ -131,8 +131,11 @@ class TournamentSeedList(SQLModel, table=True):
     ppg: float = Field(default=0.0)
     rpg: float = Field(default=0.0)
     apg: float = Field(default=0.0)
+    spg: float = Field(default=0.0)
+    bpg: float = Field(default=0.0)
     fg_pct: float = Field(default=0.0)
     three_pct: float = Field(default=0.0)
+    ft_pct: float = Field(default=0.0)
     
     # Advanced Stats (The ones the Backend will calculate from Totals)
     oppg: float = Field(default=0.0)  # Total Points Against / Games
