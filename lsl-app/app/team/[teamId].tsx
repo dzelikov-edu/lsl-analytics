@@ -278,6 +278,9 @@ export default function TeamDetailScreen() {
         enabled: !!teamId,
     });
 
+    // NEW: derive a not-tracked flag from the error text
+    const isNotTracked = !!error && (String(error).includes('Unknown team_id') || String(error).includes('404'));
+
     const lslRank = team?.polls?.LSL?.rank;
     const lslNext5 = team?.polls?.LSL?.next5_order;
     const lcaaRank = team?.polls?.LCAA?.rank;
@@ -437,6 +440,15 @@ export default function TeamDetailScreen() {
                 <View style={styles.centerBlock}>
                     <ActivityIndicator size="large" />
                     <Text style={styles.helper}>Loading team...</Text>
+                </View>
+            ) : isNotTracked ? (
+                <View style={styles.errorCard}>
+                    <Text style={styles.errorTitle}>Team Not Tracked</Text>
+                    <Text style={styles.body}>
+                        This program isn’t part of the 69 fully tracked Legends teams yet, so a detailed team page
+                        isn’t available. You’ll still see them in schedules, box scores, and conference views
+                        if they're a part of the group of currently tracked conferences.
+                    </Text>
                 </View>
             ) : error ? (
                 <View style={styles.errorCard}>

@@ -19,6 +19,8 @@ export default function BracketTab() {
     const [loading, setLoading] = useState(true);
     const [brackets, setBrackets] = useState<any[]>([]);
     const [selectedBracketId, setSelectedBracketId] = useState<string | null>(null);
+    const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+    const [activeGroupName, setActiveGroupName] = useState<string | null>(null);
 
     // Sim State
     const [personalSim, setPersonalSim] = useState<any[] | null>(null);
@@ -33,19 +35,24 @@ export default function BracketTab() {
     const loadInitialData = async () => {
         try {
             const token = await getToken();
-            const [stateRes, bracketsRes, groupsRes] = await Promise.all([
+            // 1. Fetch all data including user profile for ownership check
+            const [userRes, stateRes, bracketsRes, groupsRes] = await Promise.all([
+                fetch(`${API_BASE_URL}/auth/me`, { headers: { Authorization: `Bearer ${token}` } }),
                 fetch(`${API_BASE_URL}/api/tournament/state?season=2036`),
                 fetch(`${API_BASE_URL}/api/tournament/brackets?season=2036`, { headers: { Authorization: `Bearer ${token}` } }),
-                fetch(`${API_BASE_URL}/api/tournament/groups/me?season=2036`, { headers: { Authorization: `Bearer ${token}` } }) // NEW
+                fetch(`${API_BASE_URL}/api/tournament/groups/me?season=2036`, { headers: { Authorization: `Bearer ${token}` } })
             ]);
 
+            const userData = await userRes.json();
             const stateData = await stateRes.json();
             const bracketListData = await bracketsRes.json();
-            const groupsListData = await groupsRes.json(); // NEW
+            const groupsListData = await groupsRes.json();
 
+            // 2. Set all state variables
+            setCurrentUserId(userData.id);
             setPhase(stateData.phase);
             setBrackets(bracketListData);
-            setMyGroups(groupsListData); // NEW
+            setMyGroups(groupsListData);
         } catch (e) {
             console.error(e);
             setPhase('BRACKETOLOGY');
@@ -231,7 +238,29 @@ export default function BracketTab() {
         );
     };
 
-    const loadLeaderboard = async (groupId: string) => {
+    const handleLeaveGroup = (id: string) => {
+        Alert.alert(
+            "Leave Group",
+            "Are you sure you want to leave this league? Your bracket entry will be removed from the leaderboard.",
+            [
+                { text: "Cancel", style: "cancel" },
+                {
+                    text: "Leave",
+                    style: "destructive",
+                    onPress: async () => {
+                        const token = await getToken();
+                        await fetch(`${API_BASE_URL}/api/tournament/groups/${id}/leave`, {
+                            method: 'POST',
+                            headers: { Authorization: `Bearer ${token}` }
+                        });
+                        loadInitialData(); // Refresh the list
+                    }
+                }
+            ]
+        );
+    };
+
+    const loadLeaderboard = async (groupId: string, groupName: string) => {
         setLoading(true);
         try {
             const token = await getToken();
@@ -241,6 +270,7 @@ export default function BracketTab() {
             const data = await res.json();
             setLeaderboard(data);
             setActiveGroupId(groupId);
+            setActiveGroupName(groupName);
         } catch (e) {
             Alert.alert("Error", "Could not load leaderboard.");
         } finally {
@@ -285,14 +315,12 @@ export default function BracketTab() {
     if (selectedBracketId) {
         return (
             <View style={{ flex: 1, backgroundColor: theme.background }}>
-                {/* Header for the Map to get back to the list */}
-                <View style={{ height: 90, backgroundColor: theme.background, justifyContent: 'flex-end', paddingBottom: 10, paddingHorizontal: 20, borderBottomWidth: 1, borderBottomColor: theme.border }}>
-                    {/* CHANGE: Use handleCloseMap instead of an inline arrow function */}
-                    <Pressable onPress={handleCloseMap}>
-                        <Text style={{ color: '#007AFF', fontWeight: 'bold' }}>← My Brackets</Text>
-                    </Pressable>
-                </View>
-                <TournamentMap isMock={false} initialBracketId={selectedBracketId} />
+                {/* Manual header removed. TournamentMap now handles its own Close/Back button */}
+                <TournamentMap
+                    isMock={false}
+                    initialBracketId={selectedBracketId}
+                    onClose={handleCloseMap} // Passing handleCloseMap so the X works
+                />
             </View>
         );
     }
@@ -304,8 +332,13 @@ export default function BracketTab() {
                     <Text style={{ color: '#007AFF', fontWeight: 'bold' }}>← Back to Groups</Text>
                 </Pressable>
 
-                <Text style={{ color: theme.text, fontSize: 28, fontWeight: '800' }}>Leaderboard</Text>
-                <Text style={{ color: theme.mutedText, marginBottom: 30 }}>LCAA Tournament Standings</Text>
+                {/* UPDATED HEADER */}
+                <Text style={{ color: theme.text, fontSize: 28, fontWeight: '800' }}>
+                    {activeGroupName || 'Leaderboard'}
+                </Text>
+                <Text style={{ color: theme.mutedText, marginBottom: 30 }}>
+                    Group Standings • 2036 LCAA
+                </Text>
 
                 {leaderboard.map((row, index) => (
                     <View key={index} style={{
@@ -340,8 +373,41 @@ export default function BracketTab() {
 
     // 3. List View (Default LIVE state)
     return (
-        <ScrollView style={{ flex: 1, backgroundColor: theme.background }} contentContainerStyle={{ padding: 20, paddingTop: 60 }}>
-            <Text style={{ color: theme.text, fontSize: 32, fontWeight: '800', marginBottom: 5 }}>LCAA Tournament Bracket Challenge</Text>
+        <ScrollView
+            style={{ flex: 1, backgroundColor: theme.background }}
+            contentContainerStyle={{
+                padding: 20,
+                // iPad uses 10px, phones use the dynamic top inset (Notch room)
+                paddingTop: isTablet ? 10 : insets.top
+            }}
+        >
+            {/* --- BRANDED HEADER --- */}
+            <View style={{
+                alignItems: 'center',
+                marginBottom: 20,
+                marginTop: isTablet ? 12 : 18 // 12 for iPad, 18 for all Phones
+            }}>
+                <Image
+                    source={require('@/assets/images/index_header_icon.png')}
+                    style={{ width: 140, height: 60 }}
+                    resizeMode="contain"
+                />
+                <Text style={{
+                    fontSize: 12,
+                    fontWeight: '800',
+                    color: theme.mutedText,
+                    letterSpacing: 2.5,
+                    marginTop: 8,
+                    textTransform: 'uppercase'
+                }}>
+                    Tournament Challenge
+                </Text>
+            </View>
+
+            {/* Existing Title (we keep it but it will now sit below the logo) */}
+            <Text style={{ color: theme.text, fontSize: 30, fontWeight: '800', textAlign: 'center', marginBottom: 5 }}>
+                LCAA Tournament Bracket Challenge
+            </Text>
 
             {/* --- MODE TOGGLE (NEW) --- */}
             <View style={{ flexDirection: 'row', backgroundColor: theme.card, borderRadius: 12, padding: 4, marginVertical: 20, borderWidth: 1, borderColor: theme.border }}>
@@ -430,38 +496,45 @@ export default function BracketTab() {
                     <Text style={{ color: theme.mutedText, fontSize: 16, marginBottom: 30 }}>Compete against friends in custom leagues.</Text>
 
                     {myGroups.length > 0 ? (
-                        myGroups.map((g, index) => (
-                            <View
-                                key={`${g.id}-${index}`}
-                                style={{
-                                    backgroundColor: theme.card,
-                                    padding: 18,
-                                    borderRadius: 15,
-                                    marginBottom: 12,
-                                    borderWidth: 1,
-                                    borderColor: theme.border,
-                                    flexDirection: 'row',
-                                    justifyContent: 'space-between',
-                                    alignItems: 'center'
-                                }}
-                            >
-                                <Pressable
-                                    style={{ flex: 1 }}
-                                    onPress={() => loadLeaderboard(g.id)} // <--- CHANGE THIS
-                                >
-                                    <Text style={{ color: theme.text, fontSize: 17, fontWeight: '800' }}>{g.name}</Text>
-                                    <Text style={{ color: theme.mutedText, fontSize: 12, marginTop: 4 }}>CODE: {g.join_code}</Text>
-                                </Pressable>
+                        myGroups.map((g, index) => {
+                            // Check if the current logged-in user is the creator
+                            const isOwner = g.owner_user_id === currentUserId;
 
-                                {/* DELETE BUTTON */}
-                                <Pressable
-                                    onPress={() => handleDeleteGroup(g.id)}
-                                    style={{ padding: 5, marginLeft: 10 }}
+                            return (
+                                <View
+                                    key={`${g.id}-${index}`}
+                                    style={{
+                                        backgroundColor: theme.card,
+                                        padding: 18,
+                                        borderRadius: 15,
+                                        marginBottom: 12,
+                                        borderWidth: 1,
+                                        borderColor: theme.border,
+                                        flexDirection: 'row',
+                                        justifyContent: 'space-between',
+                                        alignItems: 'center'
+                                    }}
                                 >
-                                    <Text style={{ fontSize: 18 }}>🗑️</Text>
-                                </Pressable>
-                            </View>
-                        ))
+                                    <Pressable
+                                        style={{ flex: 1 }}
+                                        onPress={() => loadLeaderboard(g.id, g.name)}
+                                    >
+                                        <Text style={{ color: theme.text, fontSize: 17, fontWeight: '800' }}>{g.name}</Text>
+                                        <Text style={{ color: theme.mutedText, fontSize: 12, marginTop: 4 }}>
+                                            {isOwner ? `CODE: ${g.join_code} (OWNER)` : `CODE: ${g.join_code}`}
+                                        </Text>
+                                    </Pressable>
+
+                                    {/* DYNAMIC ACTION: Delete for owner, Leave for member */}
+                                    <Pressable
+                                        onPress={() => isOwner ? handleDeleteGroup(g.id) : handleLeaveGroup(g.id)}
+                                        style={{ padding: 10, marginLeft: 10 }}
+                                    >
+                                        <Text style={{ fontSize: 18 }}>{isOwner ? '🗑️' : '🚪'}</Text>
+                                    </Pressable>
+                                </View>
+                            );
+                        })
                     ) : (
                         <View style={{ alignItems: 'center', marginVertical: 40 }}>
                             <Text style={{ fontSize: 40, marginBottom: 10 }}>🏆</Text>

@@ -472,6 +472,55 @@ export default function ProfileScreen() {
         );
     };
 
+    const handlePlayersSnapshotSync = async () => {
+        Alert.alert(
+            "Sync Players Snapshot",
+            "This will pull the latest player data from the PlayersSnapshot tab in your Master sheet and overwrite the in-app snapshot. Continue?",
+            [
+                { text: "Cancel", style: "cancel" },
+                {
+                    text: "Run Sync",
+                    onPress: async () => {
+                        setLoading(true);
+                        try {
+                            const token = await getToken();
+                            if (!token) {
+                                Alert.alert("Error", "You must be logged in as an admin.");
+                                return;
+                            }
+
+                            const res = await fetch(`${API_BASE_URL}/admin/players/sync`, {
+                                method: 'POST',
+                                headers: { Authorization: `Bearer ${token}` },
+                            });
+
+                            const text = await res.text();
+                            let data: any = {};
+                            try {
+                                data = JSON.parse(text);
+                            } catch {
+                                // ignore parse error; text may not be JSON on failure
+                            }
+
+                            setLoading(false);
+
+                            if (res.ok) {
+                                const imported = data?.rows_imported ?? 'unknown';
+                                Alert.alert("Success", `Synced ${imported} player rows from PlayersSnapshot.`);
+                            } else {
+                                Alert.alert("Error", data?.detail || `Sync failed (HTTP ${res.status}).`);
+                            }
+                        } catch (e) {
+                            console.log("Players snapshot sync error", e);
+                            setLoading(false);
+                            Alert.alert("Error", "Could not connect to server.");
+                        }
+                    }
+                }
+            ]
+        );
+    };
+
     return (
         <ScrollView
             style={styles.container}
@@ -680,6 +729,19 @@ export default function ProfileScreen() {
                             <Text style={[styles.settingLabel, { color: '#fff' }]}>📊 Sync LCAA Bracketology</Text>
                             <Text style={{ color: 'rgba(255,255,255,0.8)', fontSize: 12, marginTop: 2 }}>
                                 Update the projected rankings from Google Sheets.
+                            </Text>
+                        </View>
+                    </Pressable>
+
+                    {/* --- PLAYERS SNAPSHOT SYNC (GREEN) --- */}
+                    <Pressable
+                        style={[styles.settingRow, { backgroundColor: '#34C759', marginBottom: 10 }]}
+                        onPress={handlePlayersSnapshotSync}
+                    >
+                        <View style={{ flex: 1 }}>
+                            <Text style={[styles.settingLabel, { color: '#fff' }]}>👤 Sync Players Snapshot</Text>
+                            <Text style={{ color: 'rgba(255,255,255,0.8)', fontSize: 12, marginTop: 2 }}>
+                                Refresh all roster & player details from the PlayersSnapshot sheet.
                             </Text>
                         </View>
                     </Pressable>

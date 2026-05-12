@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useLayoutEffect } from 'react';
 import { StyleSheet, View, Dimensions, Text, ActivityIndicator, Pressable, Alert, useWindowDimensions, Platform } from 'react-native';
 import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
-import Animated, { useSharedValue, useAnimatedStyle } from 'react-native-reanimated';
+import Animated, { useSharedValue, useAnimatedStyle, withDecay, cancelAnimation } from 'react-native-reanimated';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { AppColors } from '@/constants/app-colors';
 import { API_BASE_URL } from '@/lib/api';
@@ -12,7 +12,7 @@ import TeamLogo from '@/components/TeamLogo';
 import { getGameCoordinates, GAME_HEIGHT, CENTER_X, CENTER_Y } from '@/lib/bracketLayout';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { getTeamBranding } from '@/lib/teamBranding';
-import { useFocusEffect } from 'expo-router';
+import { useFocusEffect, router, Stack, useNavigation } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const MAP_SIZE = 5000;
@@ -21,25 +21,34 @@ type TournamentMapProps = {
     isMock?: boolean;
     overrideBracketData?: any[]; initialBracketId?: string | null;
     onRunPersonalSim?: () => void;       // handler for bottom-bar button
+    onClose?: () => void;
 };
 
-export default function TournamentMap({ isMock = false, overrideBracketData, onRunPersonalSim, initialBracketId }: TournamentMapProps) {
+export default function TournamentMap({ isMock = false, overrideBracketData, onRunPersonalSim, initialBracketId, onClose }: TournamentMapProps) {
     const colorScheme = useColorScheme() ?? 'light';
     const theme = AppColors[colorScheme];
     const insets = useSafeAreaInsets();
     const { width } = useWindowDimensions();
     const isTablet = width >= 768;
     const isAndroid = Platform.OS === 'android';
+    const navigation = useNavigation();
+
+    useLayoutEffect(() => {
+        // ONLY hide the header if this is the pushed Official Bracket screen
+        if (!isMock) {
+            navigation.setOptions({ headerShown: false });
+        }
+    }, [navigation, isMock]);
 
     // --- DYNAMIC FORCEFIELD LOGIC ---
     // iPad: keep original. (-1035)
     // iPhone: keep current behavior. (-1250)
     // Android phones: allow much more travel so bottom of bracket is reachable.
     const maxY = isTablet
-        ? -1035
+        ? (isMock ? -1035 : -1035) // -1035 remains locked for Bracketology (iPad)
         : isAndroid
-            ? -1328  // more negative → can pan further down into the bracket
-            : -1250; // iPhone (unchanged)
+            ? (isMock ? -1328 : -1420) // -1328 remains locked for Bracketology (Android)
+            : (isMock ? -1250 : -1250); // -1250 remains locked for Bracketology (iPhone)
     // iPad stays at your original -85 top limit. iPhone gets more room at -20.
     const minY = isTablet ? -85 : -60;
 
@@ -63,8 +72,11 @@ export default function TournamentMap({ isMock = false, overrideBracketData, onR
     const [hasCustomLogos, setHasCustomLogos] = useState(false);
 
     // iPad starts at your original -1000. iPhone starts higher at -350.
-    const offset = useSharedValue({ x: -1000, y: isTablet ? -1000 : -350 });
-    const start = useSharedValue({ x: -1000, y: isTablet ? -1000 : -350 });
+    const translateX = useSharedValue(-1000);
+    const translateY = useSharedValue(isTablet ? -1000 : -350);
+
+    const startX = useSharedValue(-1000);
+    const startY = useSharedValue(isTablet ? -1000 : -350);
 
     const roundHeaders = [
         { round: 'Survival_16', label: 'SURVIVAL 16', dates: '3/16 – 3/17', gap: 140 },
@@ -114,24 +126,44 @@ export default function TournamentMap({ isMock = false, overrideBracketData, onR
     const champAccent = champBranding?.primary ?? theme.border;
     const champAccentSecondary = champBranding?.secondary ?? theme.border;
 
-    const panGesture = Gesture.Pan().onUpdate((e) => {
-        const nextX = e.translationX + start.value.x;
-        const nextY = e.translationY + start.value.y;
+    const panGesture = Gesture.Pan()
+        .onStart(() => {
+            // Stop any ongoing momentum immediately
+            cancelAnimation(translateX);
+            cancelAnimation(translateY);
 
-        // Use the dynamic Clamps we just defined
-        // Use the dynamic X and Y Clamps
-        offset.value = {
-            x: Math.min(minX, Math.max(nextX, maxX)),
-            y: Math.min(minY, Math.max(nextY, maxY))
-        };
-    }).onEnd(() => {
-        start.value = { x: offset.value.x, y: offset.value.y };
-    });
+            // Capture where the map is at the exact moment you touch it
+            startX.value = translateX.value;
+            startY.value = translateY.value;
+        })
+        .onUpdate((e) => {
+            // Calculate the new position and keep it inside your forcefield
+            translateX.value = Math.min(minX, Math.max(e.translationX + startX.value, maxX));
+            translateY.value = Math.min(minY, Math.max(e.translationY + startY.value, maxY));
+        })
+        .onEnd((e) => {
+            // Apply the "Hot Wheels" glide effect
+            translateX.value = withDecay({
+                velocity: e.velocityX,
+                clamp: [maxX, minX], // [Left Wall, Right Wall]
+                deceleration: 0.995,
+            });
+            translateY.value = withDecay({
+                velocity: e.velocityY,
+                clamp: [maxY, minY], // [Bottom Wall, Top Wall]
+                deceleration: 0.995,
+            });
+        });
 
-    const animatedStyle = useAnimatedStyle(() => ({ transform: [{ translateX: offset.value.x }, { translateY: offset.value.y }] }));
+    const animatedStyle = useAnimatedStyle(() => ({
+        transform: [
+            { translateX: translateX.value },
+            { translateY: translateY.value }
+        ]
+    }));
 
     const headerAnimatedStyle = useAnimatedStyle(() => ({
-        transform: [{ translateX: offset.value.x }],
+        transform: [{ translateX: translateX.value }],
     }));
 
     useEffect(() => {
@@ -356,48 +388,55 @@ export default function TournamentMap({ isMock = false, overrideBracketData, onR
     };
 
     const handleLockBracket = async () => {
-        if (!bracketId) {
-            console.log("No bracketId; cannot lock bracket.");
-            return;
-        }
-        setLocking(true);
-        try {
-            const token = await getToken();
-            if (!token) {
-                console.log("No auth token, cannot lock bracket.");
-                return;
-            }
+        if (!bracketId) return;
 
-            const nonEmptyPicks: { [k: string]: string } = {};
-            Object.entries(picks).forEach(([gameId, winnerId]) => {
-                if (winnerId && winnerId !== "TBD") {
-                    nonEmptyPicks[gameId] = winnerId;
-                }
-            });
-
-            const res = await fetch(
-                `${API_BASE_URL}/api/tournament/brackets/${bracketId}/picks?season=2036&lock=true`,
+        Alert.alert(
+            "Save Picks",
+            "Saving your current picks will also take you back to the 'My Brackets' screen. Proceed?",
+            [
+                { text: "Cancel", style: "cancel" },
                 {
-                    method: 'POST',
-                    headers: {
-                        Authorization: `Bearer ${token}`,
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({ picks: nonEmptyPicks }),
-                }
-            );
+                    text: "Save & Exit",
+                    onPress: async () => {
+                        setLocking(true);
+                        try {
+                            const token = await getToken();
+                            if (!token) return;
 
-            if (!res.ok) {
-                Alert.alert("Error", "Failed to save picks. Check connection.");
-            } else {
-                await res.json(); // Clear the buffer
-                Alert.alert("Success", "Picks saved! Your progress has been updated.");
-            }
-        } catch (e) {
-            console.log("Error locking bracket:", e);
-        } finally {
-            setLocking(false);
-        }
+                            const nonEmptyPicks: { [k: string]: string } = {};
+                            Object.entries(picks).forEach(([gameId, winnerId]) => {
+                                if (winnerId && winnerId !== "TBD") {
+                                    nonEmptyPicks[gameId] = winnerId;
+                                }
+                            });
+
+                            // THE MISSING LINE:
+                            const res = await fetch(
+                                `${API_BASE_URL}/api/tournament/brackets/${bracketId}/picks?season=2036&lock=true`,
+                                {
+                                    method: 'POST',
+                                    headers: {
+                                        Authorization: `Bearer ${token}`,
+                                        'Content-Type': 'application/json',
+                                    },
+                                    body: JSON.stringify({ picks: nonEmptyPicks }),
+                                }
+                            );
+
+                            if (res.ok) {
+                                if (onClose) onClose(); // Take user back to list
+                            } else {
+                                Alert.alert("Error", "Failed to save picks. Check connection.");
+                            }
+                        } catch (e) {
+                            console.log("Error locking bracket:", e);
+                        } finally {
+                            setLocking(false);
+                        }
+                    }
+                }
+            ]
+        );
     };
 
     const renderSideRoundHeaders = (side: 'left' | 'right') => {
@@ -515,6 +554,12 @@ export default function TournamentMap({ isMock = false, overrideBracketData, onR
 
     return (
         <GestureHandlerRootView style={{ flex: 1 }}>
+            {/* FORCE HIDE THE NATIVE HEADER */}
+            <Stack.Screen options={{
+                headerShown: false,
+                headerTransparent: true,
+                headerTitle: ""
+            }} />
             <View style={[styles.container, { backgroundColor: theme.background }]}>
                 <GestureDetector gesture={panGesture}>
                     <Animated.View style={[styles.canvas, animatedStyle]}>
@@ -752,19 +797,56 @@ export default function TournamentMap({ isMock = false, overrideBracketData, onR
                     </Animated.View>
                 </GestureDetector>
 
-                <View style={[
-                    styles.topBar,
-                    {
-                        backgroundColor: theme.background,
-                        height: 72 + (isTablet ? 0 : insets.top - 22)
-                    }
-                ]}>
-                    {/* CENTER TITLE - Pushed up for room, champLine removed */}
+                <View style={{
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    zIndex: 1000,
+                    backgroundColor: theme.background,
+                    borderBottomWidth: 1,
+                    borderBottomColor: '#333',
+                    overflow: 'hidden',
+                    // Guarded height: Bracketology stays at 72... Official gets proper notch room.
+                    height: isMock
+                        ? (72 + (isTablet ? 0 : insets.top - 22))
+                        : isTablet
+                            ? 72
+                            : isAndroid
+                                ? 80   // <-- Nudge Android Height independently
+                                : 98,  // <-- Nudge iPhone Height independently
+                }}>
+                    {/* ✕ EXIT BUTTON - ONLY FOR OFFICIAL MODE */}
+                    {!isMock && (
+                        <Pressable
+                            onPress={onClose} // CHANGE THIS FROM router.back() to onClose
+                            style={{
+                                position: 'absolute',
+                                left: 15,
+                                top: isTablet
+                                    ? 12.5
+                                    : isAndroid
+                                        ? 15 // <-- Nudge Android X Position
+                                        : insets.top - 9.5, // <-- Nudge iPhone X Position
+                                zIndex: 1100,
+                                padding: 10,
+                            }}
+                        >
+                            <Text style={{ color: theme.text, fontSize: 24, fontWeight: '200' }}>✕</Text>
+                        </Pressable>
+                    )}
+
+                    {/* CENTER TITLE */}
                     <View style={{
                         position: 'absolute',
-                        // On iPad, we keep it exactly at 20. 
-                        // On iPhone, we use the inset (notch) but subtract 10 to tuck it tighter.
-                        top: isTablet ? 20 : insets.top - 0,
+                        // GUARDED POSITION: Keep your perfect Bracketology math
+                        top: isMock
+                            ? (isTablet ? 20 : insets.top - 0)
+                            : isTablet
+                                ? 25
+                                : isAndroid
+                                    ? 20 // <-- Nudge Android Title Position
+                                    : insets.top + 3, // <-- Nudge iPhone Title Position
                         left: 0,
                         right: 0,
                         alignItems: 'center',
@@ -775,11 +857,17 @@ export default function TournamentMap({ isMock = false, overrideBracketData, onR
                         </Text>
                     </View>
 
-                    {/* SLIDING HEADERS LAYER */}
+                    {/* SLIDING ROUND HEADERS */}
                     <Animated.View style={[{
                         position: 'absolute',
-                        // Sync header position with the taller top bar
-                        top: 20 + (isTablet ? 20 : insets.top),
+                        // GUARDED POSITION: Keep your perfect Bracketology math
+                        top: isMock
+                            ? (20 + (isTablet ? 20 : insets.top))
+                            : isTablet
+                                ? 45
+                                : isAndroid
+                                    ? 50 // <-- Nudge Android Headers Position
+                                    : insets.top + 23, // <-- Nudge iPhone Headers Position
                         left: 0,
                         flexDirection: 'row'
                     }, headerAnimatedStyle]}>

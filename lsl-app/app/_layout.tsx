@@ -72,6 +72,7 @@ export default function RootLayout() {
           <Stack.Screen name="conference" options={{ headerShown: false }} />
           <Stack.Screen name="player" options={{ headerShown: false }} />
           <Stack.Screen name="game" options={{ headerShown: false }} />
+          <Stack.Screen name="tournament/map" options={{ headerShown: false }} />
           <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
         </Stack>
         <StatusBar style="auto" />

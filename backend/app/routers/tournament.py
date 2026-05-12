@@ -678,15 +678,18 @@ async def create_bracket_group(
 
 @router.get("/groups/me")
 async def list_my_groups(season: int = 2036, current_user: User = Depends(get_current_user)):
-    """Returns all groups the user is a member of."""
+    """Returns all groups the user is a member of, including owner info."""
     async with AsyncSessionLocal() as session:
-        # Join GroupMembership with BracketGroup
+        # Fetch groups where the user is a member
         stmt = select(BracketGroup).join(GroupMembership).where(
             GroupMembership.user_id == current_user.id,
             BracketGroup.season == season
         )
         res = await session.exec(stmt)
-        return res.all()
+        groups = res.all()
+        
+        # Return as dicts so we are certain owner_user_id is included
+        return [g.model_dump() for g in groups]
 
 @router.post("/groups/join")
 async def join_bracket_group(
@@ -776,9 +779,9 @@ async def get_group_leaderboard(
     current_user: User = Depends(get_current_user)
 ):
     async with AsyncSessionLocal() as session:
-        # 1. Verification & Fetch
+        # 1. Verification & Fetch (Surgically changed User.email to User.username)
         stmt = (
-            select(GroupBracket, User.email, UserBracket.name, UserBracket.id)
+            select(GroupBracket, User.username, UserBracket.name, UserBracket.id)
             .join(User, GroupBracket.user_id == User.id)
             .join(UserBracket, GroupBracket.user_bracket_id == UserBracket.id)
             .where(GroupBracket.group_id == group_id)
@@ -799,7 +802,7 @@ async def get_group_leaderboard(
         }
 
         leaderboard = []
-        for entry, email, bracket_name, bracket_id in results:
+        for entry, username, bracket_name, bracket_id in results:
             picks = (await session.exec(select(UserBracketPick).where(UserBracketPick.user_bracket_id == bracket_id))).all()
             user_picks_map = {p.tournament_game_id: p.picked_winner_id for p in picks}
 
@@ -831,7 +834,7 @@ async def get_group_leaderboard(
                     points_rem += (round_pts + bonus)
 
             leaderboard.append({
-                "user_name": email.split('@')[0],
+                "user_name": username or "Unknown Legend", # Return the real username
                 "bracket_name": bracket_name,
                 "score": current_score,
                 "pts_rem": points_rem
@@ -839,3 +842,24 @@ async def get_group_leaderboard(
 
         leaderboard.sort(key=lambda x: x['score'], reverse=True)
         return leaderboard
+
+@router.post("/groups/{group_id}/leave")
+async def leave_bracket_group(
+    group_id: str,
+    current_user: User = Depends(get_current_user)
+):
+    """Allows a member to leave a group and removes their bracket entry."""
+    async with AsyncSessionLocal() as session:
+        # 1. Delete their bracket entry from this group
+        await session.execute(delete(GroupBracket).where(
+            GroupBracket.group_id == group_id,
+            GroupBracket.user_id == current_user.id
+        ))
+        # 2. Delete their membership
+        await session.execute(delete(GroupMembership).where(
+            GroupMembership.group_id == group_id,
+            GroupMembership.user_id == current_user.id
+        ))
+        await session.commit()
+        
+    return {"status": "success", "message": "You have left the group."}
