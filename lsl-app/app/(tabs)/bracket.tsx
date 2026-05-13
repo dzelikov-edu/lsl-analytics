@@ -7,6 +7,7 @@ import { AppColors } from '@/constants/app-colors';
 import TournamentMap from '../tournament/map';
 import { getToken } from '@/lib/auth-storage';
 import { useFocusEffect } from 'expo-router';
+import TeamLogo from '@/components/TeamLogo';
 
 export default function BracketTab() {
     const colorScheme = useColorScheme() ?? 'light';
@@ -19,6 +20,7 @@ export default function BracketTab() {
     const [loading, setLoading] = useState(true);
     const [brackets, setBrackets] = useState<any[]>([]);
     const [selectedBracketId, setSelectedBracketId] = useState<string | null>(null);
+    const [teamNames, setTeamNames] = useState<Record<string, string>>({});
     const [currentUserId, setCurrentUserId] = useState<string | null>(null);
     const [activeGroupName, setActiveGroupName] = useState<string | null>(null);
 
@@ -69,23 +71,28 @@ export default function BracketTab() {
         try {
             const token = await getToken();
             // 1. Fetch all data including user profile for ownership check
-            const [userRes, stateRes, bracketsRes, groupsRes] = await Promise.all([
+            const [userRes, stateRes, bracketsRes, groupsRes, namesRes] = await Promise.all([
                 fetch(`${API_BASE_URL}/auth/me`, { headers: { Authorization: `Bearer ${token}` } }),
                 fetch(`${API_BASE_URL}/api/tournament/state?season=2036`),
                 fetch(`${API_BASE_URL}/api/tournament/brackets?season=2036`, { headers: { Authorization: `Bearer ${token}` } }),
-                fetch(`${API_BASE_URL}/api/tournament/groups/me?season=2036`, { headers: { Authorization: `Bearer ${token}` } })
+                fetch(`${API_BASE_URL}/api/tournament/groups/me?season=2036`, { headers: { Authorization: `Bearer ${token}` } }),
+                fetch(`${API_BASE_URL}/api/tournament/team-names`),
             ]);
 
             const userData = await userRes.json();
             const stateData = await stateRes.json();
             const bracketListData = await bracketsRes.json();
             const groupsListData = await groupsRes.json();
+            const namesData = namesRes.ok ? await namesRes.json() : {};
 
             // 2. Set all state variables
             setCurrentUserId(userData.id);
             setPhase(stateData.phase);
             setBrackets(bracketListData);
             setMyGroups(groupsListData);
+            if (namesData && typeof namesData === 'object') {
+                setTeamNames(namesData);
+            }
         } catch (e) {
             console.error(e);
             setPhase('BRACKETOLOGY');
@@ -418,6 +425,24 @@ export default function BracketTab() {
                             <View style={{ alignItems: 'flex-end' }}>
                                 <Text style={{ color: theme.text, fontSize: 22, fontWeight: '900' }}>{row.score}</Text>
                                 <Text style={{ color: theme.mutedText, fontSize: 10, fontWeight: '700' }}>{row.pts_rem} REM</Text>
+
+                                {/* LIVE-only champ pick peek */}
+                                {phase === 'LIVE' && row.champ_pick && (
+                                    <View style={{ marginTop: 6, flexDirection: 'row', alignItems: 'center' }}>
+                                        <TeamLogo teamId={row.champ_pick} size={18} />
+                                        <Text
+                                            style={{
+                                                marginLeft: 6,
+                                                color: theme.mutedText,
+                                                fontSize: 10,
+                                                fontWeight: '600',
+                                            }}
+                                            numberOfLines={1}
+                                        >
+                                            Champ: {teamNames[row.champ_pick] || row.champ_pick}
+                                        </Text>
+                                    </View>
+                                )}
                             </View>
                         </View>
                     </Pressable>

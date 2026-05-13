@@ -521,3 +521,73 @@ async def admin_record_tournament_score(
         "pushed_to": pushed_to,
     }
 
+@router.post("/tournament/undo-score")
+async def admin_undo_tournament_score(
+    req: RecordScoreRequest,  # Reuse the same model for game_id and season
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Admin-only: Undoes a score for a TournamentBracket game.
+    Resets score_a, score_b, winner_id, and reverses any advancement to the next game.
+    Only allowed in LIVE phase.
+    """
+    if not current_user.is_admin:
+        raise HTTPException(status_code=403, detail="Admin only.")
+
+    async with AsyncSessionLocal() as session:
+        # Phase guard
+        stmt_state = select(TournamentState).where(TournamentState.season == req.season)
+        state_res = await session.exec(stmt_state)
+        state = state_res.one_or_none()
+        if state and state.phase != "LIVE":
+            raise HTTPException(status_code=400, detail="Scores can only be undone in LIVE phase.")
+
+        # Load the game
+        stmt = select(TournamentBracket).where(
+            TournamentBracket.id == req.game_id,
+            TournamentBracket.season == req.season,
+        )
+        result = await session.exec(stmt)
+        game = result.one_or_none()
+
+        if not game:
+            raise HTTPException(status_code=404, detail="Tournament game not found.")
+
+        if game.winner_id is None:
+            raise HTTPException(status_code=400, detail="This game has no recorded score to undo.")
+
+        # Store the current winner for reversal
+        old_winner_id = game.winner_id
+
+        # Reset this game
+        game.score_a = None
+        game.score_b = None
+        game.winner_id = None
+        session.add(game)
+
+        # Reverse the advancement if this game fed into another
+        if game.next_game_id:
+            stmt_next = select(TournamentBracket).where(
+                TournamentBracket.id == game.next_game_id,
+                TournamentBracket.season == req.season,
+            )
+            result_next = await session.exec(stmt_next)
+            next_game = result_next.one_or_none()
+
+            if next_game:
+                # Determine which slot to clear (based on original game_slot)
+                if game.round == "Survival_16" and next_game.round == "Round_64":
+                    next_game.team_b_id = "TBD"  # Clear the specific slot
+                elif game.game_slot % 2 == 1:
+                    next_game.team_a_id = "TBD"
+                else:
+                    next_game.team_b_id = "TBD"
+                session.add(next_game)
+
+        await session.commit()
+
+        return {
+            "status": "success",
+            "game_id": game.id,
+            "message": "Score undone and advancement reversed.",
+        }
