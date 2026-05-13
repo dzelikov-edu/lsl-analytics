@@ -17,6 +17,8 @@ type MatchupProps = {
     teamB: MatchupTeam;
     status: 'PREDICTION' | 'LIVE' | 'FINAL';
     pickedWinnerId?: string | null;
+    pickIsAlive?: boolean | null;
+    isBusted?: boolean;
     onPressTeamA?: () => void;
     onPressTeamB?: () => void;
     onLongPress?: () => void;
@@ -28,6 +30,8 @@ export default function TournamentMatchup({
     teamB,
     status,
     pickedWinnerId,
+    pickIsAlive,
+    isBusted,
     onPressTeamA,
     onPressTeamB,
     onLongPress,
@@ -39,11 +43,38 @@ export default function TournamentMatchup({
     const isPickedA = pickedWinnerId === teamA.id && teamA.id !== 'TBD';
     const isPickedB = pickedWinnerId === teamB.id && teamB.id !== 'TBD';
 
+    const isFinal = status === 'FINAL';
+    const isLive = status === 'LIVE';
+
+    const shouldFadeA = isFinal
+        ? !teamA.isWinner
+        : !!(pickedWinnerId && pickedWinnerId !== teamA.id);
+
+    const shouldFadeB = isFinal
+        ? !teamB.isWinner
+        : !!(pickedWinnerId && pickedWinnerId !== teamB.id);
+
     return (
-        <View style={[styles.container, { backgroundColor: theme.card, borderColor: theme.border }]}>
+        <View
+            style={[
+                styles.container,
+                {
+                    backgroundColor: theme.card,
+                    borderColor: isBusted ? '#FF3B30' : theme.border,
+                },
+            ]}
+        >
             {/* Team A Row */}
             <Pressable style={styles.teamRow} onPress={onPressTeamA} onLongPress={onLongPress}>
-                <Text style={[styles.seed, { color: theme.mutedText, opacity: (pickedWinnerId && pickedWinnerId !== teamA.id) ? 0.35 : 1 }]}>
+                <Text
+                    style={[
+                        styles.seed,
+                        {
+                            color: theme.mutedText,
+                            opacity: shouldFadeA ? 0.35 : 1,
+                        },
+                    ]}
+                >
                     {teamA.seed}
                 </Text>
                 <TeamLogo teamId={teamA.id} size={22} />
@@ -52,22 +83,37 @@ export default function TournamentMatchup({
                         styles.teamName,
                         {
                             color: theme.text,
-                            fontWeight: showPickIndicators && isPickedA ? '900' : '400',
-                            // ADD THIS LINE: If Team B is picked, Team A fades out
-                            opacity: (pickedWinnerId && pickedWinnerId !== teamA.id) ? 0.35 : 1
-                        }
+                            fontWeight:
+                                isFinal && teamA.isWinner
+                                    ? '900'
+                                    : !isFinal && showPickIndicators && isPickedA
+                                        ? '900'
+                                        : '400',
+                            opacity: shouldFadeA ? 0.35 : 1,
+                        },
                     ]}
                     numberOfLines={1}
                 >
                     {teamA.name}
                 </Text>
-                {/* THE RADIO CIRCLE */}
+
+                {/* LIVE/FINAL SCORE */}
+                {(isLive || isFinal) && teamA.score != null && (
+                    <Text style={[styles.score, { color: theme.text }]}>
+                        {teamA.score}
+                    </Text>
+                )}
+
+                {/* PICK DOT: green if alive, red if busted */}
                 {showPickIndicators && (
-                    <View style={[
-                        styles.radioCircle,
-                        { borderColor: theme.border },
-                        isPickedA && { backgroundColor: '#34C759', borderColor: '#34C759' }
-                    ]} />
+                    <View
+                        style={[
+                            styles.radioCircle,
+                            { borderColor: theme.border },
+                            isPickedA && pickIsAlive === true && { backgroundColor: '#34C759', borderColor: '#34C759' },
+                            isPickedA && pickIsAlive === false && { backgroundColor: '#FF3B30', borderColor: '#FF3B30' },
+                        ]}
+                    />
                 )}
             </Pressable>
 
@@ -75,7 +121,15 @@ export default function TournamentMatchup({
 
             {/* Team B Row */}
             <Pressable style={styles.teamRow} onPress={onPressTeamB} onLongPress={onLongPress}>
-                <Text style={[styles.seed, { color: theme.mutedText, opacity: (pickedWinnerId && pickedWinnerId !== teamB.id) ? 0.35 : 1 }]}>
+                <Text
+                    style={[
+                        styles.seed,
+                        {
+                            color: theme.mutedText,
+                            opacity: shouldFadeB ? 0.35 : 1,
+                        },
+                    ]}
+                >
                     {teamB.seed}
                 </Text>
                 <TeamLogo teamId={teamB.id} size={22} />
@@ -84,22 +138,37 @@ export default function TournamentMatchup({
                         styles.teamName,
                         {
                             color: theme.text,
-                            fontWeight: showPickIndicators && isPickedB ? '900' : '400',
-                            // ADD THIS LINE: If Team A is picked, Team B fades out
-                            opacity: (pickedWinnerId && pickedWinnerId !== teamB.id) ? 0.35 : 1
-                        }
+                            fontWeight:
+                                isFinal && teamB.isWinner
+                                    ? '900'
+                                    : !isFinal && showPickIndicators && isPickedB
+                                        ? '900'
+                                        : '400',
+                            opacity: shouldFadeB ? 0.35 : 1,
+                        },
                     ]}
                     numberOfLines={1}
                 >
                     {teamB.name}
                 </Text>
-                {/* THE RADIO CIRCLE */}
+
+                {/* LIVE/FINAL SCORE */}
+                {(isLive || isFinal) && teamB.score != null && (
+                    <Text style={[styles.score, { color: theme.text }]}>
+                        {teamB.score}
+                    </Text>
+                )}
+
+                {/* PICK DOT: green if alive, red if busted */}
                 {showPickIndicators && (
-                    <View style={[
-                        styles.radioCircle,
-                        { borderColor: theme.border },
-                        isPickedB && { backgroundColor: '#34C759', borderColor: '#34C759' }
-                    ]} />
+                    <View
+                        style={[
+                            styles.radioCircle,
+                            { borderColor: theme.border },
+                            isPickedB && pickIsAlive === true && { backgroundColor: '#34C759', borderColor: '#34C759' },
+                            isPickedB && pickIsAlive === false && { backgroundColor: '#FF3B30', borderColor: '#FF3B30' },
+                        ]}
+                    />
                 )}
             </Pressable>
         </View>

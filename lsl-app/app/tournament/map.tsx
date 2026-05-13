@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useLayoutEffect } from 'react';
-import { StyleSheet, View, Dimensions, Text, ActivityIndicator, Pressable, Alert, useWindowDimensions, Platform, ScrollView } from 'react-native';
+import React, { useState, useEffect, useLayoutEffect, useMemo } from 'react';
+import { StyleSheet, View, Dimensions, Text, ActivityIndicator, Pressable, Alert, useWindowDimensions, Platform, ScrollView, TextInput, KeyboardAvoidingView } from 'react-native';
 import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
 import Animated, { useSharedValue, useAnimatedStyle, withDecay, cancelAnimation } from 'react-native-reanimated';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -74,6 +74,7 @@ export default function TournamentMap({ isMock = false, viewOnly = false, overri
 
     const [loading, setLoading] = useState(true);
     const [bracketGames, setBracketGames] = useState<any[]>([]);
+    const [officialGames, setOfficialGames] = useState<any[]>([]);
     const [regionOrder, setRegionOrder] = useState<string[]>([]);
     const [teamNames, setTeamNames] = useState<Record<string, string>>({});
     const [teamSeeds, setTeamSeeds] = useState<Record<string, number>>({});
@@ -81,9 +82,37 @@ export default function TournamentMap({ isMock = false, viewOnly = false, overri
     const [picks, setPicks] = useState<{ [gameId: string]: string }>({});
     const [selectedMatchup, setSelectedMatchup] = useState<any>(null);
     const [modalVisible, setModalVisible] = useState(false);
+    // Commissioner score entry
+    const [scoreModalVisible, setScoreModalVisible] = useState(false);
+    const [scoreGame, setScoreGame] = useState<any | null>(null);
+    const [scoreA, setScoreA] = useState('');
+    const [scoreB, setScoreB] = useState('');
+    const [savingScore, setSavingScore] = useState(false);
+    // ------------------------
     const [bracketId, setBracketId] = useState<string | null>(null); // NEW
     const [locking, setLocking] = useState(false);
     const [hasCustomLogos, setHasCustomLogos] = useState(false);
+
+    // Teams still "alive" in the official bracket (for busted-path logic)
+    const aliveTeams = useMemo(() => {
+        const alive = new Set<string>();
+
+        // Only meaningful for Official mode
+        if (isMock) return alive;
+
+        (officialGames || []).forEach((g: any) => {
+            if (g.winner_id && g.winner_id !== 'TBD') {
+                // If we have a winner, only the winner is alive from this game
+                alive.add(g.winner_id);
+            } else {
+                // No official winner yet: both participants are still alive
+                if (g.team_a_id && g.team_a_id !== 'TBD') alive.add(g.team_a_id);
+                if (g.team_b_id && g.team_b_id !== 'TBD') alive.add(g.team_b_id);
+            }
+        });
+
+        return alive;
+    }, [officialGames, isMock]);
 
     // iPad starts at your original -1000. iPhone starts higher at -350.
     const translateX = useSharedValue(-1000);
@@ -231,6 +260,11 @@ export default function TournamentMap({ isMock = false, viewOnly = false, overri
                 ? overrideBracketData
                 : apiBracketData;
 
+            // Keep an untouched copy of the official bracket for busted-path logic
+            if (!isMock && Array.isArray(apiBracketData)) {
+                setOfficialGames(apiBracketData);
+            }
+
             // 2. Process Team Names and Stats immediately using the Branding Gate
             const gatedNames: Record<string, string> = {};
             Object.keys(namesData).forEach(tid => {
@@ -341,6 +375,28 @@ export default function TournamentMap({ isMock = false, viewOnly = false, overri
         return bracketGames.filter(g => g.round === roundName && picks[g.id]).length;
     };
 
+    const openScoreModal = (game: any) => {
+        // Only allow when both teams are set
+        if (!game.team_a_id || !game.team_b_id || game.team_a_id === 'TBD' || game.team_b_id === 'TBD') {
+            Alert.alert("Cannot Record Score", "Both teams must be locked into this game before recording a result.");
+            return;
+        }
+        setScoreGame(game);
+        setScoreA('');
+        setScoreB('');
+        setScoreModalVisible(true);
+    };
+
+    const handleTeamPress = (game: any, teamId: string) => {
+        // Commissioner scoring: Official mode, LIVE phase, not view-only
+        if (!isMock && phase === 'LIVE' && !viewOnly) {
+            openScoreModal(game);
+            return;
+        }
+        // Otherwise, normal pick logic (Selection Sunday flow)
+        handlePick(game.id, teamId);
+    };
+
     const handlePick = (gameId: string, teamId: string) => {
         if (isMock || viewOnly || phase === 'LIVE') return; // LOCK THE GATES
         if (teamId === "TBD") return;
@@ -379,6 +435,63 @@ export default function TournamentMap({ isMock = false, viewOnly = false, overri
             }
             return updated;
         });
+    };
+
+    const handleSubmitScore = async () => {
+        if (!scoreGame) return;
+
+        const a = parseInt(scoreA, 10);
+        const b = parseInt(scoreB, 10);
+
+        if (Number.isNaN(a) || Number.isNaN(b)) {
+            Alert.alert("Invalid Score", "Please enter numeric scores for both teams.");
+            return;
+        }
+        if (a === b) {
+            Alert.alert("Invalid Score", "Tournament games cannot end in a tie.");
+            return;
+        }
+
+        try {
+            setSavingScore(true);
+            const token = await getToken();
+            if (!token) {
+                Alert.alert("Auth Error", "You must be logged in to record scores.");
+                return;
+            }
+
+            const res = await fetch(`${API_BASE_URL}/admin/tournament/record-score`, {
+                method: 'POST',
+                headers: {
+                    Authorization: `Bearer ${token}`,
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    game_id: scoreGame.id,
+                    score_a: a,
+                    score_b: b,
+                    season: 2036,
+                }),
+            });
+
+            const data = await res.json();
+
+            if (!res.ok) {
+                const msg = data?.detail || `Failed to record score (HTTP ${res.status}).`;
+                Alert.alert("Error", msg);
+                return;
+            }
+
+            // Success: close modal and refresh bracket from server
+            setScoreModalVisible(false);
+            setScoreGame(null);
+            await loadData();
+        } catch (e) {
+            console.log("Error recording score:", e);
+            Alert.alert("Error", "Network error while recording score.");
+        } finally {
+            setSavingScore(false);
+        }
     };
 
     const openScoutingReport = (game: any) => {
@@ -684,18 +797,56 @@ export default function TournamentMap({ isMock = false, viewOnly = false, overri
                             const coords = getGameCoordinates(game.region, game.round, game.game_slot, regionOrder);
                             const isChampGame = champGame && game.id === champGame.id && champTeamId;
 
+                            const isOfficial = !isMock;
+                            const gameWinnerId = game.winner_id || null;
+
+                            let gameStatus: 'PREDICTION' | 'LIVE' | 'FINAL' = 'PREDICTION';
+                            if (isOfficial) {
+                                if (gameWinnerId) {
+                                    gameStatus = 'FINAL';
+                                } else if (phase === 'LIVE') {
+                                    gameStatus = 'LIVE';
+                                } else {
+                                    gameStatus = 'PREDICTION';
+                                }
+                            }
+
+                            const pickedId = !isMock ? picks[game.id] : null;
+                            const pickIsAlive =
+                                !isMock && pickedId && pickedId !== 'TBD'
+                                    ? aliveTeams.has(pickedId)
+                                    : null;
+
+                            const isBusted =
+                                !isMock && !!pickedId && pickIsAlive === false;
+
                             return (
                                 <React.Fragment key={game.id}>
                                     <View style={{ position: 'absolute', left: coords.x, top: coords.y }}>
                                         <TournamentMatchup
-                                            teamA={{ id: game.team_a_id, name: teamNames[game.team_a_id] || game.team_a_id, seed: teamSeeds[game.team_a_id] || 0 }}
-                                            teamB={{ id: game.team_b_id, name: teamNames[game.team_b_id] || game.team_b_id, seed: teamSeeds[game.team_b_id] || 0 }}
-                                            status="PREDICTION"
-                                            pickedWinnerId={picks[game.id]}
-                                            onPressTeamA={() => handlePick(game.id, game.team_a_id)}
-                                            onPressTeamB={() => handlePick(game.id, game.team_b_id)}
+                                            teamA={{
+                                                id: game.team_a_id,
+                                                name: teamNames[game.team_a_id] || game.team_a_id,
+                                                seed: teamSeeds[game.team_a_id] || 0,
+                                                score: !isMock ? game.score_a : null,
+                                                isWinner: !isMock && gameWinnerId === game.team_a_id,
+                                            }}
+                                            teamB={{
+                                                id: game.team_b_id,
+                                                name: teamNames[game.team_b_id] || game.team_b_id,
+                                                seed: teamSeeds[game.team_b_id] || 0,
+                                                score: !isMock ? game.score_b : null,
+                                                isWinner: !isMock && gameWinnerId === game.team_b_id,
+                                            }}
+                                            status={gameStatus}
+                                            pickedWinnerId={pickedId || undefined}
+                                            pickIsAlive={pickIsAlive}
+                                            isBusted={isBusted}
+                                            onPressTeamA={() => handleTeamPress(game, game.team_a_id)}
+                                            onPressTeamB={() => handleTeamPress(game, game.team_b_id)}
                                             onLongPress={!isMock ? () => openScoutingReport(game) : undefined}
-                                            showPickIndicators={!isMock}
+                                            // Show pick indicators in Official mode for both SELECTION_SUNDAY and LIVE
+                                            showPickIndicators={!isMock && !!pickedId}
                                         />
                                     </View>
 
@@ -910,8 +1061,9 @@ export default function TournamentMap({ isMock = false, viewOnly = false, overri
                     </Animated.View>
                 </View>
 
-                {/* BOTTOM BAR: Only visible in Official Mode AND if predictions are OPEN AND not in View-Only mode */}
+                {/* BOTTOM BAR */}
                 {!isMock && phase === 'SELECTION_SUNDAY' && !viewOnly ? (
+                    // Official mode, drafting open: Save Picks bar
                     <View style={[styles.bottomBar, { backgroundColor: theme.card }]}>
                         <View style={{ flex: 1, justifyContent: 'center' }}>
                             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ maxHeight: 18 }}>
@@ -944,8 +1096,37 @@ export default function TournamentMap({ isMock = false, viewOnly = false, overri
                             </Text>
                         </Pressable>
                     </View>
+                ) : !isMock && phase === 'LIVE' ? (
+                    // Official mode, LIVE: busted-path legend
+                    <View style={[styles.bottomBar, { backgroundColor: theme.card, justifyContent: 'flex-start' }]}>
+                        <Text style={{ color: theme.mutedText, fontSize: 9, fontWeight: '600' }}>
+                            Legend:
+                        </Text>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', marginLeft: 8 }}>
+                            <View
+                                style={{
+                                    width: 10,
+                                    height: 10,
+                                    borderRadius: 5,
+                                    backgroundColor: '#34C759',
+                                    marginRight: 4,
+                                }}
+                            />
+                            <Text style={{ color: theme.text, fontSize: 9, marginRight: 12 }}>Pick alive</Text>
+                            <View
+                                style={{
+                                    width: 10,
+                                    height: 10,
+                                    borderRadius: 5,
+                                    backgroundColor: '#FF3B30',
+                                    marginRight: 4,
+                                }}
+                            />
+                            <Text style={{ color: theme.text, fontSize: 9 }}>Pick busted</Text>
+                        </View>
+                    </View>
                 ) : (
-                    /* Mock Mode Bottom Bar (Your existing Bracketology logic) */
+                    // Mock Mode Bottom Bar (Bracketology)
                     isMock ? (
                         <View style={[styles.bottomBar, { backgroundColor: theme.card }]}>
                             <View style={{ flex: 1 }}>
@@ -973,10 +1154,127 @@ export default function TournamentMap({ isMock = false, viewOnly = false, overri
                                 </Pressable>
                             )}
                         </View>
-                    ) : null /* Hidden entirely if LIVE or Peeking */
+                    ) : null
                 )}
 
-                {selectedMatchup && <ScoutingReport visible={modalVisible} onClose={() => setModalVisible(false)} teamA={{ ...selectedMatchup.teamA, name: teamNames[selectedMatchup.teamA.id] || selectedMatchup.teamA.id }} teamB={{ ...selectedMatchup.teamB, name: teamNames[selectedMatchup.teamB.id] || selectedMatchup.teamB.id }} />}
+                {selectedMatchup && (
+                    <ScoutingReport
+                        visible={modalVisible}
+                        onClose={() => setModalVisible(false)}
+                        teamA={{ ...selectedMatchup.teamA, name: teamNames[selectedMatchup.teamA.id] || selectedMatchup.teamA.id }}
+                        teamB={{ ...selectedMatchup.teamB, name: teamNames[selectedMatchup.teamB.id] || selectedMatchup.teamB.id }}
+                    />
+                )}
+
+                {/* Commissioner Score Entry Modal (Official, LIVE) */}
+                {scoreGame && (
+                    <View
+                        pointerEvents={scoreModalVisible ? 'auto' : 'none'}
+                        style={{
+                            position: 'absolute',
+                            left: 0,
+                            right: 0,
+                            top: 0,
+                            bottom: 0,
+                            backgroundColor: scoreModalVisible ? 'rgba(0,0,0,0.4)' : 'transparent',
+                            justifyContent: 'center',
+                            alignItems: 'center',
+                        }}
+                    >
+                        {scoreModalVisible && (
+                            <KeyboardAvoidingView behavior="padding">
+                                <View
+                                    style={{
+                                        width: 280,
+                                        padding: 16,
+                                        borderRadius: 12,
+                                        backgroundColor: theme.card,
+                                        borderWidth: 1,
+                                        borderColor: theme.border,
+                                    }}
+                                >
+                                    <Text style={{ color: theme.text, fontWeight: '800', fontSize: 14, marginBottom: 8 }}>
+                                        Record Final Score
+                                    </Text>
+                                    <Text style={{ color: theme.mutedText, fontSize: 12, marginBottom: 12 }}>
+                                        {teamNames[scoreGame.team_a_id] || scoreGame.team_a_id} vs {teamNames[scoreGame.team_b_id] || scoreGame.team_b_id}
+                                    </Text>
+
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
+                                        <Text style={{ color: theme.text, width: 120, fontSize: 13 }}>
+                                            {teamNames[scoreGame.team_a_id] || scoreGame.team_a_id}
+                                        </Text>
+                                        <TextInput
+                                            style={{
+                                                flex: 1,
+                                                borderWidth: 1,
+                                                borderColor: theme.border,
+                                                borderRadius: 6,
+                                                paddingHorizontal: 8,
+                                                paddingVertical: 4,
+                                                color: theme.text,
+                                            }}
+                                            keyboardType="number-pad"
+                                            value={scoreA}
+                                            onChangeText={setScoreA}
+                                            placeholder="A"
+                                            placeholderTextColor={theme.mutedText}
+                                        />
+                                    </View>
+
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 16 }}>
+                                        <Text style={{ color: theme.text, width: 120, fontSize: 13 }}>
+                                            {teamNames[scoreGame.team_b_id] || scoreGame.team_b_id}
+                                        </Text>
+                                        <TextInput
+                                            style={{
+                                                flex: 1,
+                                                borderWidth: 1,
+                                                borderColor: theme.border,
+                                                borderRadius: 6,
+                                                paddingHorizontal: 8,
+                                                paddingVertical: 4,
+                                                color: theme.text,
+                                            }}
+                                            keyboardType="number-pad"
+                                            value={scoreB}
+                                            onChangeText={setScoreB}
+                                            placeholder="B"
+                                            placeholderTextColor={theme.mutedText}
+                                        />
+                                    </View>
+
+                                    <View style={{ flexDirection: 'row', justifyContent: 'flex-end' }}>
+                                        <Pressable
+                                            onPress={() => {
+                                                if (savingScore) return;
+                                                setScoreModalVisible(false);
+                                                setScoreGame(null);
+                                            }}
+                                            style={{ paddingVertical: 8, paddingHorizontal: 10, marginRight: 8 }}
+                                        >
+                                            <Text style={{ color: theme.mutedText, fontWeight: '600', fontSize: 13 }}>Cancel</Text>
+                                        </Pressable>
+                                        <Pressable
+                                            onPress={handleSubmitScore}
+                                            disabled={savingScore}
+                                            style={{
+                                                paddingVertical: 8,
+                                                paddingHorizontal: 14,
+                                                borderRadius: 8,
+                                                backgroundColor: savingScore ? theme.border : '#34C759',
+                                            }}
+                                        >
+                                            <Text style={{ color: '#fff', fontWeight: '800', fontSize: 13 }}>
+                                                {savingScore ? 'Saving...' : 'Submit'}
+                                            </Text>
+                                        </Pressable>
+                                    </View>
+                                </View>
+                            </KeyboardAvoidingView>
+                        )}
+                    </View>
+                )}
             </View>
         </GestureHandlerRootView>
     );

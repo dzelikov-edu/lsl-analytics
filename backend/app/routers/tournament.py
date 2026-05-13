@@ -791,6 +791,107 @@ async def delete_bracket_group(
         await session.commit()
     return {"status": "success"}
 
+def calculate_bracket_score_summary(
+    official_games: list[TournamentBracket],
+    seeds: list[TournamentSeedList],
+    picks: list[UserBracketPick],
+) -> dict:
+    point_values = {
+        "Survival_16": 1, "Round_64": 2, "Round_32": 4,
+        "Sweet_16": 8, "Elite_8": 16, "National Semifinals": 32, "Championship": 64
+    }
+
+    team_seed_map = {s.team_id: s.seed for s in seeds}
+    official_map = {
+        g.id: {
+            "winner": g.winner_id,
+            "round": g.round,
+            "team_a": g.team_a_id,
+            "team_b": g.team_b_id,
+        }
+        for g in official_games
+    }
+    user_picks_map = {p.tournament_game_id: p.picked_winner_id for p in picks}
+
+    current_score = 0
+    points_rem = 0
+
+    for gid, game in official_map.items():
+        u_pick = user_picks_map.get(gid)
+        if not u_pick or u_pick == "TBD":
+            continue
+
+        s_a = team_seed_map.get(game["team_a"], 0)
+        s_b = team_seed_map.get(game["team_b"], 0)
+        round_pts = point_values.get(game["round"], 0)
+
+        # Upset bonus: only if the numerical higher seed (dog) wins
+        bonus = 0
+        if s_a != s_b:
+            dog_seed = max(s_a, s_b)
+            if team_seed_map.get(game["winner"]) == dog_seed:
+                bonus = abs(s_a - s_b)
+
+        # Actual points earned so far
+        if game["winner"] == u_pick:
+            current_score += (round_pts + bonus)
+
+        # Points remaining potential from this pick
+        if game["winner"] is None:
+            # Game undecided: if the pick is the dog and could win, potential includes bonus
+            potential_bonus = 0
+            if s_a != s_b and team_seed_map.get(u_pick) == max(s_a, s_b):
+                potential_bonus = abs(s_a - s_b)
+            points_rem += (round_pts + potential_bonus)
+
+    return {"score": current_score, "pts_rem": points_rem}
+
+@router.get("/brackets/{bracket_id}/score-summary")
+async def get_bracket_score_summary(
+    bracket_id: str,
+    season: int = 2036,
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Returns a simple score summary for one bracket:
+    {
+      "score": int,
+      "pts_rem": int
+    }
+    """
+    async with AsyncSessionLocal() as session:
+        # 1) Load bracket and check access
+        stmt_b = select(UserBracket).where(UserBracket.id == bracket_id)
+        res_b = await session.exec(stmt_b)
+        bracket = res_b.one_or_none()
+        if not bracket:
+            raise HTTPException(status_code=404, detail="Bracket not found.")
+        if bracket.user_id != current_user.id and not current_user.is_admin:
+            raise HTTPException(status_code=403, detail="Not allowed to view this bracket's score.")
+        if bracket.season != season:
+            raise HTTPException(status_code=400, detail="Season mismatch for this bracket.")
+
+        # 2) Load official games and seeds
+        official_games = (await session.exec(
+            select(TournamentBracket).where(TournamentBracket.season == season)
+        )).all()
+        seeds = (await session.exec(
+            select(TournamentSeedList).where(TournamentSeedList.season == season)
+        )).all()
+
+        # 3) Load this bracket's picks
+        picks = (await session.exec(
+            select(UserBracketPick).where(UserBracketPick.user_bracket_id == bracket_id)
+        )).all()
+
+        summary = calculate_bracket_score_summary(
+            official_games=official_games,
+            seeds=seeds,
+            picks=picks,
+        )
+
+    return summary
+
 @router.get("/groups/{group_id}/leaderboard")
 async def get_group_leaderboard(
     group_id: str,
@@ -882,3 +983,4 @@ async def leave_bracket_group(
         await session.commit()
         
     return {"status": "success", "message": "You have left the group."}
+
