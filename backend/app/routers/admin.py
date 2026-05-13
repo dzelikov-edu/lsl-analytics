@@ -10,6 +10,7 @@ from app.models_devices import (
     TournamentSeedList, 
     MockBracketResult,
     PlayerSnapshot,
+    TournamentBracket,
 )
 from app.workers.push_sender import notify_team
 from app.players_sync import refresh_players_snapshot_cache
@@ -25,6 +26,12 @@ class TestPushRequest(BaseModel):
     title: str = Field(..., min_length=1, max_length=100)
     body: str = Field(..., min_length=1, max_length=255)
     gameKey: str | None = Field(None, description="Optional game key for data payload")
+
+class RecordScoreRequest(BaseModel):
+    game_id: str = Field(..., description="TournamentBracket.id for this game")
+    score_a: int = Field(..., ge=0)
+    score_b: int = Field(..., ge=0)
+    season: int = Field(2036, description="Season of this tournament")
 
 @router.post("/send-test-push")
 async def send_test_push(
@@ -389,3 +396,89 @@ async def admin_sync_players(
 
     result = await refresh_players_snapshot_cache()
     return {"status": "success", **result}
+
+@router.post("/tournament/record-score")
+async def admin_record_tournament_score(
+    req: RecordScoreRequest,
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Admin-only:
+    - Records score_a / score_b for a TournamentBracket game.
+    - Sets winner_id based on the scores.
+    - Pushes the winner into the next_game (team_a_id or team_b_id) using game_slot rules.
+    """
+    if not current_user.is_admin:
+        raise HTTPException(status_code=403, detail="Admin only.")
+
+    async with AsyncSessionLocal() as session:
+        # 1. Load the current game
+        stmt = select(TournamentBracket).where(
+            TournamentBracket.id == req.game_id,
+            TournamentBracket.season == req.season,
+        )
+        result = await session.exec(stmt)
+        game = result.one_or_none()
+
+        if not game:
+            raise HTTPException(status_code=404, detail="Tournament game not found.")
+
+        # 2. Basic validation: no ties allowed
+        if req.score_a == req.score_b:
+            raise HTTPException(
+                status_code=400,
+                detail="Scores cannot be tied in a completed tournament game.",
+            )
+
+        # 3. Determine winner
+        winner_id = game.team_a_id if req.score_a > req.score_b else game.team_b_id
+
+        # 4. Update the current game
+        game.score_a = req.score_a
+        game.score_b = req.score_b
+        game.winner_id = winner_id
+
+        session.add(game)
+
+        # 5. Push winner forward, if this game feeds another game
+        pushed_to = None
+        if game.next_game_id:
+            # Load the next game in the chain
+            stmt_next = select(TournamentBracket).where(
+                TournamentBracket.id == game.next_game_id,
+                TournamentBracket.season == req.season,
+            )
+            result_next = await session.exec(stmt_next)
+            next_game = result_next.one_or_none()
+
+            if not next_game:
+                raise HTTPException(
+                    status_code=500,
+                    detail=f"next_game_id {game.next_game_id} not found for game {game.id}",
+                )
+
+            # Special rule: Survival_16 winner fills team_b_id in Round_64
+            if game.round == "Survival_16" and next_game.round == "Round_64":
+                next_game.team_b_id = winner_id
+                pushed_to = {"slot": "B", "next_game_id": next_game.id}
+            else:
+                # General rule: odd game_slot winner -> team_a, even -> team_b
+                if game.game_slot % 2 == 1:
+                    next_game.team_a_id = winner_id
+                    pushed_to = {"slot": "A", "next_game_id": next_game.id}
+                else:
+                    next_game.team_b_id = winner_id
+                    pushed_to = {"slot": "B", "next_game_id": next_game.id}
+
+            session.add(next_game)
+
+        await session.commit()
+
+    return {
+        "status": "success",
+        "game_id": game.id,
+        "winner_id": winner_id,
+        "score_a": game.score_a,
+        "score_b": game.score_b,
+        "pushed_to": pushed_to,
+    }
