@@ -26,6 +26,39 @@ export default function BracketTab() {
     const [personalSim, setPersonalSim] = useState<any[] | null>(null);
     const [simLoading, setSimLoading] = useState(false);
 
+    const [scoreSummary, setScoreSummary] = useState<{ score: number; pts_rem: number } | null>(null);
+
+    useEffect(() => {
+        const loadScoreSummary = async () => {
+            if (!selectedBracketId) {
+                setScoreSummary(null);
+                return;
+            }
+            try {
+                const token = await getToken();
+                if (!token) return;
+                const res = await fetch(
+                    `${API_BASE_URL}/api/tournament/brackets/${selectedBracketId}/score-summary?season=2036`,
+                    { headers: { Authorization: `Bearer ${token}` } }
+                );
+                if (!res.ok) {
+                    console.log("Failed to load score summary", res.status);
+                    setScoreSummary(null);
+                    return;
+                }
+                const data = await res.json();
+                setScoreSummary({
+                    score: data.score ?? 0,
+                    pts_rem: data.pts_rem ?? 0,
+                });
+            } catch (e) {
+                console.log("Error loading score summary", e);
+                setScoreSummary(null);
+            }
+        };
+        loadScoreSummary();
+    }, [selectedBracketId]);
+
     const [viewMode, setViewMode] = useState<'BRACKETS' | 'GROUPS'>('BRACKETS');
     const [myGroups, setMyGroups] = useState<any[]>([]);
 
@@ -323,6 +356,7 @@ export default function BracketTab() {
                     initialBracketId={selectedBracketId}
                     onClose={handleCloseMap}
                     viewOnly={!isMyBracket} // If it's not mine, I can only view it
+                    scoreSummary={scoreSummary || undefined}
                 />
             </View>
         );
@@ -346,7 +380,25 @@ export default function BracketTab() {
                 {leaderboard.map((row, index) => (
                     <Pressable
                         key={index}
-                        onPress={() => setSelectedBracketId(row.bracket_id)} // THE PEEK
+                        onPress={() => {
+                            const isMyBracket = brackets.some(b => b.id === row.bracket_id);
+
+                            if (isMyBracket) {
+                                // Always allow viewing your own bracket
+                                setSelectedBracketId(row.bracket_id);
+                                return;
+                            }
+
+                            if (phase === 'LIVE') {
+                                // Only allow peeking others once tournament is LIVE
+                                setSelectedBracketId(row.bracket_id);
+                            } else {
+                                Alert.alert(
+                                    "Locked",
+                                    "You can only view other entries once the tournament is LIVE."
+                                );
+                            }
+                        }}
                         style={({ pressed }) => [{
                             backgroundColor: theme.card,
                             padding: 16,

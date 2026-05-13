@@ -8,6 +8,7 @@ import { API_BASE_URL } from '@/lib/api';
 import { getToken } from '@/lib/auth-storage';
 import TournamentMatchup from '@/components/TournamentMatchup';
 import ScoutingReport from '@/components/ScoutingReport';
+import ResultSheet from '@/components/ResultSheet';
 import TeamLogo from '@/components/TeamLogo';
 import { getGameCoordinates, GAME_HEIGHT, CENTER_X, CENTER_Y } from '@/lib/bracketLayout';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -24,9 +25,10 @@ type TournamentMapProps = {
     initialBracketId?: string | null;
     onRunPersonalSim?: () => void;       // handler for bottom-bar button
     onClose?: () => void;
+    scoreSummary?: { score: number; pts_rem: number };
 };
 
-export default function TournamentMap({ isMock = false, viewOnly = false, overrideBracketData, onRunPersonalSim, initialBracketId, onClose }: TournamentMapProps) {
+export default function TournamentMap({ isMock = false, viewOnly = false, overrideBracketData, onRunPersonalSim, initialBracketId, onClose, scoreSummary, }: TournamentMapProps) {
     const colorScheme = useColorScheme() ?? 'light';
     const theme = AppColors[colorScheme];
     const insets = useSafeAreaInsets();
@@ -79,9 +81,12 @@ export default function TournamentMap({ isMock = false, viewOnly = false, overri
     const [teamNames, setTeamNames] = useState<Record<string, string>>({});
     const [teamSeeds, setTeamSeeds] = useState<Record<string, number>>({});
     const [teamStats, setTeamStats] = useState<Record<string, any>>({});
+    const [teamRanks, setTeamRanks] = useState<Record<string, number>>({});
     const [picks, setPicks] = useState<{ [gameId: string]: string }>({});
     const [selectedMatchup, setSelectedMatchup] = useState<any>(null);
     const [modalVisible, setModalVisible] = useState(false);
+    const [resultVisible, setResultVisible] = useState(false);
+    const [resultGame, setResultGame] = useState<any | null>(null);
     // Commissioner score entry
     const [scoreModalVisible, setScoreModalVisible] = useState(false);
     const [scoreGame, setScoreGame] = useState<any | null>(null);
@@ -273,6 +278,7 @@ export default function TournamentMap({ isMock = false, viewOnly = false, overri
             });
             setTeamNames(gatedNames);
             const statsMap: Record<string, any> = {};
+            const rankMap: Record<string, number> = {};
             (seedListData || []).forEach((row: any) => {
                 statsMap[row.team_id] = {
                     ppg: row.ppg ?? 0,
@@ -288,8 +294,12 @@ export default function TournamentMap({ isMock = false, viewOnly = false, overri
                     fpg: row.fpg ?? 0,
                     record: row.games_played > 0 ? `~${row.games_played} gp` : "—",
                 };
+                if (typeof row.overall_rank === 'number') {
+                    rankMap[row.team_id] = row.overall_rank;
+                }
             });
             setTeamStats(statsMap);
+            setTeamRanks(rankMap);
 
             const seedMap: Record<string, number> = {};
             bracketData.forEach((g: any) => {
@@ -494,7 +504,15 @@ export default function TournamentMap({ isMock = false, viewOnly = false, overri
         }
     };
 
-    const openScoutingReport = (game: any) => {
+    const openGameDetails = (game: any) => {
+        // LIVE Official mode: show ResultSheet
+        if (!isMock && phase === 'LIVE') {
+            setResultGame(game);
+            setResultVisible(true);
+            return;
+        }
+
+        // Otherwise: existing scouting report (only if both teams are set)
         const teamAId = game.team_a_id;
         const teamBId = game.team_b_id;
         if (!teamAId || !teamBId || teamAId === "TBD" || teamBId === "TBD") return;
@@ -502,15 +520,24 @@ export default function TournamentMap({ isMock = false, viewOnly = false, overri
         const aStats = teamStats[teamAId] || {};
         const bStats = teamStats[teamBId] || {};
 
+        const seedA = teamSeeds[teamAId] || 0;
+        const seedB = teamSeeds[teamBId] || 0;
+        const rankA = teamRanks[teamAId] || 0;
+        const rankB = teamRanks[teamBId] || 0;
+
         setSelectedMatchup({
             teamA: {
                 id: teamAId,
                 name: teamNames[teamAId] || teamAId,
+                seed: seedA,
+                overall_rank: rankA,
                 ...aStats,
             },
             teamB: {
                 id: teamBId,
                 name: teamNames[teamBId] || teamBId,
+                seed: seedB,
+                overall_rank: rankB,
                 ...bStats,
             },
         });
@@ -844,7 +871,7 @@ export default function TournamentMap({ isMock = false, viewOnly = false, overri
                                             isBusted={isBusted}
                                             onPressTeamA={() => handleTeamPress(game, game.team_a_id)}
                                             onPressTeamB={() => handleTeamPress(game, game.team_b_id)}
-                                            onLongPress={!isMock ? () => openScoutingReport(game) : undefined}
+                                            onLongPress={() => openGameDetails(game)}
                                             // Show pick indicators in Official mode for both SELECTION_SUNDAY and LIVE
                                             showPickIndicators={!isMock && !!pickedId}
                                         />
@@ -1097,33 +1124,46 @@ export default function TournamentMap({ isMock = false, viewOnly = false, overri
                         </Pressable>
                     </View>
                 ) : !isMock && phase === 'LIVE' ? (
-                    // Official mode, LIVE: busted-path legend
-                    <View style={[styles.bottomBar, { backgroundColor: theme.card, justifyContent: 'flex-start' }]}>
-                        <Text style={{ color: theme.mutedText, fontSize: 9, fontWeight: '600' }}>
-                            Legend:
-                        </Text>
-                        <View style={{ flexDirection: 'row', alignItems: 'center', marginLeft: 8 }}>
-                            <View
-                                style={{
-                                    width: 10,
-                                    height: 10,
-                                    borderRadius: 5,
-                                    backgroundColor: '#34C759',
-                                    marginRight: 4,
-                                }}
-                            />
-                            <Text style={{ color: theme.text, fontSize: 9, marginRight: 12 }}>Pick alive</Text>
-                            <View
-                                style={{
-                                    width: 10,
-                                    height: 10,
-                                    borderRadius: 5,
-                                    backgroundColor: '#FF3B30',
-                                    marginRight: 4,
-                                }}
-                            />
-                            <Text style={{ color: theme.text, fontSize: 9 }}>Pick busted</Text>
+                    // Official mode, LIVE: busted-path legend + optional score summary
+                    <View style={[styles.bottomBar, { backgroundColor: theme.card, justifyContent: 'space-between' }]}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                            <Text style={{ color: theme.mutedText, fontSize: 9, fontWeight: '600' }}>
+                                Legend:
+                            </Text>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', marginLeft: 8 }}>
+                                <View
+                                    style={{
+                                        width: 10,
+                                        height: 10,
+                                        borderRadius: 5,
+                                        backgroundColor: '#34C759',
+                                        marginRight: 4,
+                                    }}
+                                />
+                                <Text style={{ color: theme.text, fontSize: 9, marginRight: 12 }}>Pick alive</Text>
+                                <View
+                                    style={{
+                                        width: 10,
+                                        height: 10,
+                                        borderRadius: 5,
+                                        backgroundColor: '#FF3B30',
+                                        marginRight: 4,
+                                    }}
+                                />
+                                <Text style={{ color: theme.text, fontSize: 9 }}>Pick busted</Text>
+                            </View>
                         </View>
+
+                        {scoreSummary && (
+                            <View style={{ alignItems: 'flex-end' }}>
+                                <Text style={{ color: theme.text, fontSize: 9, fontWeight: '700' }}>
+                                    Score: {scoreSummary.score}
+                                </Text>
+                                <Text style={{ color: theme.mutedText, fontSize: 8, fontWeight: '600', marginTop: 1 }}>
+                                    Max Possible: {scoreSummary.score + scoreSummary.pts_rem}
+                                </Text>
+                            </View>
+                        )}
                     </View>
                 ) : (
                     // Mock Mode Bottom Bar (Bracketology)
@@ -1163,6 +1203,22 @@ export default function TournamentMap({ isMock = false, viewOnly = false, overri
                         onClose={() => setModalVisible(false)}
                         teamA={{ ...selectedMatchup.teamA, name: teamNames[selectedMatchup.teamA.id] || selectedMatchup.teamA.id }}
                         teamB={{ ...selectedMatchup.teamB, name: teamNames[selectedMatchup.teamB.id] || selectedMatchup.teamB.id }}
+                    />
+                )}
+
+                {/* LIVE Result Sheet (Official mode only) */}
+                {!isMock && resultGame && (
+                    <ResultSheet
+                        visible={resultVisible}
+                        onClose={() => {
+                            setResultVisible(false);
+                            setResultGame(null);
+                        }}
+                        game={resultGame}
+                        teamNames={teamNames}
+                        pickedId={picks[resultGame.id] || null}
+                        teamSeeds={teamSeeds}
+                        teamRanks={teamRanks}
                     />
                 )}
 

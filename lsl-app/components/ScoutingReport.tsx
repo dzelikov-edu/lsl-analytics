@@ -19,6 +19,40 @@ export default function ScoutingReport({ visible, onClose, teamA, teamB }: Scout
 
     if (!teamA || !teamB) return null;
 
+    const seedA: number | undefined = teamA.seed;
+    const seedB: number | undefined = teamB.seed;
+
+    type SRTeam = typeof teamA;
+
+    let leftTeam: SRTeam = teamA;
+    let rightTeam: SRTeam = teamB;
+
+    if (typeof seedA === 'number' && typeof seedB === 'number') {
+        if (seedA < seedB) {
+            // teamA better seed -> home on right
+            leftTeam = teamB;
+            rightTeam = teamA;
+        } else if (seedB < seedA) {
+            // teamB better seed -> home on right (already)
+            leftTeam = teamA;
+            rightTeam = teamB;
+        } else {
+            // Seeds equal: use overall_rank if available
+            const rankA: number | undefined = teamA.overall_rank;
+            const rankB: number | undefined = teamB.overall_rank;
+            if (typeof rankA === 'number' && typeof rankB === 'number') {
+                if (rankA < rankB) {
+                    // teamA better rank -> home on right
+                    leftTeam = teamB;
+                    rightTeam = teamA;
+                } else if (rankB < rankA) {
+                    leftTeam = teamA;
+                    rightTeam = teamB;
+                }
+            }
+        }
+    }
+
     return (
         <Modal visible={visible} animationType="slide" transparent={true} onRequestClose={onClose}>
             <View style={styles.overlay}>
@@ -29,34 +63,72 @@ export default function ScoutingReport({ visible, onClose, teamA, teamB }: Scout
 
                     <View style={styles.header}>
                         <View style={styles.headerTeam}>
-                            <TeamLogo teamId={teamA.id} size={40} />
-                            <Text style={[styles.teamName, { color: theme.text }]}>{teamA.name}</Text>
+                            <TeamLogo teamId={leftTeam.id} size={40} />
+                            <Text style={[styles.teamName, { color: theme.text }]} numberOfLines={1}>
+                                {typeof leftTeam.seed === 'number' && leftTeam.seed > 0
+                                    ? `(${leftTeam.seed}) ${leftTeam.name}`
+                                    : leftTeam.name}
+                            </Text>
                         </View>
                         <Text style={[styles.vs, { color: theme.mutedText }]}>VS</Text>
                         <View style={styles.headerTeam}>
-                            <TeamLogo teamId={teamB.id} size={40} />
-                            <Text style={[styles.teamName, { color: theme.text }]}>{teamB.name}</Text>
+                            <TeamLogo teamId={rightTeam.id} size={40} />
+                            <Text style={[styles.teamName, { color: theme.text }]} numberOfLines={1}>
+                                {typeof rightTeam.seed === 'number' && rightTeam.seed > 0
+                                    ? `(${rightTeam.seed}) ${rightTeam.name}`
+                                    : rightTeam.name}
+                            </Text>
                         </View>
                     </View>
 
                     <ScrollView style={styles.statsScroll}>
                         {/* CORE STATS */}
-                        <StatRow label="Record" valueA={teamA.record} valueB={teamB.record} isCore />
-                        <StatRow label="PPG" valueA={teamA.ppg} valueB={teamB.ppg} isCore />
-                        <StatRow label="RPG" valueA={teamA.rpg} valueB={teamB.rpg} isCore />
-                        <StatRow label="FG%" valueA={`${teamA.fg_pct ?? 0}%`} valueB={`${teamB.fg_pct ?? 0}%`} isCore />
-                        <StatRow label="3PT%" valueA={`${teamA.three_pct ?? 0}%`} valueB={`${teamB.three_pct ?? 0}%`} isCore />
-                        <StatRow label="FT%" valueA={`${teamA.ft_pct ?? 0}%`} valueB={`${teamB.ft_pct ?? 0}%`} isCore />
+                        <StatRow
+                            label="Record"
+                            valueA={leftTeam.record}
+                            valueB={rightTeam.record}
+                            isCore
+                        />
+                        <StatRow
+                            label="PPG"
+                            valueA={leftTeam.ppg}
+                            valueB={rightTeam.ppg}
+                            isCore
+                        />
+                        <StatRow
+                            label="RPG"
+                            valueA={leftTeam.rpg}
+                            valueB={rightTeam.rpg}
+                            isCore
+                        />
+                        <StatRow
+                            label="FG%"
+                            valueA={`${leftTeam.fg_pct ?? 0}%`}
+                            valueB={`${rightTeam.fg_pct ?? 0}%`}
+                            isCore
+                        />
+                        <StatRow
+                            label="3PT%"
+                            valueA={`${leftTeam.three_pct ?? 0}%`}
+                            valueB={`${rightTeam.three_pct ?? 0}%`}
+                            isCore
+                        />
+                        <StatRow
+                            label="FT%"
+                            valueA={`${leftTeam.ft_pct ?? 0}%`}
+                            valueB={`${rightTeam.ft_pct ?? 0}%`}
+                            isCore
+                        />
 
                         {/* ADVANCED STATS (Conditional) */}
                         {isExpanded && (
                             <View>
-                                <StatRow label="APG" valueA={teamA.apg} valueB={teamB.apg} />
-                                <StatRow label="SPG" valueA={teamA.spg} valueB={teamB.spg} />
-                                <StatRow label="BPG" valueA={teamA.bpg} valueB={teamB.bpg} />
-                                <StatRow label="OPPG" valueA={teamA.oppg} valueB={teamB.oppg} />
-                                <StatRow label="TOPG" valueA={teamA.topg} valueB={teamB.topg} />
-                                <StatRow label="FPG" valueA={teamA.fpg} valueB={teamB.fpg} />
+                                <StatRow label="APG" valueA={leftTeam.apg} valueB={rightTeam.apg} />
+                                <StatRow label="SPG" valueA={leftTeam.spg} valueB={rightTeam.spg} />
+                                <StatRow label="BPG" valueA={leftTeam.bpg} valueB={rightTeam.bpg} />
+                                <StatRow label="OPPG" valueA={leftTeam.oppg} valueB={rightTeam.oppg} />
+                                <StatRow label="TOPG" valueA={leftTeam.topg} valueB={rightTeam.topg} />
+                                <StatRow label="FPG" valueA={leftTeam.fpg} valueB={rightTeam.fpg} />
                             </View>
                         )}
 

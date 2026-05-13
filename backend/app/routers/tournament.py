@@ -915,6 +915,10 @@ async def get_group_leaderboard(
         # Official state map
         official_map = {g.id: {"winner": g.winner_id, "round": g.round, "team_a": g.team_a_id, "team_b": g.team_b_id} for g in official_games}
 
+        # Find the Championship game id for this season
+        champ_game = next((g for g in official_games if g.round == "Championship"), None)
+        champ_game_id = champ_game.id if champ_game else None
+
         point_values = {
             "Survival_16": 1, "Round_64": 2, "Round_32": 4, 
             "Sweet_16": 8, "Elite_8": 16, "National Semifinals": 32, "Championship": 64
@@ -952,12 +956,18 @@ async def get_group_leaderboard(
                     bonus = abs(s_a - s_b) if team_seed_map.get(u_pick) == max(s_a, s_b) and s_a != s_b else 0
                     points_rem += (round_pts + bonus)
 
+            # Champion pick (if any)
+            champ_pick = None
+            if champ_game_id:
+                champ_pick = user_picks_map.get(champ_game_id) or None
+
             leaderboard.append({
                 "user_name": username or "Unknown Legend", # Return the real username
                 "bracket_name": bracket_name,
                 "bracket_id": bracket_id,
                 "score": current_score,
-                "pts_rem": points_rem
+                "pts_rem": points_rem,
+                "champ_pick": champ_pick,
             })
 
         leaderboard.sort(key=lambda x: x['score'], reverse=True)
