@@ -32,6 +32,7 @@ class RecordScoreRequest(BaseModel):
     score_a: int = Field(..., ge=0)
     score_b: int = Field(..., ge=0)
     season: int = Field(2036, description="Season of this tournament")
+    force: bool = Field(False, description="Allow overwriting an already-scored game")
 
 @router.post("/send-test-push")
 async def send_test_push(
@@ -407,11 +408,23 @@ async def admin_record_tournament_score(
     - Records score_a / score_b for a TournamentBracket game.
     - Sets winner_id based on the scores.
     - Pushes the winner into the next_game (team_a_id or team_b_id) using game_slot rules.
+    - Enforces: phase must be LIVE, no overwrite unless force=True,
+      and no overwriting non-TBD slots in the next game.
     """
     if not current_user.is_admin:
         raise HTTPException(status_code=403, detail="Admin only.")
 
     async with AsyncSessionLocal() as session:
+        # NEW: Phase guard – only allow scoring when tournament is LIVE
+        stmt_state = select(TournamentState).where(TournamentState.season == req.season)
+        state_res = await session.exec(stmt_state)
+        state = state_res.one_or_none()
+        if state and state.phase != "LIVE":
+            raise HTTPException(
+                status_code=400,
+                detail=f"Tournament phase is {state.phase}. Scores can only be recorded in LIVE phase.",
+            )
+
         # 1. Load the current game
         stmt = select(TournamentBracket).where(
             TournamentBracket.id == req.game_id,
@@ -422,6 +435,13 @@ async def admin_record_tournament_score(
 
         if not game:
             raise HTTPException(status_code=404, detail="Tournament game not found.")
+
+        # NEW: Prevent re-scoring unless force=True
+        if game.winner_id is not None and not req.force:
+            raise HTTPException(
+                status_code=400,
+                detail="This game already has a recorded winner. Pass force=true to overwrite.",
+            )
 
         # 2. Basic validation: no ties allowed
         if req.score_a == req.score_b:
@@ -459,14 +479,32 @@ async def admin_record_tournament_score(
 
             # Special rule: Survival_16 winner fills team_b_id in Round_64
             if game.round == "Survival_16" and next_game.round == "Round_64":
+                # NEW: don't overwrite a non-TBD team_b_id
+                if next_game.team_b_id not in (None, "", "TBD") and next_game.team_b_id != winner_id:
+                    raise HTTPException(
+                        status_code=400,
+                        detail="Next game's team_b_id is already set to a different team.",
+                    )
                 next_game.team_b_id = winner_id
                 pushed_to = {"slot": "B", "next_game_id": next_game.id}
             else:
                 # General rule: odd game_slot winner -> team_a, even -> team_b
                 if game.game_slot % 2 == 1:
+                    # NEW: don't overwrite a non-TBD team_a_id
+                    if next_game.team_a_id not in (None, "", "TBD") and next_game.team_a_id != winner_id:
+                        raise HTTPException(
+                            status_code=400,
+                            detail="Next game's team_a_id is already set to a different team.",
+                        )
                     next_game.team_a_id = winner_id
                     pushed_to = {"slot": "A", "next_game_id": next_game.id}
                 else:
+                    # NEW: don't overwrite a non-TBD team_b_id
+                    if next_game.team_b_id not in (None, "", "TBD") and next_game.team_b_id != winner_id:
+                        raise HTTPException(
+                            status_code=400,
+                            detail="Next game's team_b_id is already set to a different team.",
+                        )
                     next_game.team_b_id = winner_id
                     pushed_to = {"slot": "B", "next_game_id": next_game.id}
 
@@ -482,3 +520,4 @@ async def admin_record_tournament_score(
         "score_b": game.score_b,
         "pushed_to": pushed_to,
     }
+
