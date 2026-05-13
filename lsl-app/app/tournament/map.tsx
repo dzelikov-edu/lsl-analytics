@@ -1,5 +1,7 @@
+/// <reference lib="dom" />
+
 import React, { useState, useEffect, useLayoutEffect, useMemo } from 'react';
-import { StyleSheet, View, Dimensions, Text, ActivityIndicator, Pressable, Alert, useWindowDimensions, Platform, ScrollView, TextInput, KeyboardAvoidingView } from 'react-native';
+import { StyleSheet, View, Dimensions, Text, ActivityIndicator, Pressable, Alert, useWindowDimensions, Platform, ScrollView, TextInput, KeyboardAvoidingView, } from 'react-native';
 import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
 import Animated, { useSharedValue, useAnimatedStyle, withDecay, cancelAnimation } from 'react-native-reanimated';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -97,6 +99,7 @@ export default function TournamentMap({ isMock = false, viewOnly = false, overri
     const [bracketId, setBracketId] = useState<string | null>(null); // NEW
     const [locking, setLocking] = useState(false);
     const [hasCustomLogos, setHasCustomLogos] = useState(false);
+    const [userIsAdmin, setUserIsAdmin] = useState(false);
 
     // Teams still "alive" in the official bracket (for busted-path logic)
     const aliveTeams = useMemo(() => {
@@ -253,12 +256,16 @@ export default function TournamentMap({ isMock = false, viewOnly = false, overri
                 return label === "team-names" ? {} : [];
             };
 
-            const [brackets, apiBracketData, seedListData, namesData] = await Promise.all([
+            const [userRes, brackets, apiBracketData, seedListData, namesData] = await Promise.all([
+                fetch(`${API_BASE_URL}/auth/me`, { headers: { Authorization: `Bearer ${token}` } }),
                 safeJson(responses[0], "brackets"),
                 safeJson(responses[1], "main-bracket"),
                 safeJson(responses[2], "seeds"),
                 safeJson(responses[3], "team-names")
             ]);
+
+            const userData = await userRes.json();
+            setUserIsAdmin(userData.is_admin || false);
 
             // Use override data if provided (personal sim), otherwise use API data
             const bracketData = (isMock && overrideBracketData && overrideBracketData.length > 0)
@@ -1219,6 +1226,7 @@ export default function TournamentMap({ isMock = false, viewOnly = false, overri
                         pickedId={picks[resultGame.id] || null}
                         teamSeeds={teamSeeds}
                         teamRanks={teamRanks}
+                        userIsAdmin={userIsAdmin}  // Assuming currentUser is in scope
                     />
                 )}
 

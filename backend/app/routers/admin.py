@@ -521,9 +521,13 @@ async def admin_record_tournament_score(
         "pushed_to": pushed_to,
     }
 
+class UndoScoreRequest(BaseModel):
+    game_id: str = Field(..., description="TournamentBracket.id for this game")
+    season: int = Field(..., description="Season of this tournament")
+
 @router.post("/tournament/undo-score")
 async def admin_undo_tournament_score(
-    req: RecordScoreRequest,  # Reuse the same model for game_id and season
+    req: UndoScoreRequest,  # Use the new model
     current_user: User = Depends(get_current_user),
 ):
     """

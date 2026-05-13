@@ -1,8 +1,10 @@
 import React from 'react';
-import { View, Text, StyleSheet, Modal, Pressable } from 'react-native';
+import { View, Text, StyleSheet, Modal, Pressable, Alert } from 'react-native';
 import { AppColors } from '@/constants/app-colors';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import TeamLogo from './TeamLogo';
+import { API_BASE_URL } from '@/lib/api';  // Added this
+import { getToken } from '@/lib/auth-storage';  // Added this
 
 type ResultSheetProps = {
     visible: boolean;
@@ -12,9 +14,10 @@ type ResultSheetProps = {
     pickedId: string | null;
     teamSeeds: Record<string, number>;
     teamRanks: Record<string, number>;
+    userIsAdmin: boolean;  // Pass true if the user is admin
 };
 
-export default function ResultSheet({ visible, onClose, game, teamNames, pickedId, teamSeeds, teamRanks }: ResultSheetProps) {
+export default function ResultSheet({ visible, onClose, game, teamNames, pickedId, teamSeeds, teamRanks, userIsAdmin }: ResultSheetProps) {
     const colorScheme = useColorScheme() ?? 'light';
     const theme = AppColors[colorScheme];
 
@@ -172,6 +175,45 @@ export default function ResultSheet({ visible, onClose, game, teamNames, pickedI
                     </View>
 
                     <View style={{ alignItems: 'flex-end', marginTop: 18 }}>
+                        {hasFinal && userIsAdmin && (
+                            <Pressable
+                                onPress={async () => {
+                                    try {
+                                        const token = await getToken();  // Assuming getToken is in your lib
+                                        const res = await fetch(`${API_BASE_URL}/admin/tournament/undo-score`, {
+                                            method: 'POST',
+                                            headers: {
+                                                Authorization: `Bearer ${token}`,
+                                                'Content-Type': 'application/json',
+                                            },
+                                            body: JSON.stringify({
+                                                game_id: game.id,
+                                                season: 2036,  // Hardcoded for now, but could be passed
+                                            }),
+                                        });
+                                        if (res.ok) {
+                                            Alert.alert("Success", "Score undone.");
+                                            onClose();  // Close the sheet
+                                        } else {
+                                            const data = await res.json();
+                                            Alert.alert("Error", data.detail || "Failed to undo score.");
+                                        }
+                                    } catch (e) {
+                                        Alert.alert("Error", "Network issue.");
+                                    }
+                                }}
+                                style={{
+                                    paddingHorizontal: 14,
+                                    paddingVertical: 8,
+                                    borderRadius: 8,
+                                    backgroundColor: '#FF3B30',
+                                    marginBottom: 8,
+                                }}
+                            >
+                                <Text style={{ color: '#fff', fontWeight: '800', fontSize: 12 }}>Undo Score</Text>
+                            </Pressable>
+                        )}
+
                         <Pressable
                             onPress={onClose}
                             style={{
