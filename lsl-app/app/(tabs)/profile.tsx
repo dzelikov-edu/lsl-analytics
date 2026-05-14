@@ -784,7 +784,7 @@ export default function ProfileScreen() {
                             placeholderTextColor={theme.mutedText}
                         />
                         <TextInput
-                            placeholder="Target Team IDs (MICH, CREI) or blank for ALL"
+                            placeholder="Target Real Team IDs or blank for ALL"
                             value={targetTeam}
                             onChangeText={setTargetTeam}
                             autoCapitalize="characters"

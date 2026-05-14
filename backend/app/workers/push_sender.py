@@ -95,26 +95,14 @@ async def notify_all_active_devices(title: str, body: str, data: dict = None):
         q = select(Device).where(Device.active == True, Device.notifications_enabled == True)
         res = await session.exec(q)
         devices = res.all()
-        
-        # --- STANDARD LIST ---
-        # tokens = [d.expo_push_token for d in devices if d.expo_push_token]
-        # unique_tokens = list(dict.fromkeys(tokens))
 
+        # --- RESTORED STANDARD LIST ---
         tokens = [d.expo_push_token for d in devices if d.expo_push_token]
-        
-        # --- DEVELOPER TEST GATE ---
-        # We manually filter the list so only your iPad receives the broadcast
-        DEVELOPER_TOKEN = "ExponentPushToken[-QHvqILhwPdn6FxyqRk-q-]"
-        unique_tokens = [t for t in tokens if t == DEVELOPER_TOKEN]
-        # ---------------------------
+        unique_tokens = list(dict.fromkeys(tokens))
+        # ------------------------------
 
         if not unique_tokens:
-            print("[PUSH] Broadcast skipped: Developer device not found in active list.")
             return
-
-        # --- STANDARD LIST ---
-        # if not unique_tokens:
-        #    return
 
         for i in range(0, len(unique_tokens), BATCH_SIZE):
             batch = unique_tokens[i : i + BATCH_SIZE]
