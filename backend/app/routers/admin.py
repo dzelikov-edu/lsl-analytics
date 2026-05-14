@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
 import asyncio
 from datetime import datetime
+from typing import Optional, List
 
 from app.deps_auth import get_current_user
 from app.models_devices import (
@@ -634,3 +635,27 @@ async def admin_undo_tournament_score(
             "game_id": game.id,
             "message": "Score undone and advancement reversed.",
         }
+
+class GlobalPushRequest(BaseModel):
+    title: str = Field(..., min_length=1, max_length=100)
+    body: str = Field(..., min_length=1, max_length=255)
+    # Changed to a list of strings
+    teamIds: Optional[List[str]] = None 
+
+@router.post("/send-global-push")
+async def admin_send_global_push(
+    req: GlobalPushRequest,
+    current_user: User = Depends(get_current_user)
+):
+    if not current_user.is_admin:
+        raise HTTPException(status_code=403, detail="Admin only.")
+
+    if req.teamIds and len(req.teamIds) > 0:
+        # Targeted: Notify fans of every team in your list
+        for tid in req.teamIds:
+            asyncio.create_task(notify_team(tid.strip().upper(), req.title, req.body))
+        return {"status": "success", "message": f"Broadcast sent to {len(req.teamIds)} specific teams."}
+    else:
+        # Global: Every active device in the league
+        asyncio.create_task(notify_all_active_devices(req.title, req.body))
+        return {"status": "success", "message": "League-wide broadcast enqueued."}

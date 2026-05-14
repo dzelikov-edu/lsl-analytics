@@ -1,4 +1,4 @@
-import { View, Text, Pressable, StyleSheet, ScrollView, ActivityIndicator, RefreshControl, Alert, Switch, Image, useWindowDimensions } from 'react-native';
+import { View, Text, Pressable, StyleSheet, ScrollView, ActivityIndicator, RefreshControl, Alert, Switch, Image, useWindowDimensions, TextInput } from 'react-native';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { AppColors } from '@/constants/app-colors';
 import { router, useFocusEffect } from 'expo-router'; // Add useFocusEffect
@@ -33,6 +33,9 @@ export default function ProfileScreen() {
     const [notificationsEnabled, setNotificationsEnabled] = useState(true);
     const [syncProgress, setSyncProgress] = useState(0); // NEW
     const [syncTotal, setSyncTotal] = useState(0);     // NEW
+    const [customTitle, setCustomTitle] = useState('');
+    const [customBody, setCustomBody] = useState('');
+    const [targetTeam, setTargetTeam] = useState(''); // Leave empty for ALL
 
     // This function fetches all the data
     const loadProfileData = useCallback(async () => {
@@ -529,6 +532,55 @@ export default function ProfileScreen() {
         );
     };
 
+    const handleManualPush = async () => {
+        if (!customTitle || !customBody) {
+            Alert.alert("Error", "Title and Body are required.");
+            return;
+        }
+
+        // Split input by commas, trim spaces, remove empty strings
+        const teamsList = targetTeam
+            ? targetTeam.split(',').map(t => t.trim()).filter(t => t.length > 0)
+            : [];
+
+        Alert.alert(
+            "Confirm Broadcast",
+            `Send this to ${teamsList.length > 0 ? teamsList.join(' & ') + ' fans' : 'EVERYONE'}?`,
+            [
+                { text: "Cancel", style: "cancel" },
+                {
+                    text: "Send Now",
+                    onPress: async () => {
+                        try {
+                            const token = await getToken();
+                            const res = await fetch(`${API_BASE_URL}/admin/send-global-push`, {
+                                method: 'POST',
+                                headers: {
+                                    'Authorization': `Bearer ${token}`,
+                                    'Content-Type': 'application/json'
+                                },
+                                body: JSON.stringify({
+                                    title: customTitle,
+                                    body: customBody,
+                                    teamIds: teamsList.length > 0 ? teamsList : null
+                                })
+                            });
+                            if (res.ok) {
+                                Alert.alert("Success", "Broadcast enqueued!");
+                                setCustomTitle(''); setCustomBody(''); setTargetTeam('');
+                            } else {
+                                const err = await res.json();
+                                Alert.alert("Error", err.detail || "Failed to send.");
+                            }
+                        } catch (e) {
+                            Alert.alert("Error", "Connection failure.");
+                        }
+                    }
+                }
+            ]
+        );
+    };
+
     return (
         <ScrollView
             style={styles.container}
@@ -700,6 +752,60 @@ export default function ProfileScreen() {
             {user?.is_admin && (
                 <View style={{ marginTop: 20, borderTopWidth: 1, borderTopColor: theme.border, paddingTop: 20 }}>
                     <Text style={[styles.sectionTitle, { fontSize: 18 }]}>Commissioner Console</Text>
+
+                    {/* --- COMMISSIONER MEGAPHONE --- */}
+                    <View style={{
+                        marginTop: 10,
+                        padding: 15,
+                        backgroundColor: theme.card,
+                        borderRadius: 12,
+                        borderStyle: 'dashed',
+                        borderWidth: 1,
+                        borderColor: theme.border,
+                        marginBottom: 20
+                    }}>
+                        <Text style={{ fontSize: 15, fontWeight: '800', color: theme.text, marginBottom: 5 }}>
+                            📢 Commissioner Megaphone
+                        </Text>
+
+                        <TextInput
+                            placeholder="Alert Title (e.g. BREAKING NEWS)"
+                            value={customTitle}
+                            onChangeText={setCustomTitle}
+                            style={{ backgroundColor: theme.background, color: theme.text, padding: 12, borderRadius: 8, marginTop: 10, borderWidth: 1, borderColor: theme.border }}
+                            placeholderTextColor={theme.mutedText}
+                        />
+                        <TextInput
+                            placeholder="Alert Message..."
+                            value={customBody}
+                            onChangeText={setCustomBody}
+                            multiline
+                            style={{ backgroundColor: theme.background, color: theme.text, padding: 12, borderRadius: 8, marginTop: 10, height: 80, textAlignVertical: 'top', borderWidth: 1, borderColor: theme.border }}
+                            placeholderTextColor={theme.mutedText}
+                        />
+                        <TextInput
+                            placeholder="Target Team IDs (MICH, CREI) or blank for ALL"
+                            value={targetTeam}
+                            onChangeText={setTargetTeam}
+                            autoCapitalize="characters"
+                            style={{ backgroundColor: theme.background, color: theme.text, padding: 12, borderRadius: 8, marginTop: 10, borderWidth: 1, borderColor: theme.border }}
+                            placeholderTextColor={theme.mutedText}
+                        />
+
+                        <Pressable
+                            onPress={handleManualPush}
+                            style={({ pressed }) => ({
+                                backgroundColor: '#FF9500',
+                                padding: 14,
+                                borderRadius: 10,
+                                marginTop: 15,
+                                alignItems: 'center',
+                                opacity: pressed ? 0.8 : 1
+                            })}
+                        >
+                            <Text style={{ color: '#fff', fontWeight: '900', fontSize: 14 }}>FIRE BROADCAST</Text>
+                        </Pressable>
+                    </View>
 
                     {/* --- ADD THIS GREEN BUTTON --- */}
                     <Pressable
