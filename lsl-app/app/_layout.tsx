@@ -3,7 +3,7 @@ import { getToken } from '../lib/auth-storage';
 import { Stack, router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useState } from 'react';
-import { View, ActivityIndicator, Alert } from 'react-native';
+import { View, ActivityIndicator, Alert, Platform } from 'react-native';
 import 'react-native-reanimated';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import * as Notifications from 'expo-notifications';
@@ -83,23 +83,29 @@ export default function RootLayout() {
 
 async function registerNotifications(token: string) {
   if (!Device.isDevice) return;
+
   const { status } = await Notifications.requestPermissionsAsync();
   if (status !== 'granted') return;
 
-  const tokenData = await Notifications.getExpoPushTokenAsync({
-    projectId: "1123b7ce-5272-4e3c-a214-fca8911aa554",
-  });
+  try {
+    const tokenData = await Notifications.getExpoPushTokenAsync({
+      projectId: "1123b7ce-5272-4e3c-a214-fca8911aa554",
+    });
 
-  await fetch('https://lsl-backend.onrender.com/api/devices', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${token}`,
-    },
-    body: JSON.stringify({
-      expoPushToken: tokenData.data,
-      deviceId: Device.modelName || 'beta-device',
-      platform: Device.osName?.toLowerCase() || 'ios',
-    }),
-  });
+    await fetch('https://lsl-backend.onrender.com/api/devices', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      },
+      body: JSON.stringify({
+        expoPushToken: tokenData.data,
+        deviceId: Device.modelName || 'beta-device',
+        platform: Platform.OS === 'ios' ? 'ios' : 'android',
+      }),
+    });
+  } catch (error) {
+    // Keep a quiet error log just in case
+    console.warn("Notification registration failed:", error);
+  }
 }

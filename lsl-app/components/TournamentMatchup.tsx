@@ -104,14 +104,15 @@ export default function TournamentMatchup({
                     </Text>
                 )}
 
-                {/* PICK DOT: green if alive, red if busted */}
+                {/* PICK DOT: show empty circle if game is picked anywhere and not final, green if correct, red if busted */}
                 {showPickIndicators && (
                     <View
                         style={[
                             styles.radioCircle,
                             { borderColor: theme.border },
-                            isPickedA && pickIsAlive === true && { backgroundColor: '#34C759', borderColor: '#34C759' },
-                            isPickedA && pickIsAlive === false && { backgroundColor: '#FF3B30', borderColor: '#FF3B30' },
+                            (isPickedA || pickedWinnerId) && !isFinal && { backgroundColor: 'transparent' },  // Empty for any picked game that's not final
+                            isPickedA && isFinal && pickIsAlive === true && { backgroundColor: '#34C759', borderColor: '#34C759' },
+                            isPickedA && isFinal && pickIsAlive === false && { backgroundColor: '#FF3B30', borderColor: '#FF3B30' },
                         ]}
                     />
                 )}
@@ -159,14 +160,15 @@ export default function TournamentMatchup({
                     </Text>
                 )}
 
-                {/* PICK DOT: green if alive, red if busted */}
+                {/* PICK DOT: show empty circle if game is picked anywhere and not final, green if correct, red if busted */}
                 {showPickIndicators && (
                     <View
                         style={[
                             styles.radioCircle,
                             { borderColor: theme.border },
-                            isPickedB && pickIsAlive === true && { backgroundColor: '#34C759', borderColor: '#34C759' },
-                            isPickedB && pickIsAlive === false && { backgroundColor: '#FF3B30', borderColor: '#FF3B30' },
+                            (isPickedB || pickedWinnerId) && !isFinal && { backgroundColor: 'transparent' },  // Empty for any picked game that's not final
+                            isPickedB && isFinal && pickIsAlive === true && { backgroundColor: '#34C759', borderColor: '#34C759' },
+                            isPickedB && isFinal && pickIsAlive === false && { backgroundColor: '#FF3B30', borderColor: '#FF3B30' },
                         ]}
                     />
                 )}

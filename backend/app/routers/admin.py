@@ -11,8 +11,9 @@ from app.models_devices import (
     MockBracketResult,
     PlayerSnapshot,
     TournamentBracket,
+    NotificationLog,
 )
-from app.workers.push_sender import notify_team
+from app.workers.push_sender import notify_team, notify_all_active_devices
 from app.players_sync import refresh_players_snapshot_cache
 
 from sqlmodel import select, delete
@@ -511,6 +512,44 @@ async def admin_record_tournament_score(
             session.add(next_game)
 
         await session.commit()
+
+        # --- AUTOMATED NOTIFICATIONS (League-Wide Priority Logic) ---
+        try:
+            # 1. Check if we already sent notifications for this specific game
+            stmt_log = select(NotificationLog).where(NotificationLog.game_key == game.id)
+            log_res = await session.exec(stmt_log)
+            if not log_res.one_or_none():
+                
+                # 2. Setup Data
+                score_line = f"{game.team_a_id} {req.score_a}, {game.team_b_id} {req.score_b}"
+                fav_id = game.team_a_id if game.seed_a <= game.seed_b else game.team_b_id
+                dog_id = game.team_b_id if game.seed_a <= game.seed_b else game.team_a_id
+                fav_seed = min(game.seed_a, game.seed_b)
+                dog_seed = max(game.seed_a, game.seed_b)
+
+                # --- PRIORITY 1: NATIONAL CHAMPIONSHIP ---
+                if game.round == "Championship":
+                    champ_body = f"THE LEGENDS UNIVERSE HAS A CHAMPION! {winner_id} wins the title! ({score_line})"
+                    asyncio.create_task(notify_all_active_devices("NATIONAL CHAMPIONSHIP", champ_body, {"game_id": game.id}))
+                
+                # --- PRIORITY 2: UPSET ALERT ---
+                elif (dog_seed - fav_seed) >= 5 and winner_id == dog_id:
+                    upset_body = f"🚨 ({dog_seed}) {dog_id} just knocked off ({fav_seed}) {fav_id}! ({score_line})"
+                    asyncio.create_task(notify_all_active_devices("UPSET ALERT", upset_body, {"game_id": game.id}))
+                
+                # --- PRIORITY 3: ALL OTHER TOURNAMENT GAMES ---
+                else:
+                    # Every active user gets the final score
+                    game_body = f"FINAL: ({game.seed_a}) {game.team_a_id} {req.score_a}, ({game.seed_b}) {game.team_b_id} {req.score_b}"
+                    asyncio.create_task(notify_all_active_devices("TOURNAMENT UPDATE", game_body, {"game_id": game.id}))
+
+                # 3. Finalize Log to prevent double-firing
+                new_log = NotificationLog(game_key=game.id)
+                session.add(new_log)
+                await session.commit()
+                
+        except Exception as n_err:
+            print(f"[PUSH ERROR] Failed to trigger league-wide occasions: {n_err}")
 
     return {
         "status": "success",

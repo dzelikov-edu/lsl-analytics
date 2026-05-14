@@ -47,6 +47,40 @@ export default function HomeScreen() {
     }, [loadFavs])
   );
 
+  // --- TOURNAMENT CONTEXT STATE ---
+  const [phase, setPhase] = useState<string | null>(null);
+  const [teamSeeds, setTeamSeeds] = useState<Record<string, number>>({});
+
+  const loadTournamentContext = useCallback(async () => {
+    try {
+      const [stateRes, seedsRes] = await Promise.all([
+        fetch(`${API_BASE_URL}/api/tournament/state?season=2036`),
+        fetch(`${API_BASE_URL}/api/tournament/seeds?season=2036`)
+      ]);
+      if (stateRes.ok) {
+        const stateData = await stateRes.json();
+        setPhase(stateData.phase);
+      }
+      if (seedsRes.ok) {
+        const seedsData = await seedsRes.json();
+        const seedMap: Record<string, number> = {};
+        if (Array.isArray(seedsData)) {
+          seedsData.forEach((s: any) => { seedMap[s.team_id] = s.seed; });
+        }
+        setTeamSeeds(seedMap);
+      }
+    } catch (e) {
+      console.log("Error loading tournament context on home", e);
+    }
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      loadTournamentContext();
+    }, [loadTournamentContext])
+  );
+  // --------------------------------
+
   const featuredCardPadding = isCompact ? 12 : 14;
   const featuredCardRadius = isCompact ? 14 : 16;
   const featuredMetaFontSize = isCompact ? 12 : 13;
@@ -278,6 +312,16 @@ export default function HomeScreen() {
     [theme, topTabPadding, isCompact]
   );
 
+  const getDisplayRank = (teamId: string, lslRank: number | null | undefined, gamePhase: string) => {
+    const tournamentPhases = ['Survival_16', 'Round_64', 'Round_32', 'Sweet_16', 'Elite_8', 'National Semifinals', 'Championship'];
+    const isTournamentGame = tournamentPhases.includes(gamePhase);
+    const seed = teamSeeds[teamId];
+
+    if (isTournamentGame && seed) return `(${seed}) `;
+    if (lslRank !== null && lslRank !== undefined) return `#${lslRank} `;
+    return '';
+  };
+
   const {
     data: payload,
     loading,
@@ -289,8 +333,6 @@ export default function HomeScreen() {
     endpoint: '/home',        // Stable endpoint
     maxAgeMs: 1000 * 60 * 10,  // 10 minutes cache
   });
-
-
 
   const featuredGames = payload?.featured_games?.games ?? [];
   const rankings = payload?.rankings_preview?.rankings ?? [];
@@ -452,9 +494,7 @@ export default function HomeScreen() {
                       <TeamLogo teamId={game.away_id} size={20} />
                       <View style={styles.cardTeamTextWrap}>
                         <Text style={styles.cardTeamLine} numberOfLines={1}>
-                          {game.lsl_rank_away !== null && game.lsl_rank_away !== undefined
-                            ? `#${game.lsl_rank_away} `
-                            : ''}
+                          {getDisplayRank(game.away_id, game.lsl_rank_away, game.phase)}
                           {getTeamBranding(game.away_id, game.away_name).displayName}
                         </Text>
                       </View>
@@ -471,9 +511,7 @@ export default function HomeScreen() {
                       <TeamLogo teamId={game.home_id} size={20} />
                       <View style={styles.cardTeamTextWrap}>
                         <Text style={styles.cardTeamLine} numberOfLines={1}>
-                          {game.lsl_rank_home !== null && game.lsl_rank_home !== undefined
-                            ? `#${game.lsl_rank_home} `
-                            : ''}
+                          {getDisplayRank(game.home_id, game.lsl_rank_home, game.phase)}
                           {getTeamBranding(game.home_id, game.home_name).displayName}
                         </Text>
                       </View>
@@ -491,46 +529,86 @@ export default function HomeScreen() {
           )}
 
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Featured Games</Text>
-            {featuredGames.map((game: any, index: number) => (
+            <Text style={styles.sectionTitle}>
+              {phase === 'SELECTION_SUNDAY' || phase === 'LIVE' ? 'LCAA Tournament' : 'Featured Games'}
+            </Text>
+
+            {phase === 'SELECTION_SUNDAY' || phase === 'LIVE' ? (
+              /* BIG BRACKET PORTAL CARD */
               <Pressable
-                key={game.game_key ?? index}
-                onPress={() =>
-                  router.push({
-                    pathname: '/game/[gameKey]',
-                    params: { gameKey: game.game_key },
-                  })
-                }
-                style={({ pressed }) => [styles.featuredCard, pressed && styles.cardPressed]}>
-                <Text style={styles.featuredCardMeta}>
-                  {game.display_date || game.date_key || 'TBD'} • {game.phase_display || game.phase || '—'} • Week {game.week ?? '—'}
-                </Text>
-
-                <View style={styles.featuredTeamRow}>
-                  <TeamLogo teamId={game.away_id} size={featuredLogoSize} />
-                  <View style={styles.featuredTeamTextWrap}>
-                    <Text style={styles.featuredTeamLine}>
-                      {game.lsl_rank_away !== null && game.lsl_rank_away !== undefined
-                        ? `#${game.lsl_rank_away} `
-                        : ''}
-                      {getTeamBranding(game.away_id, game.away_name).displayName}
+                onPress={() => router.push('/tournament/map?portal=true')}
+                style={({ pressed }) => [
+                  styles.featuredCard,
+                  { backgroundColor: '#1C1C1E', borderColor: '#007AFF', borderWidth: 2 },
+                  pressed && styles.cardPressed
+                ]}
+              >
+                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.featuredCardMeta, { color: '#007AFF', fontWeight: '800', marginBottom: 4 }]}>
+                      OFFICIAL 2036 BRACKET
+                    </Text>
+                    <Text style={[styles.featuredTeamLine, { fontSize: 22, color: '#fff' }]}>
+                      The Road to the Forever Four
+                    </Text>
+                    <Text style={{ color: theme.mutedText, marginTop: 4, fontSize: 13 }}>
+                      View the official field and track the live results.
                     </Text>
                   </View>
+                  <Image
+                    source={require('@/assets/images/index_header_icon.png')}
+                    style={{ width: 60, height: 60, opacity: 0.8 }}
+                    resizeMode="contain"
+                  />
                 </View>
-
-                <View style={[styles.featuredTeamRow, { marginBottom: 0 }]}>
-                  <TeamLogo teamId={game.home_id} size={featuredLogoSize} />
-                  <View style={styles.featuredTeamTextWrap}>
-                    <Text style={styles.featuredTeamLine}>
-                      {game.lsl_rank_home !== null && game.lsl_rank_home !== undefined
-                        ? `#${game.lsl_rank_home} `
-                        : ''}
-                      {getTeamBranding(game.home_id, game.home_name).displayName}
-                    </Text>
-                  </View>
+                <View style={{
+                  marginTop: 15,
+                  backgroundColor: '#007AFF',
+                  paddingVertical: 10,
+                  borderRadius: 8,
+                  alignItems: 'center'
+                }}>
+                  <Text style={{ color: '#fff', fontWeight: '900', fontSize: 14 }}>VIEW OFFICIAL BRACKET</Text>
                 </View>
               </Pressable>
-            ))}
+            ) : (
+              /* ORIGINAL FEATURED GAMES LOGIC */
+              featuredGames.map((game: any, index: number) => (
+                <Pressable
+                  key={game.game_key ?? index}
+                  onPress={() =>
+                    router.push({
+                      pathname: '/game/[gameKey]',
+                      params: { gameKey: game.game_key },
+                    })
+                  }
+                  style={({ pressed }) => [styles.featuredCard, pressed && styles.cardPressed]}>
+                  <Text style={styles.featuredCardMeta}>
+                    {game.display_date || game.date_key || 'TBD'} • {game.phase_display || game.phase || '—'} • Week {game.week ?? '—'}
+                  </Text>
+
+                  <View style={styles.featuredTeamRow}>
+                    <TeamLogo teamId={game.away_id} size={featuredLogoSize} />
+                    <View style={styles.featuredTeamTextWrap}>
+                      <Text style={styles.featuredTeamLine}>
+                        {getDisplayRank(game.away_id, game.lsl_rank_away, game.phase)}
+                        {getTeamBranding(game.away_id, game.away_name).displayName}
+                      </Text>
+                    </View>
+                  </View>
+
+                  <View style={[styles.featuredTeamRow, { marginBottom: 0 }]}>
+                    <TeamLogo teamId={game.home_id} size={featuredLogoSize} />
+                    <View style={styles.featuredTeamTextWrap}>
+                      <Text style={styles.featuredTeamLine}>
+                        {getDisplayRank(game.home_id, game.lsl_rank_home, game.phase)}
+                        {getTeamBranding(game.home_id, game.home_name).displayName}
+                      </Text>
+                    </View>
+                  </View>
+                </Pressable>
+              ))
+            )}
           </View>
 
           <View style={styles.section}>
@@ -634,9 +712,7 @@ export default function HomeScreen() {
                           <TeamLogo teamId={game.away_id} size={upcomingLogoSize} />
                           <View style={styles.upcomingGameTextWrap}>
                             <Text style={styles.upcomingGameLine}>
-                              {game.lsl_rank_away !== null && game.lsl_rank_away !== undefined
-                                ? `#${game.lsl_rank_away} `
-                                : ''}
+                              {getDisplayRank(game.away_id, game.lsl_rank_away, game.phase)}
                               {getTeamBranding(game.away_id, game.away_name).displayName}
                             </Text>
                           </View>
@@ -646,9 +722,7 @@ export default function HomeScreen() {
                           <TeamLogo teamId={game.home_id} size={upcomingLogoSize} />
                           <View style={styles.upcomingGameTextWrap}>
                             <Text style={styles.upcomingGameLine}>
-                              {game.lsl_rank_home !== null && game.lsl_rank_home !== undefined
-                                ? `#${game.lsl_rank_home} `
-                                : ''}
+                              {getDisplayRank(game.home_id, game.lsl_rank_home, game.phase)}
                               {getTeamBranding(game.home_id, game.home_name).displayName}
                             </Text>
                           </View>

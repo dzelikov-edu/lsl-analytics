@@ -15,7 +15,7 @@ import TeamLogo from '@/components/TeamLogo';
 import { getGameCoordinates, GAME_HEIGHT, CENTER_X, CENTER_Y } from '@/lib/bracketLayout';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { getTeamBranding } from '@/lib/teamBranding';
-import { useFocusEffect, router, Stack, useNavigation } from 'expo-router';
+import { useFocusEffect, router, Stack, useNavigation, useLocalSearchParams } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const MAP_SIZE = 5000;
@@ -28,9 +28,10 @@ type TournamentMapProps = {
     onRunPersonalSim?: () => void;       // handler for bottom-bar button
     onClose?: () => void;
     scoreSummary?: { score: number; pts_rem: number };
+    isPortal?: boolean;
 };
 
-export default function TournamentMap({ isMock = false, viewOnly = false, overrideBracketData, onRunPersonalSim, initialBracketId, onClose, scoreSummary, }: TournamentMapProps) {
+export default function TournamentMap({ isMock = false, viewOnly = false, overrideBracketData, onRunPersonalSim, initialBracketId, onClose, scoreSummary, isPortal: isPortalProp }: TournamentMapProps) {
     const colorScheme = useColorScheme() ?? 'light';
     const theme = AppColors[colorScheme];
     const insets = useSafeAreaInsets();
@@ -39,6 +40,15 @@ export default function TournamentMap({ isMock = false, viewOnly = false, overri
     const isAndroid = Platform.OS === 'android';
     const navigation = useNavigation();
     const [phase, setPhase] = useState<string | null>(null);
+    const params = useLocalSearchParams();
+    const isPortal = isPortalProp || params.portal === 'true';
+
+    // If we are in Portal mode, we are NOT in mock mode and we ARE in view-only.
+    const effectiveIsMock = isPortal ? false : isMock;
+    const effectiveViewOnly = isPortal ? true : viewOnly;
+
+    // DEBUG LOG - Keep this so you can check your terminal/Git Bash
+    console.log("ENTRY_MODE:", isPortal ? "PORTAL" : "STANDARD");
 
     useLayoutEffect(() => {
         // ONLY hide the header if this is the pushed Official Bracket screen
@@ -267,8 +277,9 @@ export default function TournamentMap({ isMock = false, viewOnly = false, overri
             const userData = await userRes.json();
             setUserIsAdmin(userData.is_admin || false);
 
-            // Use override data if provided (personal sim), otherwise use API data
-            const bracketData = (isMock && overrideBracketData && overrideBracketData.length > 0)
+            // Use override data if provided (personal sim), 
+            // otherwise use API data. FORCE Official if Portal.
+            const bracketData = (effectiveIsMock && overrideBracketData && overrideBracketData.length > 0)
                 ? overrideBracketData
                 : apiBracketData;
 
@@ -324,11 +335,19 @@ export default function TournamentMap({ isMock = false, viewOnly = false, overri
 
             // 4. Handle Active Bracket ID
             let currentBracketId = initialBracketId || bracketId;
-            if (!isMock && !currentBracketId && Array.isArray(brackets) && brackets.length > 0) {
+
+            if (isPortal) {
+                // HARD RESET: If this is the Home Screen Portal, 
+                // we strictly prohibit loading any user picks.
+                currentBracketId = null;
+            } else if (!isMock && !currentBracketId && Array.isArray(brackets) && brackets.length > 0) {
                 const unlocked = brackets.filter((b: any) => !b.is_locked);
                 currentBracketId = unlocked[0]?.id || brackets[0].id;
             }
-            setBracketId(currentBracketId);
+
+            // This force-clears the ID so the user-pick fetch below it fails/skips
+            const effectiveBracketId = isPortal ? null : currentBracketId;
+            setBracketId(effectiveBracketId);
 
             // 5. Final Data Transformation (Picks & Propagation)
             let updatedGames: any[] = [...bracketData];
@@ -380,12 +399,12 @@ export default function TournamentMap({ isMock = false, viewOnly = false, overri
 
     useEffect(() => {
         loadData();
-    }, [isMock, overrideBracketData]);
+    }, [isMock, overrideBracketData, isPortal]);
 
     useFocusEffect(
         React.useCallback(() => {
             loadData();
-        }, [isMock, overrideBracketData])
+        }, [isMock, overrideBracketData, isPortal])
     );
 
     const getPickCount = (roundName: string) => {
@@ -406,7 +425,7 @@ export default function TournamentMap({ isMock = false, viewOnly = false, overri
 
     const handleTeamPress = (game: any, teamId: string) => {
         // Commissioner scoring: Official mode, LIVE phase, not view-only
-        if (!isMock && phase === 'LIVE' && !viewOnly) {
+        if (!effectiveIsMock && phase === 'LIVE' && !effectiveViewOnly && !isPortal) {
             openScoreModal(game);
             return;
         }
@@ -415,7 +434,7 @@ export default function TournamentMap({ isMock = false, viewOnly = false, overri
     };
 
     const handlePick = (gameId: string, teamId: string) => {
-        if (isMock || viewOnly || phase === 'LIVE') return; // LOCK THE GATES
+        if (effectiveIsMock || effectiveViewOnly || phase === 'LIVE' || isPortal) return; // LOCK THE GATES
         if (teamId === "TBD") return;
         const isDeselecting = picks[gameId] === teamId;
         const newWinnerId = isDeselecting ? "" : teamId;
@@ -831,7 +850,7 @@ export default function TournamentMap({ isMock = false, viewOnly = false, overri
                             const coords = getGameCoordinates(game.region, game.round, game.game_slot, regionOrder);
                             const isChampGame = champGame && game.id === champGame.id && champTeamId;
 
-                            const isOfficial = !isMock;
+                            const isOfficial = !effectiveIsMock;
                             const gameWinnerId = game.winner_id || null;
 
                             let gameStatus: 'PREDICTION' | 'LIVE' | 'FINAL' = 'PREDICTION';
@@ -862,25 +881,28 @@ export default function TournamentMap({ isMock = false, viewOnly = false, overri
                                                 id: game.team_a_id,
                                                 name: teamNames[game.team_a_id] || game.team_a_id,
                                                 seed: teamSeeds[game.team_a_id] || 0,
-                                                score: !isMock ? game.score_a : null,
-                                                isWinner: !isMock && gameWinnerId === game.team_a_id,
+                                                score: !effectiveIsMock ? game.score_a : null, // Use effectiveIsMock
+                                                isWinner: !effectiveIsMock && gameWinnerId === game.team_a_id,
                                             }}
                                             teamB={{
                                                 id: game.team_b_id,
                                                 name: teamNames[game.team_b_id] || game.team_b_id,
                                                 seed: teamSeeds[game.team_b_id] || 0,
-                                                score: !isMock ? game.score_b : null,
-                                                isWinner: !isMock && gameWinnerId === game.team_b_id,
+                                                score: !effectiveIsMock ? game.score_b : null, // Use effectiveIsMock
+                                                isWinner: !effectiveIsMock && gameWinnerId === game.team_b_id,
                                             }}
-                                            status={gameStatus}
+                                            status={effectiveIsMock ? 'PREDICTION' : gameStatus}
                                             pickedWinnerId={pickedId || undefined}
                                             pickIsAlive={pickIsAlive}
                                             isBusted={isBusted}
                                             onPressTeamA={() => handleTeamPress(game, game.team_a_id)}
                                             onPressTeamB={() => handleTeamPress(game, game.team_b_id)}
-                                            onLongPress={() => openGameDetails(game)}
-                                            // Show pick indicators in Official mode for both SELECTION_SUNDAY and LIVE
-                                            showPickIndicators={!isMock && !!pickedId}
+                                            onLongPress={!effectiveIsMock ? () => openGameDetails(game) : undefined}
+                                            // --- THE SURGICAL FIX FOR THE DOTS ---
+                                            // 1. Must NOT be mock mode
+                                            // 2. Must NOT be the Home Screen portal
+                                            // 3. Must be either Selection Sunday OR have a pick to show in LIVE
+                                            showPickIndicators={!effectiveIsMock && !isPortal && (phase === 'SELECTION_SUNDAY' || !!pickedId)}
                                         />
                                     </View>
 
@@ -1010,7 +1032,7 @@ export default function TournamentMap({ isMock = false, viewOnly = false, overri
                     borderBottomColor: '#333',
                     overflow: 'hidden',
                     // Guarded height: Bracketology stays at 72... Official gets proper notch room.
-                    height: isMock
+                    height: effectiveIsMock
                         ? (72 + (isTablet ? 0 : insets.top - 22))
                         : isTablet
                             ? 72
@@ -1019,9 +1041,13 @@ export default function TournamentMap({ isMock = false, viewOnly = false, overri
                                 : 98,  // <-- Nudge iPhone Height independently
                 }}>
                     {/* ✕ EXIT BUTTON - ONLY FOR OFFICIAL MODE */}
-                    {!isMock && (
+                    {!effectiveIsMock && (
                         <Pressable
-                            onPress={onClose} // CHANGE THIS FROM router.back() to onClose
+                            onPress={() => {
+                                if (onClose) onClose();
+                                else if (router.canGoBack()) router.back();
+                                else router.replace('/');
+                            }}
                             style={{
                                 position: 'absolute',
                                 left: 15,
@@ -1042,7 +1068,7 @@ export default function TournamentMap({ isMock = false, viewOnly = false, overri
                     <View style={{
                         position: 'absolute',
                         // GUARDED POSITION: Keep your perfect Bracketology math
-                        top: isMock
+                        top: effectiveIsMock
                             ? (isTablet ? 20 : insets.top - 0)
                             : isTablet
                                 ? 25
@@ -1055,7 +1081,7 @@ export default function TournamentMap({ isMock = false, viewOnly = false, overri
                         zIndex: 10
                     }}>
                         <Text style={{ color: theme.text, fontWeight: '900', fontSize: 14, letterSpacing: 0.5 }}>
-                            {isMock ? 'LCAA BRACKETOLOGY • 2036' : 'OFFICIAL LCAA BRACKET • 2036'}
+                            {effectiveIsMock ? 'LCAA BRACKETOLOGY • 2036' : 'OFFICIAL LCAA BRACKET • 2036'}
                         </Text>
                     </View>
 
@@ -1063,7 +1089,7 @@ export default function TournamentMap({ isMock = false, viewOnly = false, overri
                     <Animated.View style={[{
                         position: 'absolute',
                         // GUARDED POSITION: Keep your perfect Bracketology math
-                        top: isMock
+                        top: effectiveIsMock
                             ? (20 + (isTablet ? 20 : insets.top))
                             : isTablet
                                 ? 45
@@ -1096,7 +1122,34 @@ export default function TournamentMap({ isMock = false, viewOnly = false, overri
                 </View>
 
                 {/* BOTTOM BAR */}
-                {!isMock && phase === 'SELECTION_SUNDAY' && !viewOnly ? (
+                {isPortal ? (
+                    // PORTAL MODE (Highest Priority)
+                    <View style={[styles.bottomBar, { backgroundColor: theme.card, paddingHorizontal: 15 }]}>
+                        <Pressable
+                            onPress={() => {
+                                if (onClose) onClose(); // Close the modal/map
+                                router.push('/(tabs)/bracket'); // Go to Hub
+                            }}
+                            style={({ pressed }) => [
+                                {
+                                    flex: 1,
+                                    backgroundColor: '#007AFF',
+                                    height: 42,
+                                    borderRadius: 10,
+                                    justifyContent: 'center',
+                                    alignItems: 'center',
+                                    flexDirection: 'row',
+                                    opacity: pressed ? 0.8 : 1
+                                }
+                            ]}
+                        >
+                            <Text style={{ color: '#fff', fontSize: 13, fontWeight: '900', letterSpacing: 0.5 }}>
+                                ENTER LCAA TOURNAMENT HUB
+                            </Text>
+                            <Text style={{ color: '#fff', fontSize: 16, marginLeft: 8 }}>→</Text>
+                        </Pressable>
+                    </View>
+                ) : !effectiveIsMock && phase === 'SELECTION_SUNDAY' && !effectiveViewOnly ? (
                     // Official mode, drafting open: Save Picks bar
                     <View style={[styles.bottomBar, { backgroundColor: theme.card }]}>
                         <View style={{ flex: 1, justifyContent: 'center' }}>
@@ -1130,7 +1183,7 @@ export default function TournamentMap({ isMock = false, viewOnly = false, overri
                             </Text>
                         </Pressable>
                     </View>
-                ) : !isMock && phase === 'LIVE' ? (
+                ) : !effectiveIsMock && phase === 'LIVE' ? (
                     // Official mode, LIVE: busted-path legend + optional score summary
                     <View style={[styles.bottomBar, { backgroundColor: theme.card, justifyContent: 'space-between' }]}>
                         <View style={{ flexDirection: 'row', alignItems: 'center' }}>
