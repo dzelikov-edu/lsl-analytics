@@ -6,7 +6,8 @@ from typing import Optional, List
 
 from app.deps_auth import get_current_user
 from app.models_devices import (
-    User, 
+    User,
+    Device, 
     TournamentState, 
     TournamentSeedList, 
     MockBracketResult,
@@ -19,7 +20,7 @@ from app.players_sync import refresh_players_snapshot_cache
 
 from sqlmodel import select, delete
 from app.db import AsyncSessionLocal
-from sqlalchemy import text  # ADD
+from sqlalchemy import text, func  # ADD
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
@@ -659,3 +660,20 @@ async def admin_send_global_push(
         # Global: Every active device in the league
         asyncio.create_task(notify_all_active_devices(req.title, req.body))
         return {"status": "success", "message": "League-wide broadcast enqueued."}
+
+@router.get("/devices/stats")
+async def admin_get_device_stats(current_user: User = Depends(get_current_user)):
+    if not current_user.is_admin:
+        raise HTTPException(status_code=403, detail="Admin only.")
+    
+    async with AsyncSessionLocal() as session:
+        # Count total active devices with tokens
+        stmt = select(func.count(Device.id)).where(Device.active == True)
+        res = await session.exec(stmt)
+        count = res.one()
+        
+        return {
+            "status": "success",
+            "active_registered_devices": count,
+            "ready_for_broadcast": count > 0
+        }
