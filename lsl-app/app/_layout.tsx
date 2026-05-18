@@ -82,17 +82,37 @@ export default function RootLayout() {
 }
 
 async function registerNotifications(token: string) {
-  if (!Device.isDevice) return;
-
-  const { status } = await Notifications.requestPermissionsAsync();
-  if (status !== 'granted') return;
-
   try {
+    // 1. Device check
+    if (!Device.isDevice) {
+      console.log("[NOTIFICATIONS] Skipping registration: Not a physical device.");
+      return;
+    }
+
+    // 2. Permission check with safety
+    const { status: existingStatus } = await Notifications.getPermissionsAsync();
+    let finalStatus = existingStatus;
+    if (existingStatus !== 'granted') {
+      const { status } = await Notifications.requestPermissionsAsync();
+      finalStatus = status;
+    }
+
+    if (finalStatus !== 'granted') {
+      console.log("[NOTIFICATIONS] Permissions not granted.");
+      return;
+    }
+
+    // 3. Token generation with project ID safety
     const tokenData = await Notifications.getExpoPushTokenAsync({
-      projectId: "1123b7ce-5272-4e3c-a214-fca8911aa554",
+      projectId: "1123b7ce-5272-4e3c-a214-fca8911aa554", // Using original ID
     });
 
-    await fetch('https://lsl-backend.onrender.com/api/devices', {
+    if (!tokenData?.data) {
+      throw new Error("No token data returned from Expo.");
+    }
+
+    // 4. Backend registration with explicit error handling
+    const res = await fetch('https://lsl-backend.onrender.com/api/devices', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -104,8 +124,15 @@ async function registerNotifications(token: string) {
         platform: Platform.OS === 'ios' ? 'ios' : 'android',
       }),
     });
+
+    if (!res.ok) {
+      console.warn(`[NOTIFICATIONS] Backend registration failed: ${res.status}`);
+    } else {
+      console.log("[NOTIFICATIONS] Successfully registered device.");
+    }
+
   } catch (error) {
-    // Keep a quiet error log just in case
-    console.warn("Notification registration failed:", error);
+    // CRITICAL: This catch ensures that even if notification logic fails, the app DOES NOT crash.
+    console.error("[NOTIFICATIONS ERROR] Registration suppressed to prevent crash:", error);
   }
 }

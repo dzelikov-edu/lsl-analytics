@@ -16,11 +16,11 @@ export default ({ config }) => {
             ...config.extra,
             backendUrl: 'https://lsl-backend.onrender.com',
             eas: {
-                projectId: "1123b7ce-5272-4e3c-a214-fca8911aa554",
+                projectId: "f20baf8d-6663-422d-93a7-04984c1b3562",
             },
         },
         updates: {
-            url: "https://u.expo.dev/1123b7ce-5272-4e3c-a214-fca8911aa554"
+            url: "https://u.expo.dev/f20baf8d-6663-422d-93a7-04984c1b3562"
         }
     };
 };

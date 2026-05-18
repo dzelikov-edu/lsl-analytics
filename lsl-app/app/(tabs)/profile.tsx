@@ -216,8 +216,8 @@ export default function ProfileScreen() {
         }
 
         Alert.alert(
-            "Sync Official Logos",
-            `This will download official branding for ${allTeamIds.length} teams and ${CONFERENCES.length} conferences. This might take a few minutes depending on your connection. Continue?`,
+            "Sync LSL Community Logos",
+            `This will download community branding for ${allTeamIds.length} teams and ${CONFERENCES.length} conferences. This might take a few minutes depending on your connection. Continue?`,
             [
                 { text: "Cancel", style: "cancel" },
                 {
@@ -732,9 +732,9 @@ export default function ProfileScreen() {
                 disabled={allTeamIds.length === 0} // DISABLE HERE
             >
                 <View style={{ flex: 1 }}>
-                    <Text style={styles.settingLabel}>⚙️ Import Realism Pack</Text>
+                    <Text style={styles.settingLabel}>⚙️ Import LSL Community Pack</Text>
                     <Text style={{ color: theme.mutedText, fontSize: 13, marginTop: 2 }}>
-                        Download official logos and assets from an external source.
+                        Download community logos and assets from an external source.
                     </Text>
                 </View>
             </Pressable>
