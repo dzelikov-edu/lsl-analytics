@@ -153,12 +153,13 @@ export default function TeamsScreen() {
         loading,
         error,
     } = useCachedApi({
-        cacheKey: 'teams:week0',
-        endpoint: '/teams?week=0',
+        cacheKey: 'teams:latest',
+        endpoint: '/teams',
         maxAgeMs: 1000 * 60 * 30,
     });
 
     const teams: TeamRow[] = payload?.teams ?? [];
+    console.log('DEBUG TEAMS:', teams[0]?.analytics);
 
     const filteredTeams = useMemo(() => {
         if (!searchQuery.trim()) return teams;

@@ -622,21 +622,33 @@ def teams(week: int | None = None):
     teams = _cached_teams_index()
     active = [t for t in teams if t.active]
 
-    # ---- LSL poll badge maps (latest week) ----
-    lsl_top25_rank = {}   # team_id -> 1..25
-    lsl_next5_order = {}  # team_id -> 1..5 (display-only; not an official rank)
-    poll_week = None
+    # ---- Determine selected week (latest if not provided) ----
+    selected_week = week
+    if selected_week is None:
+        try:
+            rows = _cached_polls()
+            if rows:
+                available_weeks = sorted({r["week"] for r in rows})
+                selected_week = available_weeks[-1]
+            else:
+                # fallback to latest games week if no polls
+                weeks_with_games = sorted({
+                    _to_int_or_none(g.get("week"))
+                    for g in GLOBAL_GAMES_LIST
+                    if g.get("a_score") is not None and g.get("b_score") is not None
+                })
+                selected_week = weeks_with_games[-1] if weeks_with_games else 0
+        except Exception:
+            selected_week = 0
 
+    # ---- LSL poll badge maps ----
+    lsl_top25_rank = {}
+    lsl_next5_order = {}
+    
     try:
         rows = _cached_polls()
-        if rows:
-            available_weeks = sorted({r["week"] for r in rows})
-            poll_week = week if week is not None else available_weeks[-1]
-
-            if poll_week not in available_weeks:
-                raise HTTPException(status_code=404, detail=f"Poll week {poll_week} not found")
-
-            lsl_rows = [r for r in rows if r["week"] == poll_week and r["poll"] == "LSL"]
+        if rows and selected_week is not None:
+            lsl_rows = [r for r in rows if r["week"] == selected_week and r["poll"] == "LSL"]
             for r in lsl_rows:
                 tid = str(r["team_id"]).strip().upper()
                 if r["bucket"] == "TOP25":
@@ -644,10 +656,10 @@ def teams(week: int | None = None):
                 elif r["bucket"] == "NEXT5":
                     lsl_next5_order[tid] = int(r["bucket_order"])
     except Exception:
-        # polls are optional; if anything fails, we just return null badges
-        lsl_top25_rank, lsl_next5_order, poll_week = {}, {}, None
+        pass
 
-    analytics_map = _team_list_analytics_map(week)
+    # Use the resolved selected_week here!
+    analytics_map = _team_list_analytics_map(selected_week)
 
     # Build response
     out = []
@@ -659,7 +671,7 @@ def teams(week: int | None = None):
             "sheet_id": t.sheet_id,
             "export_tab": t.export_tab,
             "polls": {
-                "week": poll_week,
+                "week": selected_week,
                 "LSL": {
                     "rank": lsl_top25_rank.get(tid),             # 1..25 or None
                     "next5_order": lsl_next5_order.get(tid),     # 1..5 or None
@@ -689,7 +701,7 @@ def teams(week: int | None = None):
     return {
         "teams_total": len(teams),
         "teams_active": len(active),
-        "poll_week": poll_week,
+        "poll_week": selected_week,
         "teams": out_sorted
     }
 

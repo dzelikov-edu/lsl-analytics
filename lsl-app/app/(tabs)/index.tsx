@@ -639,23 +639,38 @@ export default function HomeScreen() {
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Analytics</Text>
             <View style={styles.card}>
-              <View style={styles.leaderRow}>
-                <TeamLogo teamId={analytics?.power?.team_id} size={26} />
-                <View style={styles.leaderTextWrap}>
-                  <Text style={styles.leaderLabel}>Power Leader</Text>
-                  <Text style={styles.leaderName}>
-                    {analytics?.power?.team_id ? getTeamBranding(analytics.power.team_id, analytics.power.team_name).displayName : '—'}
-                  </Text>
-                  <Text style={styles.leaderValue}>
-                    {analytics?.power?.rank !== null && analytics?.power?.rank !== undefined
-                      ? `#${analytics.power.rank}`
-                      : '—'}
-                    {analytics?.power?.value !== null && analytics?.power?.value !== undefined
-                      ? ` • ${analytics.power.value}`
-                      : ''}
-                  </Text>
+              {[
+                { key: 'power', label: 'Power Leader', metric: analytics?.power },
+                { key: 'resume', label: 'Resume Leader', metric: analytics?.resume },
+                { key: 'form', label: 'Form Leader', metric: analytics?.form },
+                { key: 'sos', label: 'Toughest Schedule', metric: analytics?.sos },
+              ].map((entry, index) => (
+                <View
+                  key={entry.key}
+                  style={[
+                    styles.leaderRow,
+                    index > 0 && { marginTop: 12 }, // add spacing between rows
+                  ]}
+                >
+                  <TeamLogo teamId={entry.metric?.team_id} size={26} />
+                  <View style={styles.leaderTextWrap}>
+                    <Text style={styles.leaderLabel}>{entry.label}</Text>
+                    <Text style={styles.leaderName}>
+                      {entry.metric?.team_id
+                        ? getTeamBranding(entry.metric.team_id, entry.metric.team_name).displayName
+                        : '—'}
+                    </Text>
+                    <Text style={styles.leaderValue}>
+                      {entry.metric?.rank !== null && entry.metric?.rank !== undefined
+                        ? `#${entry.metric.rank}`
+                        : '—'}
+                      {entry.metric?.value !== null && entry.metric?.value !== undefined
+                        ? ` • ${entry.metric.value}`
+                        : ''}
+                    </Text>
+                  </View>
                 </View>
-              </View>
+              ))}
             </View>
           </View>
 
