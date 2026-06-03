@@ -398,12 +398,10 @@ def _cached_preseason_power():
 
 @lru_cache(maxsize=4)
 def _cached_analytics_power_payload(week: int | None = None):
-    w = 0 if week is None else week
-
     rows = _cached_preseason_power()
     if not rows:
         return {
-            "week": w,
+            "week": week,
             "metric": "power",
             "meta": {
                 "title": "LSL Power",
@@ -415,9 +413,29 @@ def _cached_analytics_power_payload(week: int | None = None):
             "count": 0,
             "items": [],
         }
+    
+    # Choose week
+    if week is None:
+        weeks = sorted({r["week"] for r in rows})
+        if not weeks:
+            return {
+                "week": week,
+                "metric": "power",
+                "meta": {
+                    "title": "LSL Power",
+                    "subtitle": "Who would be favored on a neutral floor today",
+                    "source": "PreseasonPower",
+                    "source_detail": "week_0_preseason_only",
+                    "status": "no_data",
+                },
+                "count": 0,
+                "items": [],
+            }
+        w = weeks[-1]  # latest available
+    else:
+        w = week
 
-    subset = [r for r in rows if r["week"] == w]
-
+    subset = [r for r in rows if r["week"] == week]
     if not subset:
         return {
             "week": w,
