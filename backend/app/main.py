@@ -2130,24 +2130,14 @@ def _analytics_featured_insights(week: int | None = None) -> list[dict]:
 
 @lru_cache(maxsize=4)
 def _cached_analytics_overview(week: int | None = None):
-    # Choose evaluation week: latest available if None
-    # Reuse played-games check to avoid picking a future empty week
-    if week is None:
-        # Try to find the latest week that actually has played games
-        # We know GLOBAL_GAMES_LIST is loaded at startup
-        weeks_with_games = sorted({
-            _to_int_or_none(g.get("week"))
-            for g in GLOBAL_GAMES_LIST
-            if g.get("a_score") is not None and g.get("b_score") is not None
-        })
-        if weeks_with_games:
-            w = weeks_with_games[-1]
-        else:
-            w = 0
-    else:
-        w = week
-
-    power = analytics_power(w)
+    """
+    Summary view that delegates week selection to the metric endpoints.
+    When week is None, each metric uses its own default (usually latest snapshot).
+    """
+    power = analytics_power(week)
+    resume = analytics_resume(week)
+    form = analytics_form(week)
+    sos = analytics_sos(week)
 
     def leader_from(resp: dict) -> dict | None:
         items = resp.get("items", [])
@@ -2165,37 +2155,11 @@ def _cached_analytics_overview(week: int | None = None):
             },
         }
 
-    # Preseason / no played games yet:
-    # only Power is meaningful, so skip Resume/Form/SOS and featured insights.
-    if not _has_played_games_through_week(w):
-        return {
-            "week": w,
-            "meta": {
-                "title": "Analytics",
-                "subtitle": "League-wide advanced team metrics",
-                "metrics_available": ["power", "resume", "form", "sos"],
-            },
-            "leaders": {
-                "power": leader_from(power),
-                "resume": None,
-                "form": None,
-                "sos": None,
-            },
-            "featured_insights": [],
-            "top_tables": {
-                "power": power.get("items", [])[:5],
-                "resume": [],
-                "form": [],
-                "sos": [],
-            },
-        }
-
-    resume = analytics_resume(w)
-    form = analytics_form(w)
-    sos = analytics_sos(w)
+    # Let power decide the display week; fall back to requested week
+    display_week = power.get("week", week)
 
     return {
-        "week": w,
+        "week": display_week,
         "meta": {
             "title": "Analytics",
             "subtitle": "League-wide advanced team metrics",
@@ -2207,7 +2171,7 @@ def _cached_analytics_overview(week: int | None = None):
             "form": leader_from(form),
             "sos": leader_from(sos),
         },
-        "featured_insights": _analytics_featured_insights(w),
+        "featured_insights": _analytics_featured_insights(week),
         "top_tables": {
             "power": power.get("items", [])[:5],
             "resume": resume.get("items", [])[:5],
@@ -2215,6 +2179,7 @@ def _cached_analytics_overview(week: int | None = None):
             "sos": sos.get("items", [])[:5],
         },
     }
+
 
 @app.get("/analytics")
 def analytics_overview(week: int | None = None):
