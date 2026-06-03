@@ -3987,6 +3987,15 @@ async def get_game_by_key(game_key: str):
     records_by_team = support["records_by_team"]
     leaders_by_team = support["leaders_by_team"]
 
+    # Resolve the latest week once for the whole matchup
+    weeks_with_games = sorted({
+        _to_int_or_none(g.get("week"))
+        for g in GLOBAL_GAMES_LIST
+        if g.get("a_score") is not None and g.get("b_score") is not None
+    })
+    latest_week = weeks_with_games[-1] if weeks_with_games else 0
+    analytics_map = _team_list_analytics_map(latest_week)
+
     def _team_preview(team_id: str):
         tid = str(team_id).strip().upper()
         team_row = team_index_map.get(tid)
@@ -4010,7 +4019,12 @@ async def get_game_by_key(game_key: str):
                     "LCAA": {"rank": None, "next5_order": None},
                 },
             ),
-            "analytics": _cached_team_analytics_summary(tid, 0),
+            "analytics": analytics_map.get(tid, {
+                "power": None,
+                "resume": None,
+                "form": None,
+                "sos": None,
+            }),
             "leaders": leaders_by_team.get(
                 tid,
                 {"ppg": None, "rpg": None, "apg": None, "spg": None},
