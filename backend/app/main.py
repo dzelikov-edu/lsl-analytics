@@ -2312,21 +2312,6 @@ def _preseason_power_rank_map(week: int | None = None) -> dict[str, int]:
 def analytics_resume(week: int | None = None):
     _ensure_data_dir()
 
-    if not os.path.exists(GAMES_JSON_PATH):
-        return {
-            "week": week,
-            "metric": "resume",
-            "meta": {
-                "title": "LSL Resume",
-                "subtitle": "Season accomplishment strength",
-                "source": "games.json",
-                "source_detail": "phase_1_quads_no_sos_weighting",
-                "status": "no_games_json",
-            },
-            "count": 0,
-            "items": [],
-        }
-
     global GLOBAL_GAMES_LIST
     games = GLOBAL_GAMES_LIST
     name_map = _team_name_map(active_only=True)
@@ -2521,21 +2506,6 @@ def _form_tier_from_rank(rank: int) -> str:
 def analytics_form(week: int | None = None):
     _ensure_data_dir()
 
-    if not os.path.exists(GAMES_JSON_PATH):
-        return {
-            "week": week,
-            "metric": "form",
-            "meta": {
-                "title": "LSL Form",
-                "subtitle": "Recent performance over the last 8 games",
-                "source": "games.json",
-                "source_detail": "last_8_played_games_v1",
-                "status": "no_games_json",
-            },
-            "count": 0,
-            "items": [],
-        }
-
     global GLOBAL_GAMES_LIST
     games = GLOBAL_GAMES_LIST
     name_map = _team_name_map(active_only=True)
@@ -2717,21 +2687,6 @@ def _sos_tier_from_rank(rank: int) -> str:
 @app.get("/analytics/sos")
 def analytics_sos(week: int | None = None):
     _ensure_data_dir()
-
-    if not os.path.exists(GAMES_JSON_PATH):
-        return {
-            "week": week,
-            "metric": "sos",
-            "meta": {
-                "title": "Strength of Schedule",
-                "subtitle": "Schedule difficulty to date",
-                "source": "games.json",
-                "source_detail": "played_games_only",
-                "status": "no_games_json",
-            },
-            "count": 0,
-            "items": [],
-        }
 
     global GLOBAL_GAMES_LIST
     games = GLOBAL_GAMES_LIST
