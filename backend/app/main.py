@@ -435,7 +435,7 @@ def _cached_analytics_power_payload(week: int | None = None):
     else:
         w = week
 
-    subset = [r for r in rows if r["week"] == week]
+    subset = [r for r in rows if r["week"] == w]
     if not subset:
         return {
             "week": w,
