@@ -2287,10 +2287,21 @@ def _resume_score_from_counts(
 def _preseason_power_rank_map(week: int | None = None) -> dict[str, int]:
     """
     Builds team_id -> rank map from PreseasonPower for the requested week.
-    For now, this is the evaluation-week opponent-quality snapshot used by Resume.
+    If week is None, use the latest available week from PreseasonPower.
     """
-    w = 0 if week is None else week
     rows = load_preseason_power()
+    if not rows:
+        return {}
+    
+    if week is None:
+        # Use the most recent available week
+        weeks = sorted({r["week"] for r in rows})
+        if not weeks:
+            return {}
+        w = weeks[-1]
+    else:
+        w = week
+
     subset = [r for r in rows if r["week"] == w]
     if not subset:
         return {}
