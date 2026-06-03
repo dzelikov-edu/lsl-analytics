@@ -2130,7 +2130,22 @@ def _analytics_featured_insights(week: int | None = None) -> list[dict]:
 
 @lru_cache(maxsize=4)
 def _cached_analytics_overview(week: int | None = None):
-    w = 0 if week is None else week
+    # Choose evaluation week: latest available if None
+    # Reuse played-games check to avoid picking a future empty week
+    if week is None:
+        # Try to find the latest week that actually has played games
+        # We know GLOBAL_GAMES_LIST is loaded at startup
+        weeks_with_games = sorted({
+            _to_int_or_none(g.get("week"))
+            for g in GLOBAL_GAMES_LIST
+            if g.get("a_score") is not None and g.get("b_score") is not None
+        })
+        if weeks_with_games:
+            w = weeks_with_games[-1]
+        else:
+            w = 0
+    else:
+        w = week
 
     power = analytics_power(w)
 
