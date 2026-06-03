@@ -1194,6 +1194,23 @@ async def get_team(team_id: str, week: int | None = None):
     except Exception:
         pass
 
+    # ---- analytics summary (power, resume, form, sos) ----
+    try:
+        analytics_map = _team_list_analytics_map(selected_week)
+        analytics_block = analytics_map.get(tid, {
+            "power": None,
+            "resume": None,
+            "form": None,
+            "sos": None,
+        })
+    except Exception:
+        analytics_block = {
+            "power": None,
+            "resume": None,
+            "form": None,
+            "sos": None,
+        }
+
     return {
         "team_id": tid,
         "team_name": match.team_name,
@@ -1209,7 +1226,7 @@ async def get_team(team_id: str, week: int | None = None):
 
         "record": record_block,
 
-        "analytics": _team_analytics_summary(tid, week),
+        "analytics": analytics_block,
 
         "roster_summary": {
             "players_count": await _team_roster_count(tid),

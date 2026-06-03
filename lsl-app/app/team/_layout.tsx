@@ -19,7 +19,6 @@ function TeamStackScreens() {
                     fontWeight: '700',
                     color: branding.headerText,
                 },
-                headerBackTitleVisible: false,
                 headerShadowVisible: false,
                 headerTitleAlign: 'center',
             }}>

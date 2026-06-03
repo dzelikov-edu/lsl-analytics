@@ -207,8 +207,8 @@ export default function AnalyticsScreen() {
         loading,
         error,
     } = useCachedApi({
-        cacheKey: 'analytics:week0',
-        endpoint: '/analytics?week=0',
+        cacheKey: 'analytics:latest',
+        endpoint: '/analytics',
         maxAgeMs: 1000 * 60 * 30,
     });
 
