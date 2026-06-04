@@ -2432,18 +2432,22 @@ def analytics_resume(week: int | None = None):
         ensure_team(ta)
         ensure_team(tb)
 
-        site = str(g.get("site", "")).strip().upper()
+        # --- FIX: CORRECT SITE DETECTION ---
+        venue = str(g.get("venue", "N")).strip().upper()
+        h_id = str(g.get("home_id", "")).strip().upper()
 
-        # team A perspective
-        if site == "HOME":
-            site_a = "HOME"
-            site_b = "AWAY"
-        elif site == "AWAY":
-            site_a = "AWAY"
-            site_b = "HOME"
-        else:
+        if venue == "N":
             site_a = "NEUTRAL"
             site_b = "NEUTRAL"
+        else:
+            # If Team A is the home_id, they are HOME, Team B is AWAY
+            if ta == h_id:
+                site_a = "HOME"
+                site_b = "AWAY"
+            else:
+                site_a = "AWAY"
+                site_b = "HOME"
+        # ------------------------------------
 
         quad_a = _resume_quad_for_opponent(tb, site_a, power_rank_map)
         quad_b = _resume_quad_for_opponent(ta, site_b, power_rank_map)
