@@ -2461,8 +2461,8 @@ def analytics_resume(week: int | None = None):
 
     ranked_rows = []
     for tid, r in rows.items():
-        # 1. Calculate the raw total points
-        total_pts = _resume_score_from_counts(
+        # Only use the raw total points, no division
+        value = _resume_score_from_counts(
             q1_wins=r["q1_wins"],
             q2_wins=r["q2_wins"],
             q3_wins=r["q3_wins"],
@@ -2472,15 +2472,6 @@ def analytics_resume(week: int | None = None):
             q3_losses=r["q3_losses"],
             q4_losses=r["q4_losses"],
         )
-
-        # 2. Count total games played
-        total_games = (
-            r["q1_wins"] + r["q2_wins"] + r["q3_wins"] + r["q4_wins"] +
-            r["q1_losses"] + r["q2_losses"] + r["q3_losses"] + r["q4_losses"]
-        )
-
-        # 3. Calculate Average Value (Normalized PPG)
-        value = round(total_pts / total_games, 4) if total_games > 0 else 0.0
 
         ranked_rows.append({
             "team_id": tid,
