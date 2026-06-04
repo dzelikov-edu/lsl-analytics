@@ -865,10 +865,19 @@ async def ingest_league(teams: List[TeamIndexRow]) -> dict:
         for game_key, game_data in global_unique.items():
             home_id = game_data.get("home_id")
             away_id = game_data.get("away_id")
-            home_score = game_data.get("a_score")
-            away_score = game_data.get("b_score")
+            team_a = game_data.get("team_a")
+            
+            # --- SURGICAL SCORE MAPPING ---
+            # Correctly identify scores based on team IDs, not database slots
+            if team_a == home_id:
+                h_score_val = game_data.get("a_score")
+                a_score_val = game_data.get("b_score")
+            else:
+                h_score_val = game_data.get("b_score")
+                a_score_val = game_data.get("a_score")
+            # ------------------------------
 
-            if home_score is not None and away_score is not None:
+            if h_score_val is not None and a_score_val is not None:
                 # 1. Check if we already notified for this specific game
                 statement = select(NotificationLog).where(NotificationLog.game_key == game_key)
                 results = await session.exec(statement)
@@ -883,14 +892,14 @@ async def ingest_league(teams: List[TeamIndexRow]) -> dict:
                     h_name = name_map.get(home_id, home_id)
                     a_name = name_map.get(away_id, away_id)
 
-                    if home_score > away_score:
+                    if h_score_val > a_score_val:
                         title = f"🏀 Final: {h_name} WINS!"
-                    elif away_score > home_score:
+                    elif a_score_val > h_score_val:
                         title = f"🏀 Final: {a_name} WINS!"
                     else:
                         title = "🏀 Final: It's a TIE!"
 
-                    body = f"{a_name} {away_score}, {h_name} {home_score}. Results are live."
+                    body = f"{a_name} {a_score_val}, {h_name} {h_score_val}. Results are live."
                     # ----------------------------------
 
                     print(f"Triggering auto-push for new result: {game_key}")
@@ -900,13 +909,13 @@ async def ingest_league(teams: List[TeamIndexRow]) -> dict:
                         team_id=home_id, 
                         title=title, 
                         body=body,
-                        data={"game_key": game_key, "team_id": home_id, "score": f"{home_score}-{away_score}"}
+                        data={"game_key": game_key, "team_id": home_id, "score": f"{h_score_val}-{a_score_val}"}
                     ))
                     asyncio.create_task(notify_team(
                         team_id=away_id, 
                         title=title, 
                         body=body,
-                        data={"game_key": game_key, "team_id": away_id, "score": f"{home_score}-{away_score}"}
+                        data={"game_key": game_key, "team_id": away_id, "score": f"{h_score_val}-{a_score_val}"}
                     ))
 
     # --- POLL UPDATES (Independent of Games) ---
