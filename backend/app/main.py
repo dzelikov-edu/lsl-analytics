@@ -396,6 +396,10 @@ def _has_played_games_through_week(week: int | None = None) -> bool:
 def _cached_preseason_power():
     return load_preseason_power()
 
+# TODO(LATER-SEASON): Power v2
+# - Blend PreseasonPower with results-based performance
+# - Preseason weight decays over time (by week or games played)
+# - Keep this season as preseason-only for stability, revisit in offseason
 @lru_cache(maxsize=4)
 def _cached_analytics_power_payload(week: int | None = None):
     rows = _cached_preseason_power()
@@ -4008,14 +4012,26 @@ async def get_game_by_key(game_key: str):
     records_by_team = support["records_by_team"]
     leaders_by_team = support["leaders_by_team"]
 
-    # Pass None to let the helper decide the latest available analytics week
-    analytics_map = _team_list_analytics_map(None)
+    # Compute game week once
+    phase_v = str(g.get("phase", "")).strip().upper()
+    week_v = _to_int_or_none(g.get("week"))
+    date_key = str(g.get("date_key", "")).strip()
+
+    # Use the game's own week so this map is cacheable and cheap
+    analytics_map = _team_list_analytics_map(week_v)
 
     def _team_preview(team_id: str):
         tid = str(team_id).strip().upper()
         team_row = team_index_map.get(tid)
         conf_id = team_conf_map.get(tid)
         conf_name = conf_names.get(conf_id) if conf_id else None
+
+        analytics_block = analytics_map.get(tid, {
+            "power": None,
+            "resume": None,
+            "form": None,
+            "sos": None,
+        })
 
         return {
             "team_id": tid,
@@ -4034,12 +4050,7 @@ async def get_game_by_key(game_key: str):
                     "LCAA": {"rank": None, "next5_order": None},
                 },
             ),
-            "analytics": {
-                "power": next((i for i in analytics_power(None)["items"] if i["team_id"] == tid), None),
-                "resume": next((i for i in analytics_resume(None)["items"] if i["team_id"] == tid), None),
-                "form": next((i for i in analytics_form(None)["items"] if i["team_id"] == tid), None),
-                "sos": next((i for i in analytics_sos(None)["items"] if i["team_id"] == tid), None),
-            },
+            "analytics": analytics_block,
             "leaders": leaders_by_team.get(
                 tid,
                 {"ppg": None, "rpg": None, "apg": None, "spg": None},
@@ -4051,10 +4062,6 @@ async def get_game_by_key(game_key: str):
     home_id = str(g.get("home_id", "")).strip().upper()
     away_id = str(g.get("away_id", "")).strip().upper()
     venue = str(g.get("venue", "")).strip().upper()
-
-    phase_v = str(g.get("phase", "")).strip().upper()
-    week_v = _to_int_or_none(g.get("week"))
-    date_key = str(g.get("date_key", "")).strip()
 
     a_score = g.get("a_score")
     b_score = g.get("b_score")
