@@ -2804,8 +2804,8 @@ def analytics_sos(week: int | None = None):
     for tid, r in rec.items():
         r["win_pct"] = round((r["wins"] / r["played"]), 4) if r["played"] > 0 else 0.0
 
-    # 2) Compute SOS-lite style opponent difficulty:
-    # average opponent win_pct, weighted by each played game
+    # 2) Compute Power-Weighted SOS (Hybrid Model):
+    # Combines Opponent Power (60%) with Opponent Win % (40%) to anchor the metric.
     opp_lists = {tid: [] for tid in rec.keys()}
 
     for g in played_games:
@@ -2818,19 +2818,34 @@ def analytics_sos(week: int | None = None):
         opp_lists[ta].append(tb)
         opp_lists[tb].append(ta)
 
+    # Get the fixed rank map for the Power component
+    power_rank_map = _preseason_power_rank_map(week)
+
     rows = []
     for tid, opps in opp_lists.items():
-        if len(opps) == 0:
+        if not opps:
             sos_value = 0.0
             counted = 0
         else:
-            s = 0.0
+            total_difficulty = 0.0
             counted = 0
             for o in opps:
                 if o in rec:
-                    s += rec[o]["win_pct"]
+                    # A. Win % Component (40%)
+                    win_factor = rec[o]["win_pct"]
+                    
+                    # B. Power Rank Component (60%)
+                    # Scale: Rank 1 = 1.0 difficulty, Rank 69 = 0.0
+                    opp_rank = power_rank_map.get(o, 70)
+                    power_factor = max(0, (70 - opp_rank) / 69)
+                    
+                    # C. Hybrid Weighted Score
+                    opp_difficulty = (power_factor * 0.60) + (win_factor * 0.40)
+                    
+                    total_difficulty += opp_difficulty
                     counted += 1
-            sos_value = round((s / counted), 4) if counted > 0 else 0.0
+            
+            sos_value = round((total_difficulty / counted), 4) if counted > 0 else 0.0
 
         rows.append({
             "team_id": tid,
@@ -2877,7 +2892,7 @@ def analytics_sos(week: int | None = None):
         "meta": {
             "title": "Strength of Schedule",
             "subtitle": "Schedule difficulty to date",
-            "source": "games.json",
+            "source": "games.json + PreseasonPower",
             "source_detail": "played_games_only",
             "status": "ok",
         },
