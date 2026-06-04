@@ -4013,12 +4013,12 @@ async def get_game_by_key(game_key: str):
                     "LCAA": {"rank": None, "next5_order": None},
                 },
             ),
-            "analytics": analytics_map.get(tid, {
-                "power": None,
-                "resume": None,
-                "form": None,
-                "sos": None,
-            }),
+            "analytics": {
+                "power": next((i for i in analytics_power(None)["items"] if i["team_id"] == tid), None),
+                "resume": next((i for i in analytics_resume(None)["items"] if i["team_id"] == tid), None),
+                "form": next((i for i in analytics_form(None)["items"] if i["team_id"] == tid), None),
+                "sos": next((i for i in analytics_sos(None)["items"] if i["team_id"] == tid), None),
+            },
             "leaders": leaders_by_team.get(
                 tid,
                 {"ppg": None, "rpg": None, "apg": None, "spg": None},
