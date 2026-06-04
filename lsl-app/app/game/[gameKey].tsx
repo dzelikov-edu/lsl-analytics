@@ -98,11 +98,14 @@ export default function GamePreviewScreen() {
         loading,
         error,
     } = useCachedApi({
-        cacheKey: `game:${gameKey}:detail`,
+        cacheKey: `game:${gameKey}:detail:v2`,
         endpoint: `/games/${gameKey}`,
-        maxAgeMs: 1000 * 60 * 30,
+        maxAgeMs: 1000 * 60 * 10,
         enabled: !!gameKey,
     });
+
+    console.log('DEBUG GAME KEY:', gameKey);
+    console.log('DEBUG FULL GAME DATA:', JSON.stringify(game?.away_team?.analytics, null, 2));
 
     const awayTeam: TeamPreview | null = game?.away_team ?? null;
     const homeTeam: TeamPreview | null = game?.home_team ?? null;

@@ -3987,14 +3987,8 @@ async def get_game_by_key(game_key: str):
     records_by_team = support["records_by_team"]
     leaders_by_team = support["leaders_by_team"]
 
-    # Resolve the latest week once for the whole matchup
-    weeks_with_games = sorted({
-        _to_int_or_none(g.get("week"))
-        for g in GLOBAL_GAMES_LIST
-        if g.get("a_score") is not None and g.get("b_score") is not None
-    })
-    latest_week = weeks_with_games[-1] if weeks_with_games else 0
-    analytics_map = _team_list_analytics_map(latest_week)
+    # Pass None to let the helper decide the latest available analytics week
+    analytics_map = _team_list_analytics_map(None)
 
     def _team_preview(team_id: str):
         tid = str(team_id).strip().upper()
