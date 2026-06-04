@@ -3984,15 +3984,18 @@ def _to_int_or_none(v):
     except Exception:
         return None
     
+import time
 
 @app.get("/games/{game_key}")
 async def get_game_by_key(game_key: str):
+    t0 = time.time()
     key = game_key.strip()
 
     async with AsyncSessionLocal() as session:
         statement = select(Game).where(Game.game_key == key)
         result = await session.exec(statement)
         game_row = result.one_or_none()
+    t_db = time.time()
 
     if not game_row:
         raise HTTPException(status_code=404, detail=f"game_key not found: {key}")
@@ -4002,6 +4005,7 @@ async def get_game_by_key(game_key: str):
     name_map = _cached_team_name_map_all()
     phase_map = _cached_week_phase_map()
     support = _cached_game_preview_support()
+    t_support = time.time()
 
     team_index_map = support["team_index_map"]
     players_by_team = support["players_by_team"]
@@ -4019,6 +4023,9 @@ async def get_game_by_key(game_key: str):
 
     # Use the game's own week so this map is cacheable and cheap
     analytics_map = _team_list_analytics_map(week_v)
+    t_analytics = time.time()
+
+    print(f"[GAME_TIMING] db={t_db - t0:.3f}s support={t_support - t_db:.3f}s analytics={t_analytics - t_support:.3f}s total_before_preview={t_analytics - t0:.3f}s")
 
     def _team_preview(team_id: str):
         tid = str(team_id).strip().upper()
