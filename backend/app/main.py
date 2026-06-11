@@ -19,6 +19,9 @@ from app.ingest import (
     load_week_phase_map,
 )
 
+import asyncio
+from app.ingest import trigger_latest_poll_notification
+
 import json
 import os
 from fastapi.middleware.cors import CORSMiddleware
@@ -81,6 +84,12 @@ async def startup():
         print("Redis limiter initialized.")
     except Exception as e:
         print(f"Redis init failed: {e}")
+
+    # 4. Trigger latest poll notification once per week (if not already)
+    try:
+        asyncio.create_task(trigger_latest_poll_notification())
+    except Exception as e:
+        print(f"Poll notification on startup failed: {e}")
 
     # 3. Log memory at steady state after startup
     log_memory("startup-complete")

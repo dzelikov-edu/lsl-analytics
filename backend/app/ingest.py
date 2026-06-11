@@ -918,36 +918,51 @@ async def ingest_league(teams: List[TeamIndexRow]) -> dict:
                         data={"game_key": game_key, "team_id": away_id, "score": f"{h_score_val}-{a_score_val}"}
                     ))
 
-    # --- POLL UPDATES (Independent of Games) ---
-    polls = load_polls()
-    if polls:
-        # 1. Determine the latest week present in the Polls tab
-        latest_poll_week = max(r["week"] for r in polls)
-        
-        # 2. Only notify starting Week 2 (when rankings first actually change)
-        if latest_poll_week >= 2:
-            poll_log_key = f"POLL_UPDATE_WEEK_{latest_poll_week}"
-            
-            async with AsyncSessionLocal() as session:
-                # 3. Check if we already alerted for this specific week's poll
-                statement = select(NotificationLog).where(NotificationLog.game_key == poll_log_key)
-                already_notified = (await session.exec(statement)).one_or_none()
-
-                if not already_notified:
-                    session.add(NotificationLog(game_key=poll_log_key))
-                    await session.commit()
-
-                    # 4. Identify the current #1 team for the headline
-                    lsl_1 = next((r for r in polls if r["week"] == latest_poll_week and r["poll"] == "LSL" and r["bucket_order"] == 1), None)
-                    top_name = name_map.get(lsl_1["team_id"], lsl_1["team_id"]) if lsl_1 else "A new team"
-
-                    title = f"📊 LSL Poll: Week {latest_poll_week} is OUT!"
-                    body = f"{top_name} is #1. See where your team landed in the updated Top 25."
-
-                    print(f"Triggering league-wide push for Week {latest_poll_week} Polls")
-                    asyncio.create_task(notify_all_active_devices(title, body))
-
     return {"summary": summary, "games_by_key": global_unique}
+
+
+async def trigger_latest_poll_notification():
+    """
+    Looks at Polls, finds latest week, and sends a league-wide notification
+    if we haven't already done so for that week.
+    """
+    polls = load_polls()
+    if not polls:
+        print("[POLL_NOTIFY] No polls data available.")
+        return
+
+    latest_poll_week = max(r["week"] for r in polls)
+    if latest_poll_week < 2:
+        print(f"[POLL_NOTIFY] Latest poll week {latest_poll_week} < 2, skipping.")
+        return
+
+    poll_log_key = f"POLL_UPDATE_WEEK_{latest_poll_week}"
+    name_map = load_team_map_names()
+
+    async with AsyncSessionLocal() as session:
+        stmt = select(NotificationLog).where(NotificationLog.game_key == poll_log_key)
+        already_notified = (await session.exec(stmt)).one_or_none()
+
+        if already_notified:
+            print(f"[POLL_NOTIFY] Already notified for {poll_log_key}, skipping.")
+            return
+
+        session.add(NotificationLog(game_key=poll_log_key))
+        await session.commit()
+
+        lsl_1 = next(
+            (r for r in polls
+             if r["week"] == latest_poll_week and r["poll"] == "LSL" and r["bucket_order"] == 1),
+            None,
+        )
+        top_name = name_map.get(lsl_1["team_id"], lsl_1["team_id"]) if lsl_1 else "A new team"
+
+        title = f"📊 LSL Poll: Week {latest_poll_week} is OUT!"
+        body = f"{top_name} is #1. See where your team landed in the updated Top 25."
+
+        print(f"[POLL_NOTIFY] Triggering league-wide push for Week {latest_poll_week} Polls")
+        await notify_all_active_devices(title, body)
+
 
 async def save_games_to_db(games_by_key: Dict[str, dict]):
     async with AsyncSessionLocal() as session:
