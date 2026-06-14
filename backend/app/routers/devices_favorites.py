@@ -24,13 +24,13 @@ class FavoriteRequest(BaseModel):
     teamId: str = Field(..., min_length=2, max_length=50, description="The unique team ID")
 
 
-@router.post("/devices", status_code=201, dependencies=[Depends(RateLimiter(times=10, minutes=1))])
+@router.post("/devices", status_code=201)
 async def register_device(req: DeviceRegisterRequest, current_user = Depends(get_current_user)):
     user_id = getattr(current_user, "id", None)
     device = await create_or_update_device(user_id, req.expoPushToken, req.deviceId, req.platform)
     return {"deviceId": device.id, "registered": True}
 
-@router.delete("/devices/{device_id}", dependencies=[Depends(RateLimiter(times=5, minutes=1))])
+@router.delete("/devices/{device_id}")
 async def delete_device(device_id: str, current_user = Depends(get_current_user)):
     user_id = getattr(current_user, "id", None)
     ok = await remove_device(device_id, user_id)
@@ -38,13 +38,13 @@ async def delete_device(device_id: str, current_user = Depends(get_current_user)
         raise HTTPException(status_code=404, detail="Device not found")
     return {"deleted": True}
 
-@router.get("/favorites", response_model=List[str], dependencies=[Depends(RateLimiter(times=20, minutes=1))])
+@router.get("/favorites", response_model=List[str])
 async def get_favorites(current_user = Depends(get_current_user)):
     user_id = getattr(current_user, "id")
     favs = await list_favorites(user_id)
     return [f.team_id for f in favs]
 
-@router.post("/favorites", status_code=201, dependencies=[Depends(RateLimiter(times=50, minutes=1))])
+@router.post("/favorites", status_code=201)
 async def post_favorite(req: FavoriteRequest, current_user = Depends(get_current_user)):
     user_id = getattr(current_user, "id")
     fav = await add_favorite(user_id, req.teamId)
@@ -52,7 +52,7 @@ async def post_favorite(req: FavoriteRequest, current_user = Depends(get_current
         raise HTTPException(status_code=409, detail="Already favorited")
     return {"added": True}
 
-@router.delete("/favorites/{team_id}", dependencies=[Depends(RateLimiter(times=50, minutes=1))])
+@router.delete("/favorites/{team_id}")
 async def delete_favorite(team_id: str, current_user = Depends(get_current_user)):
     user_id = getattr(current_user, "id")
     ok = await remove_favorite(user_id, team_id)

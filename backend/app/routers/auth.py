@@ -50,7 +50,7 @@ class UsernameUpdateRequest(BaseModel):
 
 import re
 
-@router.post("/register", response_model=TokenResponse, dependencies=[Depends(RateLimiter(times=5, minutes=1))])
+@router.post("/register", response_model=TokenResponse)
 async def register_user(payload: RegisterRequest):
     # 1. Identity Validation (3-20 chars, Alphanumeric/Underscore/Period)
     username = payload.username.strip().lower()
@@ -93,7 +93,7 @@ async def register_user(payload: RegisterRequest):
         return TokenResponse(access_token=token)
 
 
-@router.post("/login", response_model=TokenResponse, dependencies=[Depends(RateLimiter(times=10, minutes=1))])
+@router.post("/login", response_model=TokenResponse)
 async def login_user(payload: LoginRequest):
     async with AsyncSessionLocal() as session:
         # We lowercase the input to match our lowercase storage policy
@@ -199,10 +199,7 @@ async def forgot_password(payload: PasswordResetRequest): # Use your existing Sc
     }
     
 
-@router.post(
-    "/request-password-reset",
-    dependencies=[Depends(RateLimiter(times=5, minutes=1))],
-)
+@router.post("/request-password-reset")
 async def request_password_reset(payload: PasswordResetRequest):
     """
     Beta behavior:
@@ -247,11 +244,7 @@ async def request_password_reset(payload: PasswordResetRequest):
     }
 
 
-@router.post(
-    "/reset-password",
-    response_model=TokenResponse,
-    dependencies=[Depends(RateLimiter(times=5, minutes=1))],
-)
+@router.post("/reset-password", response_model=TokenResponse)
 async def reset_password(payload: PasswordResetConfirm):
     """
     Resets the user's password if the token is valid, not expired, and not used.

@@ -40,10 +40,7 @@ async def get_all_team_names():
     """Returns {TEAM_ID: display_name} for all 322+ teams."""
     return load_team_map_names_cached()
 
-@router.post(
-    "/admin/sync-official",
-    dependencies=[Depends(RateLimiter(times=1, minutes=5))],  # adjust window as you like
-)
+@router.post("/admin/sync-official")
 async def admin_sync_official_tournament(
     season: int = 2036,
     current_user: User = Depends(get_current_user),
