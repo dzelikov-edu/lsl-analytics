@@ -148,10 +148,12 @@ export default function RankingsScreen() {
         loading,
         error,
     } = useCachedApi({
-        cacheKey: 'rankings-all-polls-latest', // new key to bust any old cache
+        cacheKey: 'rankings-all-polls-latest-v2', // new key to bust any old cache
         endpoint: '/rankings/polls',          // no week param -> server uses latest
         maxAgeMs: 1000 * 60 * 10,
     });
+
+    console.log('RANKINGS DEBUG - WEEK:', payload?.week, 'CACHE_KEY: v2');
 
     // The backend uses 'primary' for LSL and 'secondary' for LCAA
     const currentPollData = selectedPoll === 'LSL' ? payload?.primary : payload?.secondary;

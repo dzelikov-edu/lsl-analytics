@@ -2833,6 +2833,14 @@ def analytics_sos(week: int | None = None):
 
     # Get the fixed rank map for the Power component
     power_rank_map = _preseason_power_rank_map(week)
+
+    # Get the current Resume Rankings to value opponent achievement
+    resume_resp = analytics_resume(week)
+    resume_rank_map = {
+        str(item["team_id"]).strip().upper(): item["rank"] 
+        for item in resume_resp.get("items", [])
+    }
+
     MIN_OPP_GAMES = 5  # Threshold to be considered for full SOS value
 
     rows = []
@@ -2845,16 +2853,17 @@ def analytics_sos(week: int | None = None):
             counted = 0
             for o in opps:
                 if o in rec:
-                    # A. Win % Component (40%)
-                    win_factor = rec[o]["win_pct"]
+                    # A. Power Component (50%)
+                    opp_p_rank = power_rank_map.get(o, 70)
+                    p_factor = max(0, (70 - opp_p_rank) / 69)
                     
-                    # B. Power Rank Component (60%)
-                    # Scale: Rank 1 = 1.0 difficulty, Rank 69 = 0.0
-                    opp_rank = power_rank_map.get(o, 70)
-                    power_factor = max(0, (70 - opp_rank) / 69)
+                    # B. Resume Component (50%) - The "Achievement" Factor
+                    # We use their current Resume Rank. If they aren't ranked, they get 70.
+                    opp_r_rank = resume_rank_map.get(o, 70)
+                    r_factor = max(0, (70 - opp_r_rank) / 69)
                     
-                    # C. Hybrid Weighted Score
-                    opp_difficulty = (power_factor * 0.60) + (win_factor * 0.40)
+                    # C. Hybrid Difficulty (Power talent + Resume achievement)
+                    opp_difficulty = (p_factor * 0.50) + (r_factor * 0.50)
                     
                     total_difficulty += opp_difficulty
                     counted += 1
@@ -2912,7 +2921,7 @@ def analytics_sos(week: int | None = None):
             "title": "Strength of Schedule",
             "subtitle": "Schedule difficulty to date",
             "source": "games.json + PreseasonPower",
-            "source_detail": "played_games_only",
+            "source_detail": "power_achievement_hybrid_v1",
             "status": "ok",
         },
         "count": len(items),
