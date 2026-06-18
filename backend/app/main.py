@@ -2833,6 +2833,7 @@ def analytics_sos(week: int | None = None):
 
     # Get the fixed rank map for the Power component
     power_rank_map = _preseason_power_rank_map(week)
+    MIN_OPP_GAMES = 5  # Threshold to be considered for full SOS value
 
     rows = []
     for tid, opps in opp_lists.items():
@@ -2858,7 +2859,12 @@ def analytics_sos(week: int | None = None):
                     total_difficulty += opp_difficulty
                     counted += 1
             
-            sos_value = round((total_difficulty / counted), 4) if counted > 0 else 0.0
+            # 1. Calculate raw average difficulty (base SOS)
+            base_sos = (total_difficulty / counted) if counted > 0 else 0.0
+
+            # 2. Scale by game volume (penalizes low-sample sizes)
+            volume_factor = min(counted, MIN_OPP_GAMES) / MIN_OPP_GAMES if counted > 0 else 0.0
+            sos_value = round(base_sos * volume_factor, 4)
 
         rows.append({
             "team_id": tid,
