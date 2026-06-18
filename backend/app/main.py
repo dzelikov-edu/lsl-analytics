@@ -2841,7 +2841,7 @@ def analytics_sos(week: int | None = None):
         for item in resume_resp.get("items", [])
     }
 
-    MIN_OPP_GAMES = 6  # Threshold to be considered for full SOS value
+    MIN_OPP_GAMES = 7  # Threshold to be considered for full SOS value
 
     rows = []
     for tid, opps in opp_lists.items():
