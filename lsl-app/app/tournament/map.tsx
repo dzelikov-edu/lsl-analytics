@@ -1234,7 +1234,7 @@ export default function TournamentMap({ isMock = false, viewOnly = false, overri
                                     Bracketology: seeded field. Run an AI sim to see one possible tournament path.
                                 </Text>
                                 <Text style={{ color: '#FF9500', fontSize: 9, fontWeight: '800', marginTop: 2 }}>
-                                    POST NONCONFERENCE • V2.0
+                                    POST REGULAR SEASON • V4.0
                                 </Text>
                             </View>
                             {onRunPersonalSim && (
