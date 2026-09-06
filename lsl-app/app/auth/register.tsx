@@ -16,7 +16,7 @@ export default function RegisterScreen() {
     const [showConfirmPassword, setShowConfirmPassword] = useState(false);
     const [username, setUsername] = useState('');
 
-    const colorScheme = useColorScheme() ?? 'light';
+    const colorScheme = useColorScheme() === 'dark' ? 'dark' : 'light';
     const theme = AppColors[colorScheme];
 
     const handleRegister = async () => {

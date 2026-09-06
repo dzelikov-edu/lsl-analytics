@@ -14,7 +14,7 @@ import { getToken } from '@/lib/auth-storage';
 import { API_BASE_URL } from '@/lib/api';
 
 export default function HomeScreen() {
-  const colorScheme = useColorScheme() ?? 'light';
+  const colorScheme = useColorScheme() === 'dark' ? 'dark' : 'light';
   const theme = AppColors[colorScheme];
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();

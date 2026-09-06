@@ -37,7 +37,7 @@ export default function TournamentMatchup({
     onLongPress,
     showPickIndicators = true,
 }: MatchupProps) {
-    const colorScheme = useColorScheme() ?? 'light';
+    const colorScheme = useColorScheme() === 'dark' ? 'dark' : 'light';
     const theme = AppColors[colorScheme];
     // Only mark as picked if the ID matches AND it's a real team (not TBD)
     const isPickedA = pickedWinnerId === teamA.id && teamA.id !== 'TBD';

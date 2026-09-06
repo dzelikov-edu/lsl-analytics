@@ -10,7 +10,11 @@ export default ({ config }) => {
         // ---------------------------------------
         plugins: [
             ...(config.plugins || []),
-            "expo-secure-store"
+            "expo-secure-store",
+            "expo-font",
+            "expo-image",
+            "expo-status-bar",
+            "expo-web-browser"
         ],
         extra: {
             ...config.extra,

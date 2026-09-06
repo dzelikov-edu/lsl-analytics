@@ -13,7 +13,7 @@ export default function LoginScreen() {
     const [showPassword, setShowPassword] = useState(false);
     const [loading, setLoading] = useState(false);
 
-    const colorScheme = useColorScheme() ?? 'light';
+    const colorScheme = useColorScheme() === 'dark' ? 'dark' : 'light';
     const theme = AppColors[colorScheme];
 
     const handleLogin = async () => {

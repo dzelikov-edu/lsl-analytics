@@ -59,7 +59,7 @@ type TeamPreview = {
 
 export default function GamePreviewScreen() {
     const { gameKey } = useLocalSearchParams<{ gameKey: string }>();
-    const colorScheme = useColorScheme() ?? 'light';
+    const colorScheme = useColorScheme() === 'dark' ? 'dark' : 'light';
     const theme = AppColors[colorScheme];
     const { width } = useWindowDimensions();
 

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, ActivityIndicator, Pressable, ScrollView, StyleSheet, Alert, Image, useWindowDimensions } from 'react-native';
+import { View, Text, ActivityIndicator, Pressable, ScrollView, StyleSheet, Alert, Image, useWindowDimensions, Platform } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { API_BASE_URL } from '@/lib/api';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -10,7 +10,7 @@ import { useFocusEffect } from 'expo-router';
 import TeamLogo from '@/components/TeamLogo';
 
 export default function BracketTab() {
-    const colorScheme = useColorScheme() ?? 'light';
+    const colorScheme = useColorScheme() === 'dark' ? 'dark' : 'light';
     const theme = AppColors[colorScheme];
     const insets = useSafeAreaInsets();
     const { width } = useWindowDimensions();
@@ -141,27 +141,42 @@ export default function BracketTab() {
     };
 
     const handleRenameBracket = (id: string, currentName: string) => {
-        Alert.prompt(
-            "Rename Bracket",
-            "Enter a new name for your entry:",
-            [
-                { text: "Cancel", style: "cancel" },
-                {
-                    text: "Rename",
-                    onPress: async (newName?: string) => {
-                        if (!newName) return;
-                        const token = await getToken();
-                        await fetch(`${API_BASE_URL}/api/tournament/brackets/${id}?name=${newName}`, {
-                            method: 'PATCH',
-                            headers: { Authorization: `Bearer ${token}` }
-                        });
-                        loadInitialData(); // Refresh list
-                    }
-                }
-            ],
-            "plain-text",
-            currentName
-        );
+        const executeRename = async (newName?: string) => {
+            if (!newName || newName.trim() === "") return; // Prevent saving blank names
+
+            try {
+                const token = await getToken();
+
+                // Safely encode spaces and special characters for the web URL
+                const encodedName = encodeURIComponent(newName.trim());
+
+                await fetch(`${API_BASE_URL}/api/tournament/brackets/${id}?name=${encodedName}`, {
+                    method: 'PATCH',
+                    headers: { Authorization: `Bearer ${token}` }
+                });
+
+                loadInitialData(); // Refresh list
+            } catch (e) {
+                console.error("Failed to rename bracket:", e);
+                Alert.alert("Error", "Could not rename bracket. Please check your network connection.");
+            }
+        };
+
+        if (Platform.OS === 'web') {
+            const newName = window.prompt("Rename Bracket\n\nEnter a new name for your entry:", currentName);
+            if (newName !== null) executeRename(newName);
+        } else {
+            Alert.prompt(
+                "Rename Bracket",
+                "Enter a new name for your entry:",
+                [
+                    { text: "Cancel", style: "cancel" },
+                    { text: "Rename", onPress: executeRename }
+                ],
+                "plain-text",
+                currentName
+            );
+        }
     };
 
     const handleDeleteBracket = (id: string) => {

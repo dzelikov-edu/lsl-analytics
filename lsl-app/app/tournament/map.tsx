@@ -32,12 +32,13 @@ type TournamentMapProps = {
 };
 
 export default function TournamentMap({ isMock = false, viewOnly = false, overrideBracketData, onRunPersonalSim, initialBracketId, onClose, scoreSummary, isPortal: isPortalProp }: TournamentMapProps) {
-    const colorScheme = useColorScheme() ?? 'light';
+    const colorScheme = useColorScheme() === 'dark' ? 'dark' : 'light';
     const theme = AppColors[colorScheme];
     const insets = useSafeAreaInsets();
     const { width } = useWindowDimensions();
     const isTablet = width >= 768;
     const isAndroid = Platform.OS === 'android';
+    const isWeb = Platform.OS === 'web'; // <-- Add web detection
     const navigation = useNavigation();
     const [phase, setPhase] = useState<string | null>(null);
     const params = useLocalSearchParams();
@@ -72,19 +73,28 @@ export default function TournamentMap({ isMock = false, viewOnly = false, overri
     // iPad: keep original. (-1035)
     // iPhone: keep current behavior. (-1250)
     // Android phones: allow much more travel so bottom of bracket is reachable.
-    const maxY = isTablet
-        ? (isMock ? -1035 : -1035) // -1035 remains locked for Bracketology (iPad)
-        : isAndroid
-            ? (isMock ? -1328 : -1420) // -1328 remains locked for Bracketology (Android)
-            : (isMock ? -1250 : -1250); // -1250 remains locked for Bracketology (iPhone)
-    // iPad stays at your original -85 top limit. iPhone gets more room at -20.
-    const minY = isTablet ? -85 : -60;
+    // Web gets its own massive boundaries. Mobile keeps YOUR exact math untouched.
+    const maxY = isWeb
+        ? -1260
+        : isTablet
+            ? (isMock ? -1035 : -1035)
+            : isAndroid
+                ? (isMock ? -1328 : -1420)
+                : (isMock ? -1250 : -1250);
+
+    const minY = isWeb
+        ? -85
+        : isTablet ? -85 : -60;
 
     // --- HORIZONTAL FORCEFIELD LOGIC ---
-    // maxX: The "Left Wall" (How far you can pan to see the left side)
-    const maxX = isTablet ? -2542 : -2920; // Try -2650 for iPhone to see more left
-    // minX: The "Right Wall" (How far you can pan to see the right side)
-    const minX = isTablet ? -327 : -327;   // Try -150 for iPhone to see more right
+    // maxX: The "Right Wall" (How far you can pan to see the right side)
+    const maxX = isWeb
+        ? -1818
+        : isTablet ? -2542 : -2920;
+    // minX: The "Left Wall" (How far you can pan to see the left side)
+    const minX = isWeb
+        ? -325
+        : isTablet ? -327 : -327;
 
     const [loading, setLoading] = useState(true);
     const [bracketGames, setBracketGames] = useState<any[]>([]);
@@ -573,53 +583,60 @@ export default function TournamentMap({ isMock = false, viewOnly = false, overri
     const handleLockBracket = async () => {
         if (!bracketId) return;
 
-        Alert.alert(
-            "Save Picks",
-            "Saving your current picks will also take you back to the 'My Brackets' screen. Proceed?",
-            [
-                { text: "Cancel", style: "cancel" },
-                {
-                    text: "Save & Exit",
-                    onPress: async () => {
-                        setLocking(true);
-                        try {
-                            const token = await getToken();
-                            if (!token) return;
+        const title = "Save Picks";
+        const message = "Saving your current picks will also take you back to the 'My Brackets' screen. Proceed?";
 
-                            const nonEmptyPicks: { [k: string]: string } = {};
-                            Object.entries(picks).forEach(([gameId, winnerId]) => {
-                                if (winnerId && winnerId !== "TBD") {
-                                    nonEmptyPicks[gameId] = winnerId;
-                                }
-                            });
+        const executeSave = async () => {
+            setLocking(true);
+            try {
+                const token = await getToken();
+                if (!token) return;
 
-                            // THE MISSING LINE:
-                            const res = await fetch(
-                                `${API_BASE_URL}/api/tournament/brackets/${bracketId}/picks?season=2036&lock=true`,
-                                {
-                                    method: 'POST',
-                                    headers: {
-                                        Authorization: `Bearer ${token}`,
-                                        'Content-Type': 'application/json',
-                                    },
-                                    body: JSON.stringify({ picks: nonEmptyPicks }),
-                                }
-                            );
-
-                            if (res.ok) {
-                                if (onClose) onClose(); // Take user back to list
-                            } else {
-                                Alert.alert("Error", "Failed to save picks. Check connection.");
-                            }
-                        } catch (e) {
-                            console.log("Error locking bracket:", e);
-                        } finally {
-                            setLocking(false);
-                        }
+                const nonEmptyPicks: { [k: string]: string } = {};
+                Object.entries(picks).forEach(([gameId, winnerId]) => {
+                    if (winnerId && winnerId !== "TBD") {
+                        nonEmptyPicks[gameId] = winnerId;
                     }
+                });
+
+                const res = await fetch(
+                    `${API_BASE_URL}/api/tournament/brackets/${bracketId}/picks?season=2036&lock=true`,
+                    {
+                        method: 'POST',
+                        headers: {
+                            Authorization: `Bearer ${token}`,
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({ picks: nonEmptyPicks }),
+                    }
+                );
+
+                if (res.ok) {
+                    if (onClose) onClose(); // Take user back to list
+                } else {
+                    Alert.alert("Error", "Failed to save picks. Check connection.");
                 }
-            ]
-        );
+            } catch (e) {
+                console.log("Error locking bracket:", e);
+            } finally {
+                setLocking(false);
+            }
+        };
+
+        if (Platform.OS === 'web') {
+            if (window.confirm(`${title}\n\n${message}`)) {
+                executeSave();
+            }
+        } else {
+            Alert.alert(
+                title,
+                message,
+                [
+                    { text: "Cancel", style: "cancel" },
+                    { text: "Save & Exit", onPress: executeSave }
+                ]
+            );
+        }
     };
 
     const renderSideRoundHeaders = (side: 'left' | 'right') => {
@@ -745,7 +762,11 @@ export default function TournamentMap({ isMock = false, viewOnly = false, overri
             }} />
             <View style={[styles.container, { backgroundColor: theme.background }]}>
                 <GestureDetector gesture={panGesture}>
-                    <Animated.View style={[styles.canvas, animatedStyle]}>
+                    <Animated.View style={[
+                        styles.canvas,
+                        isWeb && { position: 'absolute' }, // <-- WEB ONLY FIX
+                        animatedStyle
+                    ]}>
                         {regionOrder.map((r) => {
                             const posA = getGameCoordinates(r, 'Round_32', 2, regionOrder);
                             const posB = getGameCoordinates(r, 'Round_32', 3, regionOrder);

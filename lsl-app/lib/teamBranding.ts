@@ -5,17 +5,31 @@ import * as FileSystem from 'expo-file-system/legacy';
 import { realismEnabledCache, setRealismEnabled } from './nameMasking';
 
 let realismNamesMap: Record<string, string> = {};
+const GITHUB_JSON_URL = 'https://raw.githubusercontent.com/dzelikov-edu/lsl-realism-mods/main/team_names.json';
 
 async function loadRealismNames() {
-    const path = `${FileSystem.documentDirectory}team_names.json`;
-    try {
-        const info = await FileSystem.getInfoAsync(path);
-        if (info.exists) {
-            const content = await FileSystem.readAsStringAsync(path);
-            realismNamesMap = JSON.parse(content);
+    if (Platform.OS === 'web') {
+        // WEB: Fetch directly from your GitHub repository
+        try {
+            const res = await fetch(GITHUB_JSON_URL);
+            if (res.ok) {
+                realismNamesMap = await res.json();
+            }
+        } catch (e) {
+            console.log("Web: Failed to fetch realism name map.");
         }
-    } catch (e) {
-        console.log("No realism name map found.");
+    } else {
+        // MOBILE: Check the local hard drive for the downloaded pack
+        const path = `${FileSystem.documentDirectory}team_names.json`;
+        try {
+            const info = await FileSystem.getInfoAsync(path);
+            if (info.exists) {
+                const content = await FileSystem.readAsStringAsync(path);
+                realismNamesMap = JSON.parse(content);
+            }
+        } catch (e) {
+            console.log("No realism name map found.");
+        }
     }
 }
 // Trigger load on startup
@@ -2645,7 +2659,8 @@ export function getTeamBranding(teamId?: string | null, apiName?: string | null)
 
     let finalDisplayName = base.displayName;
 
-    if (realismEnabledCache === true) {
+    // Automatically bypass the local cache check if we are on the web
+    if (realismEnabledCache === true || Platform.OS === 'web') {
         // 1. Priority 1: Use the downloaded MasterIndex JSON name (Best quality)
         // 2. Priority 2: Use the name provided by the specific API screen
         // 3. Priority 3: ID-based Title Case fallback

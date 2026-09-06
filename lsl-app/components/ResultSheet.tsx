@@ -18,7 +18,7 @@ type ResultSheetProps = {
 };
 
 export default function ResultSheet({ visible, onClose, game, teamNames, pickedId, teamSeeds, teamRanks, userIsAdmin }: ResultSheetProps) {
-    const colorScheme = useColorScheme() ?? 'light';
+    const colorScheme = useColorScheme() === 'dark' ? 'dark' : 'light';
     const theme = AppColors[colorScheme];
 
     if (!visible || !game) return null;

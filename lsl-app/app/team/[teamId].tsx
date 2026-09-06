@@ -12,7 +12,7 @@ import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from
 
 export default function TeamDetailScreen() {
     const { teamId } = useLocalSearchParams<{ teamId: string }>();
-    const colorScheme = useColorScheme() ?? 'light';
+    const colorScheme = useColorScheme() === 'dark' ? 'dark' : 'light';
     const theme = AppColors[colorScheme];
 
     const [isFavorite, setIsFavorite] = useState(false);

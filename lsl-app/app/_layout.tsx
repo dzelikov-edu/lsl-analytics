@@ -1,4 +1,3 @@
-import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
 import { getToken } from '../lib/auth-storage';
 import { Stack, router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
@@ -16,7 +15,7 @@ export const unstable_settings = {
 };
 
 export default function RootLayout() {
-  const colorScheme = useColorScheme();
+  const colorScheme = useColorScheme() === 'dark' ? 'dark' : 'light';
   const [isReady, setIsReady] = useState(false);
 
   useEffect(() => {
@@ -63,20 +62,18 @@ export default function RootLayout() {
 
   return (
     <SafeAreaProvider>
-      <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-        <Stack>
-          <Stack.Screen name="intro" options={{ headerShown: false }} />
-          <Stack.Screen name="auth" options={{ headerShown: false }} />
-          <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-          <Stack.Screen name="team" options={{ headerShown: false }} />
-          <Stack.Screen name="conference" options={{ headerShown: false }} />
-          <Stack.Screen name="player" options={{ headerShown: false }} />
-          <Stack.Screen name="game" options={{ headerShown: false }} />
-          <Stack.Screen name="tournament/map" options={{ headerShown: false }} />
-          <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
-        </Stack>
-        <StatusBar style="auto" />
-      </ThemeProvider>
+      <Stack>
+        <Stack.Screen name="intro" options={{ headerShown: false }} />
+        <Stack.Screen name="auth" options={{ headerShown: false }} />
+        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+        <Stack.Screen name="team" options={{ headerShown: false }} />
+        <Stack.Screen name="conference" options={{ headerShown: false }} />
+        <Stack.Screen name="player" options={{ headerShown: false }} />
+        <Stack.Screen name="game" options={{ headerShown: false }} />
+        <Stack.Screen name="tournament/map" options={{ headerShown: false }} />
+        <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
+      </Stack>
+      <StatusBar style="auto" />
     </SafeAreaProvider>
   );
 }
@@ -84,7 +81,7 @@ export default function RootLayout() {
 async function registerNotifications(token: string) {
   try {
     // 1. Device check
-    if (!Device.isDevice) {
+    if (Platform.OS === 'web' || !Device.isDevice) {
       console.log("[NOTIFICATIONS] Skipping registration: Not a physical device.");
       return;
     }

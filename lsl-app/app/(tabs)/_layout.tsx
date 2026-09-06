@@ -10,7 +10,8 @@ import { getToken } from '@/lib/auth-storage';
 import { API_BASE_URL } from '@/lib/api';
 
 export default function TabLayout() {
-  const colorScheme = useColorScheme();
+  const colorScheme = useColorScheme() === 'dark' ? 'dark' : 'light';
+  const theme = Colors[colorScheme];
   const [isVerifying, setIsVerifying] = useState(true);
 
   // --- IDENTITY GATEKEEPER LOGIC ---
@@ -48,9 +49,14 @@ export default function TabLayout() {
   return (
     <Tabs
       screenOptions={{
-        tabBarActiveTintColor: Colors[colorScheme ?? 'light'].tint,
+        tabBarActiveTintColor: theme.tint,
+        tabBarInactiveTintColor: theme.tabIconDefault, // <-- Add this line
         headerShown: false,
         tabBarButton: HapticTab,
+        tabBarStyle: {
+          backgroundColor: theme.background,
+          borderTopColor: theme.background,
+        },
       }}>
       <Tabs.Screen
         name="index"

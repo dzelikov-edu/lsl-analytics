@@ -31,7 +31,7 @@ type TableRow = {
 };
 
 export default function AnalyticsScreen() {
-    const colorScheme = useColorScheme() ?? 'light';
+    const colorScheme = useColorScheme() === 'dark' ? 'dark' : 'light';
     const theme = AppColors[colorScheme];
     const insets = useSafeAreaInsets();
     const { width } = useWindowDimensions();

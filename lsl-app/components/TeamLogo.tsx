@@ -1,12 +1,15 @@
 import { AppColors } from '@/constants/app-colors';
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import { getTeamBranding } from '@/lib/teamBranding'; // Import your existing team branding logic
-import { StyleSheet, View } from 'react-native';
+import { getTeamBranding } from '@/lib/teamBranding';
+import { StyleSheet, View, Platform } from 'react-native'; // <-- Added Platform here
 import { Image } from 'expo-image';
-import { useTeamLogo } from '@/lib/teamLogos'; // Import the new hook
+import { useTeamLogo } from '@/lib/teamLogos';
 
-// Path to your new transparent generic basketball icon
 const GENERIC_BASKETBALL_ICON = require('@/assets/images/generic_basketball_transparent.png');
+
+// Define your direct GitHub raw content URL here:
+// Replace username, repo-name, and branch (main/master) with your actual details
+const GITHUB_RAW_BASE_URL = 'https://raw.githubusercontent.com/dzelikov-edu/lsl-realism-mods/main';
 
 type TeamLogoProps = {
     teamId?: string | null;
@@ -14,17 +17,28 @@ type TeamLogoProps = {
 };
 
 export default function TeamLogo({ teamId, size = 28 }: TeamLogoProps) {
-    const colorScheme = useColorScheme() ?? 'light';
+    const colorScheme = useColorScheme() === 'dark' ? 'dark' : 'light';
     const theme = AppColors[colorScheme];
 
-    // Get team branding for colors using your existing function
     const branding = getTeamBranding(teamId);
-
-    // This hook now handles checking local storage. Returns {uri: localPath} or null.
     const resolvedLogo = useTeamLogo(teamId);
 
+    // --- NEW WEB LOGIC ---
+    // If running on the web, bypass local storage and fetch directly from GitHub
+    if (Platform.OS === 'web' && teamId) {
+        return (
+            <Image
+                source={{ uri: `${GITHUB_RAW_BASE_URL}/team-logos/${teamId}.png` }}
+                contentFit="contain"
+                transition={0}
+                style={{ width: size, height: size }}
+            />
+        );
+    }
+    // ---------------------
+
+    // Original Mobile Logic: If a local downloaded logo is found, render it
     if (resolvedLogo) {
-        // If an imported logo is found, render it normally
         return (
             <Image
                 source={resolvedLogo}
@@ -39,30 +53,29 @@ export default function TeamLogo({ teamId, size = 28 }: TeamLogoProps) {
     return (
         <View
             style={[
-                styles.fallbackContainer, // Use the new style
+                styles.fallbackContainer,
                 {
                     width: size,
                     height: size,
-                    borderRadius: size / 2, // Make it a circle
-                    backgroundColor: branding.primary, // Team's primary color
-                    borderColor: branding.secondary, // Team's secondary color
+                    borderRadius: size / 2,
+                    backgroundColor: branding.primary,
+                    borderColor: branding.secondary,
                 },
             ]}
         >
-            {/* The transparent basketball icon */}
             <Image
                 source={GENERIC_BASKETBALL_ICON}
                 contentFit="contain"
                 transition={0}
-                style={{ width: size * 0.7, height: size * 0.7 }} // Slightly smaller to show background
+                style={{ width: size * 0.7, height: size * 0.7 }}
             />
         </View>
     );
 }
 
 const styles = StyleSheet.create({
-    fallbackContainer: { // Renamed from fallback to be specific
-        borderWidth: 1.5, // A visible border
+    fallbackContainer: {
+        borderWidth: 1.5,
         alignItems: 'center',
         justifyContent: 'center',
     },

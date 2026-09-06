@@ -6,7 +6,7 @@ import { router } from 'expo-router';
 import { setHasSeenIntro } from '@/lib/firstLaunch';
 
 export default function IntroScreen() {
-    const colorScheme = useColorScheme() ?? 'light';
+    const colorScheme = useColorScheme() === 'dark' ? 'dark' : 'light';
     const theme = AppColors[colorScheme];
 
     const handleContinue = async () => {

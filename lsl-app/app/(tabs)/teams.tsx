@@ -28,7 +28,7 @@ type TeamRow = {
 
 export default function TeamsScreen() {
     const [searchQuery, setSearchQuery] = useState('');
-    const colorScheme = useColorScheme() ?? 'light';
+    const colorScheme = useColorScheme() === 'dark' ? 'dark' : 'light';
     const theme = AppColors[colorScheme];
     const insets = useSafeAreaInsets();
     const { width } = useWindowDimensions();

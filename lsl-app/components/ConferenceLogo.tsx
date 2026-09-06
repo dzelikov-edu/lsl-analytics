@@ -14,7 +14,7 @@ type ConferenceLogoProps = {
 };
 
 export default function ConferenceLogo({ confId, size = 28 }: ConferenceLogoProps) {
-    const colorScheme = useColorScheme() ?? 'light';
+    const colorScheme = useColorScheme() === 'dark' ? 'dark' : 'light';
     const theme = AppColors[colorScheme];
 
     // Get conference branding for colors using your existing function

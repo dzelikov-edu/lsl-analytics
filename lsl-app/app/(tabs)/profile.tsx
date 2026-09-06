@@ -1,4 +1,4 @@
-import { View, Text, Pressable, StyleSheet, ScrollView, ActivityIndicator, RefreshControl, Alert, Switch, Image, useWindowDimensions, TextInput } from 'react-native';
+import { View, Text, Pressable, StyleSheet, ScrollView, ActivityIndicator, RefreshControl, Alert, Switch, Image, useWindowDimensions, TextInput, Platform } from 'react-native';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { AppColors } from '@/constants/app-colors';
 import { router, useFocusEffect } from 'expo-router'; // Add useFocusEffect
@@ -17,7 +17,7 @@ import * as FileSystem from 'expo-file-system/legacy';
 const CONFERENCES = ["AAC", "ACC", "B10", "B12", "BE", "MW", "P12", "SEC", "WCC"];
 
 export default function ProfileScreen() {
-    const colorScheme = useColorScheme() ?? 'light';
+    const colorScheme = useColorScheme() === 'dark' ? 'dark' : 'light';
     const theme = AppColors[colorScheme];
     const insets = useSafeAreaInsets();
     const { width } = useWindowDimensions();
@@ -189,61 +189,82 @@ export default function ProfileScreen() {
     };
 
     const handleLogout = () => {
-        Alert.alert(
-            "Log Out",
-            "Are you sure you want to log out of Legends CBB?",
-            [
-                { text: "Cancel", style: "cancel" },
-                {
-                    text: "Log Out",
-                    style: "destructive",
-                    onPress: async () => {
-                        await deleteToken();
-                        router.replace('/auth/login');
+        const executeLogout = async () => {
+            await deleteToken();
+            router.replace('/auth/login');
+        };
+
+        if (Platform.OS === 'web') {
+            if (window.confirm("Log Out\n\nAre you sure you want to log out of Legends CBB?")) {
+                executeLogout();
+            }
+        } else {
+            Alert.alert(
+                "Log Out",
+                "Are you sure you want to log out of Legends CBB?",
+                [
+                    { text: "Cancel", style: "cancel" },
+                    {
+                        text: "Log Out",
+                        style: "destructive",
+                        onPress: executeLogout
                     }
-                }
-            ]
-        );
+                ]
+            );
+        }
     };
 
     const handleImportLogos = async () => {
-        // Use the newly fetched list of ALL team IDs
-        // Check if allTeamIds is populated before starting the sync
-        const idsToSync = allTeamIds; // Use the state variable holding ALL the IDs
+        const idsToSync = allTeamIds;
         if (allTeamIds.length === 0) {
             Alert.alert("Error", "Please wait for team data to load before syncing. Try pulling to refresh.");
             return;
         }
 
-        Alert.alert(
-            "Sync LSL Community Logos",
-            `This will download community branding for ${allTeamIds.length} teams and ${CONFERENCES.length} conferences. This might take a few minutes depending on your connection. Continue?`,
-            [
-                { text: "Cancel", style: "cancel" },
-                {
-                    text: "Sync Now",
-                    onPress: async () => {
-                        setLoading(true);
-                        setSyncProgress(0); // Reset progress
-                        setSyncTotal(idsToSync.length + CONFERENCES.length); // Set total
+        const title = "Sync LSL Community Logos";
+        const message = `This will download community branding for ${allTeamIds.length} teams and ${CONFERENCES.length} conferences. This might take a few minutes depending on your connection. Continue?`;
 
-                        const success = await importLogoPack(idsToSync, (current, total) => {
-                            setSyncProgress(current); // Update progress
-                            setSyncTotal(total);     // Update total (if it changes)
-                        });
+        const executeImport = async () => {
+            setLoading(true);
+            setSyncProgress(0); // Reset progress
+            setSyncTotal(idsToSync.length + CONFERENCES.length); // Set total
 
-                        setLoading(false);
-                        setSyncProgress(0); // Clear progress on finish
+            try {
+                const success = await importLogoPack(idsToSync, (current, total) => {
+                    setSyncProgress(current); // Update progress
+                    setSyncTotal(total);     // Update total (if it changes)
+                });
 
-                        if (success) {
-                            Alert.alert("Success", "Logos synced! Please restart the app to see the new logos.");
-                        } else {
-                            Alert.alert("Error", "Sync failed. Please check your connection or try again.");
-                        }
-                    }
+                setLoading(false);
+                setSyncProgress(0); // Clear progress on finish
+
+                if (success) {
+                    Alert.alert("Success", "Logos synced! Please restart the app to see the new logos.");
+                } else {
+                    Alert.alert("Error", "Sync failed. Please check your connection or try again.");
                 }
-            ]
-        );
+            } catch (e) {
+                setLoading(false);
+                setSyncProgress(0);
+                Alert.alert("Error", "A critical error occurred during the logo sync.");
+                console.error("Logo import error:", e);
+            }
+        };
+
+        if (Platform.OS === 'web') {
+            if (window.confirm(`${title}\n\n${message}`)) {
+                executeImport();
+            }
+        } else {
+            Alert.alert(
+                title,
+                message,
+                [
+                    { text: "Cancel", style: "cancel" },
+                    { text: "Sync Now", onPress: executeImport }
+                ]
+            );
+        }
     };
 
     const styles = useMemo(() => StyleSheet.create({
@@ -321,215 +342,272 @@ export default function ProfileScreen() {
     };
 
     const handleSyncDBSchema = async () => {
-        try {
-            const token = await getToken();
-            // Call the specific column patch endpoint
-            const res = await fetch(`${API_BASE_URL}/admin/db/patch-seedlist-columns`, {
-                method: 'POST',
-                headers: { Authorization: `Bearer ${token}` }
-            });
-            if (res.ok) {
-                Alert.alert("Success", "Columns added successfully.");
-            } else {
-                Alert.alert("Error", "Migration failed.");
+        const title = "Sync DB Schema";
+        const message = "Are you sure you want to patch the database columns? This cannot be undone.";
+
+        const executeMigration = async () => {
+            try {
+                const token = await getToken();
+                // Call the specific column patch endpoint
+                const res = await fetch(`${API_BASE_URL}/admin/db/patch-seedlist-columns`, {
+                    method: 'POST',
+                    headers: { Authorization: `Bearer ${token}` }
+                });
+                if (res.ok) {
+                    Alert.alert("Success", "Columns added successfully.");
+                } else {
+                    Alert.alert("Error", "Migration failed.");
+                }
+            } catch (e) {
+                Alert.alert("Error", "Network error.");
             }
-        } catch (e) {
-            Alert.alert("Error", "Network error.");
+        };
+
+        if (Platform.OS === 'web') {
+            if (window.confirm(`${title}\n\n${message}`)) {
+                executeMigration();
+            }
+        } else {
+            Alert.alert(
+                title,
+                message,
+                [
+                    { text: "Cancel", style: "cancel" },
+                    { text: "Confirm", onPress: executeMigration }
+                ]
+            );
         }
     };
 
     const handleSetTournamentPhase = async (newPhase: string) => {
-        Alert.alert(
-            "Change Tournament Phase",
-            `Are you sure you want to switch the app to ${newPhase} mode?`,
-            [
-                { text: "Cancel", style: "cancel" },
-                {
-                    text: "Confirm",
-                    onPress: async () => {
-                        setLoading(true);
-                        try {
-                            const token = await getToken();
-                            const res = await fetch(`${API_BASE_URL}/admin/tournament/set-phase?phase=${newPhase}&season=2036`, {
-                                method: 'POST',
-                                headers: { Authorization: `Bearer ${token}` }
-                            });
-                            if (res.ok) {
-                                setPhase(newPhase); // ADD THIS: Instantly update the label in your console
-                                Alert.alert("Success", `Phase changed to ${newPhase}.`)
-                            } else {
-                                Alert.alert("Error", "Failed to update phase.");
-                            }
-                        } catch (e) {
-                            Alert.alert("Error", "Network error.");
-                        } finally {
-                            setLoading(false);
-                        }
-                    }
+        const title = "Change Tournament Phase";
+        const message = `Are you sure you want to switch the app to ${newPhase} mode?`;
+
+        const executePhaseChange = async () => {
+            setLoading(true);
+            try {
+                const token = await getToken();
+                const res = await fetch(`${API_BASE_URL}/admin/tournament/set-phase?phase=${newPhase}&season=2036`, {
+                    method: 'POST',
+                    headers: { Authorization: `Bearer ${token}` }
+                });
+                if (res.ok) {
+                    setPhase(newPhase); // Instantly update the label in your console
+                    Alert.alert("Success", `Phase changed to ${newPhase}.`);
+                } else {
+                    Alert.alert("Error", "Failed to update phase.");
                 }
-            ]
-        );
+            } catch (e) {
+                Alert.alert("Error", "Network error.");
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        if (Platform.OS === 'web') {
+            if (window.confirm(`${title}\n\n${message}`)) {
+                executePhaseChange();
+            }
+        } else {
+            Alert.alert(
+                title,
+                message,
+                [
+                    { text: "Cancel", style: "cancel" },
+                    { text: "Confirm", onPress: executePhaseChange }
+                ]
+            );
+        }
     };
 
     const handleRunBracketSim = async () => {
-        Alert.alert(
-            "Run Tournament Simulation",
-            "This will execute the LSL AI Engine to generate a new projected bracket based on power and trends. This will overwrite the current public projection. Continue?",
-            [
-                { text: "Cancel", style: "cancel" },
-                {
-                    text: "Run Sim",
-                    onPress: async () => {
-                        setLoading(true);
-                        try {
-                            const token = await getToken();
-                            const res = await fetch(`${API_BASE_URL}/admin/tournament/run-sim?season=2036`, {
-                                method: 'POST',
-                                headers: { Authorization: `Bearer ${token}` }
-                            });
-                            setLoading(false);
-                            if (res.ok) {
-                                Alert.alert("Success", "New AI Simulation Published!");
-                            } else {
-                                Alert.alert("Error", "Simulation failed.");
-                            }
-                        } catch (e) {
-                            setLoading(false);
-                            Alert.alert("Error", "Could not connect to server.");
-                        }
-                    }
+        const title = "Run Tournament Simulation";
+        const message = "This will execute the LSL AI Engine to generate a new projected bracket based on power and trends. This will overwrite the current public projection. Continue?";
+
+        const executeAction = async () => {
+            setLoading(true);
+            try {
+                const token = await getToken();
+                const res = await fetch(`${API_BASE_URL}/admin/tournament/run-sim?season=2036`, {
+                    method: 'POST',
+                    headers: { Authorization: `Bearer ${token}` }
+                });
+                setLoading(false);
+                if (res.ok) {
+                    Alert.alert("Success", "New AI Simulation Published!");
+                } else {
+                    Alert.alert("Error", "Simulation failed.");
                 }
-            ]
-        );
+            } catch (e) {
+                setLoading(false);
+                Alert.alert("Error", "Could not connect to server.");
+            }
+        };
+
+        if (Platform.OS === 'web') {
+            if (window.confirm(`${title}\n\n${message}`)) {
+                executeAction();
+            }
+        } else {
+            Alert.alert(title, message, [
+                { text: "Cancel", style: "cancel" },
+                { text: "Run Sim", onPress: executeAction }
+            ]);
+        }
     };
 
     const handleBracketologySync = async () => {
-        Alert.alert(
-            "Sync Bracketology",
-            "This will pull the current rankings from the LCAA_Bracketology sheet to update the mock bracket. Continue?",
-            [
-                { text: "Cancel", style: "cancel" },
-                {
-                    text: "Run Sync",
-                    onPress: async () => {
-                        setLoading(true);
-                        try {
-                            const token = await getToken();
-                            const res = await fetch(`${API_BASE_URL}/admin/tournament/sync-bracketology?season=2036`, {
-                                method: 'POST',
-                                headers: { Authorization: `Bearer ${token}` }
-                            });
-                            const data = await res.json();
-                            setLoading(false);
-                            if (res.ok) {
-                                Alert.alert("Success", `Synced ${data.teams_synced} teams to the Seed List.`);
-                            } else {
-                                Alert.alert("Error", data.detail || "Sync failed.");
-                            }
-                        } catch (e) {
-                            setLoading(false);
-                            Alert.alert("Error", "Could not connect to server.");
-                        }
-                    }
+        const title = "Sync Bracketology";
+        const message = "This will pull the current rankings from the LCAA_Bracketology sheet to update the mock bracket. Continue?";
+
+        const executeSync = async () => {
+            setLoading(true);
+            try {
+                const token = await getToken();
+                const res = await fetch(`${API_BASE_URL}/admin/tournament/sync-bracketology?season=2036`, {
+                    method: 'POST',
+                    headers: { Authorization: `Bearer ${token}` }
+                });
+                const data = await res.json();
+                setLoading(false);
+                if (res.ok) {
+                    Alert.alert("Success", `Synced ${data.teams_synced} teams to the Seed List.`);
+                } else {
+                    Alert.alert("Error", data.detail || "Sync failed.");
                 }
-            ]
-        );
+            } catch (e) {
+                setLoading(false);
+                Alert.alert("Error", "Could not connect to server.");
+            }
+        };
+
+        if (Platform.OS === 'web') {
+            if (window.confirm(`${title}\n\n${message}`)) {
+                executeSync();
+            }
+        } else {
+            Alert.alert(
+                title,
+                message,
+                [
+                    { text: "Cancel", style: "cancel" },
+                    { text: "Run Sync", onPress: executeSync }
+                ]
+            );
+        }
     };
 
     const handleTournamentSync = async () => {
-        Alert.alert(
-            "LCAA Selection Sunday",
-            "This will read the Official Field from Google Sheets and generate the 2036 LCAA Bracket. Continue?",
-            [
-                { text: "Cancel", style: "cancel" },
-                {
-                    text: "Run Sync",
-                    onPress: async () => {
-                        setLoading(true);
-                        try {
-                            const token = await getToken();
-                            const res = await fetch(`${API_BASE_URL}/admin/tournament/sync?season=2036`, {
-                                method: 'POST',
-                                headers: { Authorization: `Bearer ${token}` }
-                            });
+        const title = "LCAA Selection Sunday";
+        const message = "This will read the Official Field from Google Sheets and generate the 2036 LCAA Bracket. Continue?";
 
-                            const data = await res.json();
-                            setLoading(false);
+        const executeTournamentSync = async () => {
+            setLoading(true);
+            try {
+                const token = await getToken();
+                const res = await fetch(`${API_BASE_URL}/admin/tournament/sync?season=2036`, {
+                    method: 'POST',
+                    headers: { Authorization: `Bearer ${token}` }
+                });
 
-                            if (res.ok) {
-                                // Format the AI Consultant's report
-                                const warningCount = data.consultant_report?.rematch_count || 0;
-                                const alerts = data.consultant_report?.rematch_alerts || [];
+                const data = await res.json();
+                setLoading(false);
 
-                                let alertMsg = `Successfully synced ${data.teams_synced} teams.`;
-                                if (warningCount > 0) {
-                                    alertMsg += `\n\n⚠️ AI CONSULTANT: Found ${warningCount} rematch conflicts:\n`;
-                                    alerts.forEach((a: any) => alertMsg += `\n• ${a.message}`);
-                                } else {
-                                    alertMsg += `\n\n✅ AI CONSULTANT: No pod rematches detected.`;
-                                }
+                if (res.ok) {
+                    // Format the AI Consultant's report
+                    const warningCount = data.consultant_report?.rematch_count || 0;
+                    const alerts = data.consultant_report?.rematch_alerts || [];
 
-                                Alert.alert("Sync Complete", alertMsg);
-                            } else {
-                                Alert.alert("Sync Failed", data.detail || "Check server logs.");
-                            }
-                        } catch (e) {
-                            setLoading(false);
-                            Alert.alert("Error", "Could not connect to server.");
-                        }
+                    let alertMsg = `Successfully synced ${data.teams_synced} teams.`;
+                    if (warningCount > 0) {
+                        alertMsg += `\n\n⚠️ AI CONSULTANT: Found ${warningCount} rematch conflicts:\n`;
+                        alerts.forEach((a: any) => alertMsg += `\n• ${a.message}`);
+                    } else {
+                        alertMsg += `\n\n✅ AI CONSULTANT: No pod rematches detected.`;
                     }
+
+                    Alert.alert("Sync Complete", alertMsg);
+                } else {
+                    Alert.alert("Sync Failed", data.detail || "Check server logs.");
                 }
-            ]
-        );
+            } catch (e) {
+                setLoading(false);
+                Alert.alert("Error", "Could not connect to server.");
+            }
+        };
+
+        if (Platform.OS === 'web') {
+            if (window.confirm(`${title}\n\n${message}`)) {
+                executeTournamentSync();
+            }
+        } else {
+            Alert.alert(
+                title,
+                message,
+                [
+                    { text: "Cancel", style: "cancel" },
+                    { text: "Run Sync", onPress: executeTournamentSync }
+                ]
+            );
+        }
     };
 
     const handlePlayersSnapshotSync = async () => {
-        Alert.alert(
-            "Sync Players Snapshot",
-            "This will pull the latest player data from the PlayersSnapshot tab in your Master sheet and overwrite the in-app snapshot. Continue?",
-            [
-                { text: "Cancel", style: "cancel" },
-                {
-                    text: "Run Sync",
-                    onPress: async () => {
-                        setLoading(true);
-                        try {
-                            const token = await getToken();
-                            if (!token) {
-                                Alert.alert("Error", "You must be logged in as an admin.");
-                                return;
-                            }
+        const title = "Sync Players Snapshot";
+        const message = "This will pull the latest player data from the PlayersSnapshot tab in your Master sheet and overwrite the in-app snapshot. Continue?";
 
-                            const res = await fetch(`${API_BASE_URL}/admin/players/sync`, {
-                                method: 'POST',
-                                headers: { Authorization: `Bearer ${token}` },
-                            });
-
-                            const text = await res.text();
-                            let data: any = {};
-                            try {
-                                data = JSON.parse(text);
-                            } catch {
-                                // ignore parse error; text may not be JSON on failure
-                            }
-
-                            setLoading(false);
-
-                            if (res.ok) {
-                                const imported = data?.rows_imported ?? 'unknown';
-                                Alert.alert("Success", `Synced ${imported} player rows from PlayersSnapshot.`);
-                            } else {
-                                Alert.alert("Error", data?.detail || `Sync failed (HTTP ${res.status}).`);
-                            }
-                        } catch (e) {
-                            console.log("Players snapshot sync error", e);
-                            setLoading(false);
-                            Alert.alert("Error", "Could not connect to server.");
-                        }
-                    }
+        const executeSnapshotSync = async () => {
+            setLoading(true);
+            try {
+                const token = await getToken();
+                if (!token) {
+                    setLoading(false);
+                    Alert.alert("Error", "You must be logged in as an admin.");
+                    return;
                 }
-            ]
-        );
+
+                const res = await fetch(`${API_BASE_URL}/admin/players/sync`, {
+                    method: 'POST',
+                    headers: { Authorization: `Bearer ${token}` },
+                });
+
+                const text = await res.text();
+                let data: any = {};
+                try {
+                    data = JSON.parse(text);
+                } catch {
+                    // ignore parse error; text may not be JSON on failure
+                }
+
+                setLoading(false);
+
+                if (res.ok) {
+                    const imported = data?.rows_imported ?? 'unknown';
+                    Alert.alert("Success", `Synced ${imported} player rows from PlayersSnapshot.`);
+                } else {
+                    Alert.alert("Error", data?.detail || `Sync failed (HTTP ${res.status}).`);
+                }
+            } catch (e) {
+                console.log("Players snapshot sync error", e);
+                setLoading(false);
+                Alert.alert("Error", "Could not connect to server.");
+            }
+        };
+
+        if (Platform.OS === 'web') {
+            if (window.confirm(`${title}\n\n${message}`)) {
+                executeSnapshotSync();
+            }
+        } else {
+            Alert.alert(
+                title,
+                message,
+                [
+                    { text: "Cancel", style: "cancel" },
+                    { text: "Run Sync", onPress: executeSnapshotSync }
+                ]
+            );
+        }
     };
 
     const handleManualPush = async () => {
@@ -543,42 +621,52 @@ export default function ProfileScreen() {
             ? targetTeam.split(',').map(t => t.trim()).filter(t => t.length > 0)
             : [];
 
-        Alert.alert(
-            "Confirm Broadcast",
-            `Send this to ${teamsList.length > 0 ? teamsList.join(' & ') + ' fans' : 'EVERYONE'}?`,
-            [
-                { text: "Cancel", style: "cancel" },
-                {
-                    text: "Send Now",
-                    onPress: async () => {
-                        try {
-                            const token = await getToken();
-                            const res = await fetch(`${API_BASE_URL}/admin/send-global-push`, {
-                                method: 'POST',
-                                headers: {
-                                    'Authorization': `Bearer ${token}`,
-                                    'Content-Type': 'application/json'
-                                },
-                                body: JSON.stringify({
-                                    title: customTitle,
-                                    body: customBody,
-                                    teamIds: teamsList.length > 0 ? teamsList : null
-                                })
-                            });
-                            if (res.ok) {
-                                Alert.alert("Success", "Broadcast enqueued!");
-                                setCustomTitle(''); setCustomBody(''); setTargetTeam('');
-                            } else {
-                                const err = await res.json();
-                                Alert.alert("Error", err.detail || "Failed to send.");
-                            }
-                        } catch (e) {
-                            Alert.alert("Error", "Connection failure.");
-                        }
-                    }
+        const title = "Confirm Broadcast";
+        const message = `Send this to ${teamsList.length > 0 ? teamsList.join(' & ') + ' fans' : 'EVERYONE'}?`;
+
+        const executePush = async () => {
+            try {
+                const token = await getToken();
+                const res = await fetch(`${API_BASE_URL}/admin/send-global-push`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        title: customTitle,
+                        body: customBody,
+                        teamIds: teamsList.length > 0 ? teamsList : null
+                    })
+                });
+                if (res.ok) {
+                    Alert.alert("Success", "Broadcast enqueued!");
+                    setCustomTitle('');
+                    setCustomBody('');
+                    setTargetTeam('');
+                } else {
+                    const err = await res.json();
+                    Alert.alert("Error", err.detail || "Failed to send.");
                 }
-            ]
-        );
+            } catch (e) {
+                Alert.alert("Error", "Connection failure.");
+            }
+        };
+
+        if (Platform.OS === 'web') {
+            if (window.confirm(`${title}\n\n${message}`)) {
+                executePush();
+            }
+        } else {
+            Alert.alert(
+                title,
+                message,
+                [
+                    { text: "Cancel", style: "cancel" },
+                    { text: "Send Now", onPress: executePush }
+                ]
+            );
+        }
     };
 
     return (

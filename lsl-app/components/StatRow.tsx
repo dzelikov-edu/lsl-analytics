@@ -11,7 +11,7 @@ type StatRowProps = {
 };
 
 export default function StatRow({ label, valueA, valueB, isCore }: StatRowProps) {
-    const colorScheme = useColorScheme() ?? 'light';
+    const colorScheme = useColorScheme() === 'dark' ? 'dark' : 'light';
     const theme = AppColors[colorScheme];
 
     return (

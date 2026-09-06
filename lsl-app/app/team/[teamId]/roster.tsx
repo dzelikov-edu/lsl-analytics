@@ -25,7 +25,7 @@ type PlayerRow = {
 
 export default function TeamRosterScreen() {
     const { teamId } = useLocalSearchParams<{ teamId: string }>();
-    const colorScheme = useColorScheme() ?? 'light';
+    const colorScheme = useColorScheme() === 'dark' ? 'dark' : 'light';
     const theme = AppColors[colorScheme];
 
     const styles = useMemo(

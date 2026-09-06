@@ -7,7 +7,7 @@ import { AppColors } from '@/constants/app-colors';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 
 export default function ClaimIdentityScreen() {
-    const colorScheme = useColorScheme() ?? 'light';
+    const colorScheme = useColorScheme() === 'dark' ? 'dark' : 'light';
     const theme = AppColors[colorScheme];
     const [username, setUsername] = useState('');
     const [loading, setLoading] = useState(false);

@@ -13,7 +13,7 @@ type ScoutingReportProps = {
 };
 
 export default function ScoutingReport({ visible, onClose, teamA, teamB }: ScoutingReportProps) {
-    const colorScheme = useColorScheme() ?? 'light';
+    const colorScheme = useColorScheme() === 'dark' ? 'dark' : 'light';
     const theme = AppColors[colorScheme];
     const [isExpanded, setIsExpanded] = useState(false);
 

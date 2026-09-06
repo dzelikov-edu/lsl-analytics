@@ -25,7 +25,7 @@ type Next5Row = {
 type PollKey = 'LSL' | 'LCAA';
 
 export default function RankingsScreen() {
-    const colorScheme = useColorScheme() ?? 'light';
+    const colorScheme = useColorScheme() === 'dark' ? 'dark' : 'light';
     const theme = AppColors[colorScheme];
     const insets = useSafeAreaInsets();
     const { width } = useWindowDimensions();
