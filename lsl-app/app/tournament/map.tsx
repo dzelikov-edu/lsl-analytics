@@ -40,6 +40,7 @@ export default function TournamentMap({ isMock = false, viewOnly = false, overri
     const isAndroid = Platform.OS === 'android';
     const isWeb = Platform.OS === 'web'; // <-- Add web detection
     const isDesktopWeb = isWeb && width >= 768; // Only apply web constraints if it's a large screen
+    const isMobileWeb = isWeb && width < 768;
     const navigation = useNavigation();
     const [phase, setPhase] = useState<string | null>(null);
     const params = useLocalSearchParams();
@@ -77,11 +78,13 @@ export default function TournamentMap({ isMock = false, viewOnly = false, overri
     // Web gets its own massive boundaries. Mobile keeps YOUR exact math untouched.
     const maxY = isDesktopWeb
         ? -1260
-        : isTablet
-            ? (isMock ? -1035 : -1035)
-            : isAndroid
-                ? (isMock ? -1328 : -1420)
-                : (isMock ? -1250 : -1250);
+        : isMobileWeb
+            ? -1650 // Extra travel distance to bypass mobile browser UI bars
+            : isTablet
+                ? (isMock ? -1035 : -1035)
+                : isAndroid
+                    ? (isMock ? -1328 : -1420)
+                    : (isMock ? -1250 : -1250);
 
     const minY = isDesktopWeb
         ? -85
