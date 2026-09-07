@@ -79,7 +79,7 @@ export default function TournamentMap({ isMock = false, viewOnly = false, overri
     const maxY = isDesktopWeb
         ? -1260
         : isMobileWeb
-            ? -1650 // Extra travel distance to bypass mobile browser UI bars
+            ? -1420 // Extra travel distance to bypass mobile browser UI bars
             : isTablet
                 ? (isMock ? -1035 : -1035)
                 : isAndroid
