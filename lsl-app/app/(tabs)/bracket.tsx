@@ -110,8 +110,10 @@ export default function BracketTab() {
     );
 
     const handleCreateBracket = async () => {
+        // 1. Platform fork for the limit warning
         if (brackets.length >= 10) {
-            Alert.alert("Limit Reached", "You can only create up to 10 brackets.");
+            if (Platform.OS === 'web') window.alert("Limit Reached\n\nYou can only create up to 10 brackets.");
+            else Alert.alert("Limit Reached", "You can only create up to 10 brackets.");
             return;
         }
 
@@ -131,7 +133,10 @@ export default function BracketTab() {
                 setSelectedBracketId(newBracket.id); // Auto-open new bracket
             }
         } catch (e) {
-            Alert.alert("Error", "Could not create bracket.");
+            // 2. Platform fork for the error handling
+            console.error("Failed to create bracket:", e);
+            if (Platform.OS === 'web') window.alert("Error\n\nCould not create bracket.");
+            else Alert.alert("Error", "Could not create bracket.");
         }
     };
 
@@ -180,139 +185,247 @@ export default function BracketTab() {
     };
 
     const handleDeleteBracket = (id: string) => {
-        Alert.alert(
-            "Delete Bracket",
-            "Are you sure? This will permanently remove this bracket and all its picks.",
-            [
-                { text: "Cancel", style: "cancel" },
-                {
-                    text: "Delete",
-                    style: "destructive",
-                    onPress: async () => {
-                        const token = await getToken();
-                        await fetch(`${API_BASE_URL}/api/tournament/brackets/${id}`, {
-                            method: 'DELETE',
-                            headers: { Authorization: `Bearer ${token}` }
-                        });
-                        loadInitialData();
-                    }
-                }
-            ]
-        );
+        // 1. Isolate the delete logic and add error handling
+        const executeDelete = async () => {
+            try {
+                const token = await getToken();
+                await fetch(`${API_BASE_URL}/api/tournament/brackets/${id}`, {
+                    method: 'DELETE',
+                    headers: { Authorization: `Bearer ${token}` }
+                });
+                loadInitialData();
+            } catch (e) {
+                console.error("Failed to delete bracket:", e);
+                Alert.alert("Error", "Could not delete bracket. Please check your network connection.");
+            }
+        };
+
+        // 2. Platform fork
+        if (Platform.OS === 'web') {
+            // Web uses the native browser confirmation box
+            if (window.confirm("Delete Bracket\n\nAre you sure? This will permanently remove this bracket and all its picks.")) {
+                executeDelete();
+            }
+        } else {
+            // Mobile uses your exact original Alert.alert
+            Alert.alert(
+                "Delete Bracket",
+                "Are you sure? This will permanently remove this bracket and all its picks.",
+                [
+                    { text: "Cancel", style: "cancel" },
+                    { text: "Delete", style: "destructive", onPress: executeDelete }
+                ]
+            );
+        }
     };
 
     const handleCreateGroup = () => {
-        Alert.prompt(
-            "Create Bracket Group",
-            "Enter a name for your league (e.g., The Office Pool):",
-            [
-                { text: "Cancel", style: "cancel" },
-                {
-                    text: "Create",
-                    onPress: async (groupName?: string) => {
-                        if (!groupName) return;
-                        const token = await getToken();
-                        const res = await fetch(`${API_BASE_URL}/api/tournament/groups?name=${groupName}&season=2036`, {
-                            method: 'POST',
-                            headers: { Authorization: `Bearer ${token}` }
-                        });
-                        if (res.ok) {
-                            Alert.alert("Success", "Group created! Share the code with friends.");
-                            loadInitialData(); // Refresh both lists
-                        }
-                    }
+        // 1. Isolate the API logic and add URL encoding/error handling
+        const executeCreate = async (groupName?: string) => {
+            if (!groupName || groupName.trim() === "") return;
+
+            try {
+                const token = await getToken();
+                const encodedName = encodeURIComponent(groupName.trim());
+
+                const res = await fetch(`${API_BASE_URL}/api/tournament/groups?name=${encodedName}&season=2036`, {
+                    method: 'POST',
+                    headers: { Authorization: `Bearer ${token}` }
+                });
+
+                if (res.ok) {
+                    if (Platform.OS === 'web') window.alert("Success!\n\nGroup created! Share the code with friends.");
+                    else Alert.alert("Success", "Group created! Share the code with friends.");
+                    loadInitialData(); // Refresh both lists
+                } else {
+                    const errorData = await res.json().catch(() => ({}));
+                    const errorMsg = errorData.detail || "Failed to create group.";
+                    if (Platform.OS === 'web') window.alert(`Error\n\n${errorMsg}`);
+                    else Alert.alert("Error", errorMsg);
                 }
-            ]
-        );
+            } catch (e) {
+                console.error("Failed to create group:", e);
+                if (Platform.OS === 'web') window.alert("Error\n\nCould not create group. Please check your network connection.");
+                else Alert.alert("Error", "Could not create group. Please check your network connection.");
+            }
+        };
+
+        // 2. The completely hidden platform fork
+        if (Platform.OS === 'web') {
+            const groupName = window.prompt("Create Bracket Group\n\nEnter a name for your league (e.g., The Office Pool):");
+            if (groupName !== null) {
+                executeCreate(groupName);
+            }
+        } else {
+            // By casting Alert to 'any', the web bundler ignores this entirely
+            const safePrompt = (Alert as any).prompt;
+            if (safePrompt) {
+                safePrompt(
+                    "Create Bracket Group",
+                    "Enter a name for your league (e.g., The Office Pool):",
+                    [
+                        { text: "Cancel", style: "cancel" },
+                        { text: "Create", onPress: executeCreate }
+                    ]
+                );
+            } else {
+                Alert.alert("Not Supported", "Text prompts are only supported on iOS right now.");
+            }
+        }
     };
 
     const handleJoinGroup = () => {
-        Alert.prompt(
-            "Join Bracket Group",
-            "Enter the 6-character join code:",
-            [
-                { text: "Cancel", style: "cancel" },
-                {
-                    text: "Next",
-                    onPress: (code?: string) => { // Added type
-                        if (!code) return;
+        // 1. Isolate the API logic
+        const executeJoin = async (code: string, targetBracketId: string) => {
+            try {
+                const token = await getToken();
+                const res = await fetch(`${API_BASE_URL}/api/tournament/groups/join?code=${code.toUpperCase()}&user_bracket_id=${targetBracketId}`, {
+                    method: 'POST',
+                    headers: { Authorization: `Bearer ${token}` }
+                });
+                const data = await res.json();
 
-                        // Create the buttons list
-                        const bracketButtons = brackets.map(b => ({
-                            text: b.name,
-                            onPress: async () => {
-                                const token = await getToken();
-                                const res = await fetch(`${API_BASE_URL}/api/tournament/groups/join?code=${code.toUpperCase()}&user_bracket_id=${b.id}`, {
-                                    method: 'POST',
-                                    headers: { Authorization: `Bearer ${token}` }
-                                });
-                                const data = await res.json();
-                                if (res.ok) {
-                                    Alert.alert("Welcome!", `You've joined ${data.group_name}.`);
-                                    loadInitialData();
-                                } else {
-                                    Alert.alert("Error", data.detail || "Failed to join group.");
-                                }
-                            }
-                        }));
+                if (res.ok) {
+                    if (Platform.OS === 'web') window.alert(`Welcome!\n\nYou've joined ${data.group_name}.`);
+                    else Alert.alert("Welcome!", `You've joined ${data.group_name}.`);
+                    loadInitialData();
+                } else {
+                    const errorMsg = data.detail || "Failed to join group.";
+                    if (Platform.OS === 'web') window.alert(`Error\n\n${errorMsg}`);
+                    else Alert.alert("Error", errorMsg);
+                }
+            } catch (e) {
+                console.error("Failed to join group:", e);
+                if (Platform.OS === 'web') window.alert("Error\n\nNetwork error while joining group.");
+                else Alert.alert("Error", "Network error while joining group.");
+            }
+        };
 
-                        // Show selection with a separate cancel button to avoid type mismatch
-                        Alert.alert(
-                            "Select Your Entry",
-                            "Choose which bracket to enter into this group. Remember: a bracket can only be used in one group.",
-                            [
-                                ...bracketButtons,
-                                { text: "Cancel", style: "cancel" }
-                            ]
-                        );
+        // 2. The completely hidden platform fork
+        if (Platform.OS === 'web') {
+            const code = window.prompt("Join Bracket Group\n\nEnter the 6-character join code:");
+            if (code) {
+                if (brackets.length === 0) {
+                    window.alert("You need to create a bracket first before joining a group.");
+                } else if (brackets.length === 1) {
+                    executeJoin(code, brackets[0].id);
+                } else {
+                    const options = brackets.map((b, index) => `${index + 1}. ${b.name}`).join('\n');
+                    const selection = window.prompt(`Select Your Entry\n\nEnter the NUMBER of the bracket to use:\n\n${options}`);
+                    const parsedIndex = parseInt(selection || '', 10) - 1;
+
+                    if (!isNaN(parsedIndex) && brackets[parsedIndex]) {
+                        executeJoin(code, brackets[parsedIndex].id);
+                    } else if (selection !== null) {
+                        window.alert("Invalid bracket selection.");
                     }
                 }
-            ]
-        );
+            }
+        } else {
+            // Mobile safe prompt
+            const safePrompt = (Alert as any).prompt;
+            if (safePrompt) {
+                safePrompt(
+                    "Join Bracket Group",
+                    "Enter the 6-character join code:",
+                    [
+                        { text: "Cancel", style: "cancel" },
+                        {
+                            text: "Next",
+                            onPress: (code?: string) => {
+                                if (!code) return;
+                                const bracketButtons = brackets.map(b => ({
+                                    text: b.name,
+                                    onPress: () => executeJoin(code, b.id)
+                                }));
+                                Alert.alert(
+                                    "Select Your Entry",
+                                    "Choose which bracket to enter into this group. Remember: a bracket can only be used in one group.",
+                                    [
+                                        ...bracketButtons,
+                                        { text: "Cancel", style: "cancel" }
+                                    ]
+                                );
+                            }
+                        }
+                    ]
+                );
+            } else {
+                Alert.alert("Not Supported", "Text prompts are only supported on iOS right now.");
+            }
+        }
     };
 
     const handleDeleteGroup = (id: string) => {
-        Alert.alert(
-            "Delete Group",
-            "Are you sure? This will permanently disband this group for all members currently in it.",
-            [
-                { text: "Cancel", style: "cancel" },
-                {
-                    text: "Delete",
-                    style: "destructive",
-                    onPress: async () => {
-                        const token = await getToken();
-                        await fetch(`${API_BASE_URL}/api/tournament/groups/${id}`, {
-                            method: 'DELETE',
-                            headers: { Authorization: `Bearer ${token}` }
-                        });
-                        loadInitialData(); // Refresh the list
-                    }
-                }
-            ]
-        );
+        // 1. Isolate the API logic and add error handling
+        const executeDelete = async () => {
+            try {
+                const token = await getToken();
+                await fetch(`${API_BASE_URL}/api/tournament/groups/${id}`, {
+                    method: 'DELETE',
+                    headers: { Authorization: `Bearer ${token}` }
+                });
+                loadInitialData(); // Refresh the list
+            } catch (e) {
+                console.error("Failed to delete group:", e);
+                if (Platform.OS === 'web') window.alert("Error\n\nCould not delete group. Please check your network connection.");
+                else Alert.alert("Error", "Could not delete group. Please check your network connection.");
+            }
+        };
+
+        // 2. Platform fork
+        if (Platform.OS === 'web') {
+            // Web uses the native browser confirmation box
+            if (window.confirm("Delete Group\n\nAre you sure? This will permanently disband this group for all members currently in it.")) {
+                executeDelete();
+            }
+        } else {
+            // Mobile uses your exact original Alert.alert
+            Alert.alert(
+                "Delete Group",
+                "Are you sure? This will permanently disband this group for all members currently in it.",
+                [
+                    { text: "Cancel", style: "cancel" },
+                    { text: "Delete", style: "destructive", onPress: executeDelete }
+                ]
+            );
+        }
     };
 
     const handleLeaveGroup = (id: string) => {
-        Alert.alert(
-            "Leave Group",
-            "Are you sure you want to leave this league? Your bracket entry will be removed from the leaderboard.",
-            [
-                { text: "Cancel", style: "cancel" },
-                {
-                    text: "Leave",
-                    style: "destructive",
-                    onPress: async () => {
-                        const token = await getToken();
-                        await fetch(`${API_BASE_URL}/api/tournament/groups/${id}/leave`, {
-                            method: 'POST',
-                            headers: { Authorization: `Bearer ${token}` }
-                        });
-                        loadInitialData(); // Refresh the list
-                    }
-                }
-            ]
-        );
+        // 1. Isolate the API logic and add error handling
+        const executeLeave = async () => {
+            try {
+                const token = await getToken();
+                await fetch(`${API_BASE_URL}/api/tournament/groups/${id}/leave`, {
+                    method: 'POST',
+                    headers: { Authorization: `Bearer ${token}` }
+                });
+                loadInitialData(); // Refresh the list
+            } catch (e) {
+                console.error("Failed to leave group:", e);
+                if (Platform.OS === 'web') window.alert("Error\n\nCould not leave group. Please check your network connection.");
+                else Alert.alert("Error", "Could not leave group. Please check your network connection.");
+            }
+        };
+
+        // 2. Platform fork
+        if (Platform.OS === 'web') {
+            // Web uses the native browser confirmation box
+            if (window.confirm("Leave Group\n\nAre you sure you want to leave this group? Your bracket entry will be removed from the leaderboard.")) {
+                executeLeave();
+            }
+        } else {
+            // Mobile uses your exact original Alert.alert
+            Alert.alert(
+                "Leave Group",
+                "Are you sure you want to leave this group? Your bracket entry will be removed from the leaderboard.",
+                [
+                    { text: "Cancel", style: "cancel" },
+                    { text: "Leave", style: "destructive", onPress: executeLeave }
+                ]
+            );
+        }
     };
 
     const loadLeaderboard = async (groupId: string, groupName: string) => {
@@ -327,7 +440,12 @@ export default function BracketTab() {
             setActiveGroupId(groupId);
             setActiveGroupName(groupName);
         } catch (e) {
-            Alert.alert("Error", "Could not load leaderboard.");
+            console.error("Failed to load leaderboard:", e);
+            if (Platform.OS === 'web') {
+                window.alert("Error\n\nCould not load leaderboard.");
+            } else {
+                Alert.alert("Error", "Could not load leaderboard.");
+            }
         } finally {
             setLoading(false);
         }
@@ -415,10 +533,15 @@ export default function BracketTab() {
                                 // Only allow peeking others once tournament is LIVE
                                 setSelectedBracketId(row.bracket_id);
                             } else {
-                                Alert.alert(
-                                    "Locked",
-                                    "You can only view other entries once the tournament is LIVE."
-                                );
+                                // Platform fork for the locked alert
+                                if (Platform.OS === 'web') {
+                                    window.alert("Locked\n\nYou can only view other entries once the tournament is LIVE.");
+                                } else {
+                                    Alert.alert(
+                                        "Locked",
+                                        "You can only view other entries once the tournament is LIVE."
+                                    );
+                                }
                             }
                         }}
                         style={({ pressed }) => [{

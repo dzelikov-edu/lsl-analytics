@@ -424,7 +424,11 @@ export default function TournamentMap({ isMock = false, viewOnly = false, overri
     const openScoreModal = (game: any) => {
         // Only allow when both teams are set
         if (!game.team_a_id || !game.team_b_id || game.team_a_id === 'TBD' || game.team_b_id === 'TBD') {
-            Alert.alert("Cannot Record Score", "Both teams must be locked into this game before recording a result.");
+            if (Platform.OS === 'web') {
+                window.alert("Cannot Record Score\n\nBoth teams must be locked into this game before recording a result.");
+            } else {
+                Alert.alert("Cannot Record Score", "Both teams must be locked into this game before recording a result.");
+            }
             return;
         }
         setScoreGame(game);
@@ -490,11 +494,13 @@ export default function TournamentMap({ isMock = false, viewOnly = false, overri
         const b = parseInt(scoreB, 10);
 
         if (Number.isNaN(a) || Number.isNaN(b)) {
-            Alert.alert("Invalid Score", "Please enter numeric scores for both teams.");
+            if (Platform.OS === 'web') window.alert("Invalid Score\n\nPlease enter numeric scores for both teams.");
+            else Alert.alert("Invalid Score", "Please enter numeric scores for both teams.");
             return;
         }
         if (a === b) {
-            Alert.alert("Invalid Score", "Tournament games cannot end in a tie.");
+            if (Platform.OS === 'web') window.alert("Invalid Score\n\nTournament games cannot end in a tie.");
+            else Alert.alert("Invalid Score", "Tournament games cannot end in a tie.");
             return;
         }
 
@@ -502,7 +508,8 @@ export default function TournamentMap({ isMock = false, viewOnly = false, overri
             setSavingScore(true);
             const token = await getToken();
             if (!token) {
-                Alert.alert("Auth Error", "You must be logged in to record scores.");
+                if (Platform.OS === 'web') window.alert("Auth Error\n\nYou must be logged in to record scores.");
+                else Alert.alert("Auth Error", "You must be logged in to record scores.");
                 return;
             }
 
@@ -524,7 +531,8 @@ export default function TournamentMap({ isMock = false, viewOnly = false, overri
 
             if (!res.ok) {
                 const msg = data?.detail || `Failed to record score (HTTP ${res.status}).`;
-                Alert.alert("Error", msg);
+                if (Platform.OS === 'web') window.alert(`Error\n\n${msg}`);
+                else Alert.alert("Error", msg);
                 return;
             }
 
@@ -534,7 +542,8 @@ export default function TournamentMap({ isMock = false, viewOnly = false, overri
             await loadData();
         } catch (e) {
             console.log("Error recording score:", e);
-            Alert.alert("Error", "Network error while recording score.");
+            if (Platform.OS === 'web') window.alert("Error\n\nNetwork error while recording score.");
+            else Alert.alert("Error", "Network error while recording score.");
         } finally {
             setSavingScore(false);
         }

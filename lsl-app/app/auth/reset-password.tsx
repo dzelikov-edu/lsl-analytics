@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { View, Text, TextInput, Pressable, StyleSheet, ActivityIndicator, Alert, ScrollView, Image } from 'react-native';
+import { View, Text, TextInput, Pressable, StyleSheet, ActivityIndicator, Alert, ScrollView, Image, Platform } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { AppColors } from '@/constants/app-colors';
@@ -31,17 +31,20 @@ export default function ResetPasswordScreen() {
         const confirmTrimmed = confirm.trim();
 
         if (!tokenTrimmed || !pwTrimmed || !confirmTrimmed) {
-            Alert.alert('Missing info', 'Please fill in all fields.');
+            if (Platform.OS === 'web') window.alert("Missing info\n\nPlease fill in all fields.");
+            else Alert.alert('Missing info', 'Please fill in all fields.');
             return;
         }
 
         if (pwTrimmed.length < 8) {
-            Alert.alert('Weak password', 'Password must be at least 8 characters long.');
+            if (Platform.OS === 'web') window.alert("Weak password\n\nPassword must be at least 8 characters long.");
+            else Alert.alert('Weak password', 'Password must be at least 8 characters long.');
             return;
         }
 
         if (pwTrimmed !== confirmTrimmed) {
-            Alert.alert('Password mismatch', 'Passwords do not match.');
+            if (Platform.OS === 'web') window.alert("Password mismatch\n\nPasswords do not match.");
+            else Alert.alert('Password mismatch', 'Passwords do not match.');
             return;
         }
 
@@ -59,14 +62,18 @@ export default function ResetPasswordScreen() {
 
             if (resp.ok && data?.access_token) {
                 await saveToken(data.access_token);
-                Alert.alert('Password updated', 'You are now logged in with your new password.');
+                if (Platform.OS === 'web') window.alert("Password updated\n\nYou are now logged in with your new password.");
+                else Alert.alert('Password updated', 'You are now logged in with your new password.');
                 router.replace('/(tabs)');
             } else {
-                Alert.alert('Reset failed', data?.detail || 'Unable to reset password. Please check your token.');
+                const msg = data?.detail || 'Unable to reset password. Please check your token.';
+                if (Platform.OS === 'web') window.alert(`Reset failed\n\n${msg}`);
+                else Alert.alert('Reset failed', msg);
             }
         } catch (e) {
             console.error(e);
-            Alert.alert('Network error', 'Could not connect to the server. Please try again.');
+            if (Platform.OS === 'web') window.alert("Network error\n\nCould not connect to the server. Please try again.");
+            else Alert.alert('Network error', 'Could not connect to the server. Please try again.');
         } finally {
             setLoading(false);
         }

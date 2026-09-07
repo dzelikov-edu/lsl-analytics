@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { View, Text, TextInput, Pressable, StyleSheet, ActivityIndicator, Alert, Image } from 'react-native';
+import { View, Text, TextInput, Pressable, StyleSheet, ActivityIndicator, Alert, Image, Platform } from 'react-native';
 import { router } from 'expo-router';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { AppColors } from '@/constants/app-colors';
@@ -15,13 +15,15 @@ export default function ForgotPasswordScreen() {
     const handleRequest = async () => {
         const emailTrimmed = email.trim();
         if (!emailTrimmed) {
-            Alert.alert('Missing email', 'Please enter your email address.');
+            if (Platform.OS === 'web') window.alert("Missing email\n\nPlease enter your email address.");
+            else Alert.alert('Missing email', 'Please enter your email address.');
             return;
         }
 
         // Strict email check as requested
         if (!emailTrimmed.includes('@') || !emailTrimmed.includes('.')) {
-            Alert.alert('Invalid email', 'Please enter a valid email address.');
+            if (Platform.OS === 'web') window.alert("Invalid email\n\nPlease enter a valid email address.");
+            else Alert.alert('Invalid email', 'Please enter a valid email address.');
             return;
         }
 
@@ -41,25 +43,31 @@ export default function ForgotPasswordScreen() {
             if (resp.ok) {
                 if (data?.token) {
                     // BETA BYPASS: This retrieves the 6-digit code for your non-admin account
-                    Alert.alert('Identity Verified', 'Beta bypass active. Reset code issued.');
+                    if (Platform.OS === 'web') window.alert("Identity Verified\n\nBeta bypass active. Reset code issued.");
+                    else Alert.alert('Identity Verified', 'Beta bypass active. Reset code issued.');
+
                     router.push({
                         pathname: '/auth/reset-password',
                         params: { token: data.token }, // Passes the code to the next screen
                     });
                 } else {
                     // Production behavior: user must check their actual email
-                    Alert.alert(
+                    if (Platform.OS === 'web') window.alert("Check your email\n\nIf this email exists, a 6-digit verification code has been sent.");
+                    else Alert.alert(
                         'Check your email',
                         'If this email exists, a 6-digit verification code has been sent.'
                     );
                     router.push('/auth/reset-password');
                 }
             } else {
-                Alert.alert('Error', data?.detail || 'Unable to process request.');
+                const msg = data?.detail || 'Unable to process request.';
+                if (Platform.OS === 'web') window.alert(`Error\n\n${msg}`);
+                else Alert.alert('Error', msg);
             }
         } catch (e) {
             console.error(e);
-            Alert.alert('Network error', 'Could not connect to the server.');
+            if (Platform.OS === 'web') window.alert("Network error\n\nCould not connect to the server.");
+            else Alert.alert('Network error', 'Could not connect to the server.');
         } finally {
             setLoading(false);
         }

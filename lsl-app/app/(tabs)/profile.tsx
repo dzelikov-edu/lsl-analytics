@@ -152,11 +152,13 @@ export default function ProfileScreen() {
         // 1. Frontend Validation (Matches your rules)
         const usernameRegex = /^[a-zA-Z0-9_\.]+$/;
         if (sanitizedName.length < 3 || sanitizedName.length > 20) {
-            Alert.alert("Invalid Length", "Username must be 3-20 characters.");
+            if (Platform.OS === 'web') window.alert("Invalid Length\n\nUsername must be 3-20 characters.");
+            else Alert.alert("Invalid Length", "Username must be 3-20 characters.");
             return;
         }
         if (!usernameRegex.test(sanitizedName)) {
-            Alert.alert("Invalid Characters", "Use only letters, numbers, underscores, and periods.");
+            if (Platform.OS === 'web') window.alert("Invalid Characters\n\nUse only letters, numbers, underscores, and periods.");
+            else Alert.alert("Invalid Characters", "Use only letters, numbers, underscores, and periods.");
             return;
         }
 
@@ -175,14 +177,19 @@ export default function ProfileScreen() {
             const data = await res.json();
 
             if (res.ok) {
-                Alert.alert("Success", "Legend ID updated successfully.");
+                if (Platform.OS === 'web') window.alert("Success\n\nLegend ID updated successfully.");
+                else Alert.alert("Success", "Legend ID updated successfully.");
+
                 // Update local state so the UI flips immediately
                 setUser(prev => prev ? { ...prev, username: sanitizedName } : null);
             } else {
-                Alert.alert("Update Failed", data.detail || "Could not update username.");
+                if (Platform.OS === 'web') window.alert(`Update Failed\n\n${data.detail || "Could not update username."}`);
+                else Alert.alert("Update Failed", data.detail || "Could not update username.");
             }
         } catch (e) {
-            Alert.alert("Error", "Network error. Please try again.");
+            console.error("Failed to update username:", e);
+            if (Platform.OS === 'web') window.alert("Error\n\nNetwork error. Please try again.");
+            else Alert.alert("Error", "Network error. Please try again.");
         } finally {
             setLoading(false);
         }
@@ -775,19 +782,37 @@ export default function ProfileScreen() {
             <Pressable
                 style={styles.settingRow}
                 onPress={() => {
-                    Alert.prompt(
-                        "Change Username",
-                        "Enter your new Legends ID (3-20 characters, alphanumeric and periods only).",
-                        [
-                            { text: "Cancel", style: "cancel" },
-                            {
-                                text: "Update",
-                                onPress: (newName?: string) => handleUpdateUsername(newName)
-                            }
-                        ],
-                        "plain-text",
-                        user?.username || ""
-                    );
+                    if (Platform.OS === 'web') {
+                        // 1. Web browser native prompt
+                        const newName = window.prompt(
+                            "Change Username\n\nEnter your new Legends ID (3-20 characters, alphanumeric and periods only).",
+                            user?.username || ""
+                        );
+                        if (newName !== null) {
+                            handleUpdateUsername(newName);
+                        }
+                    } else {
+                        // 2. Hidden mobile prompt to bypass strict web bundlers
+                        const safePrompt = (Alert as any).prompt;
+                        if (safePrompt) {
+                            safePrompt(
+                                "Change Username",
+                                "Enter your new Legends ID (3-20 characters, alphanumeric and periods only).",
+                                [
+                                    { text: "Cancel", style: "cancel" },
+                                    {
+                                        text: "Update",
+                                        onPress: (newName?: string) => handleUpdateUsername(newName)
+                                    }
+                                ],
+                                "plain-text",
+                                user?.username || ""
+                            );
+                        } else {
+                            // 3. Android fallback (since Android doesn't support Alert.prompt natively)
+                            Alert.alert("Not Supported", "Text prompts are only supported on iOS right now.");
+                        }
+                    }
                 }}
             >
                 <View style={{ flex: 1 }}>

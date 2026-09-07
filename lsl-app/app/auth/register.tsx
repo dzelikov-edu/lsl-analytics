@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { View, Text, TextInput, Pressable, StyleSheet, ActivityIndicator, Alert, ScrollView, Image } from 'react-native';
+import { View, Text, TextInput, Pressable, StyleSheet, ActivityIndicator, Alert, ScrollView, Image, Platform } from 'react-native';
 import { router } from 'expo-router';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { AppColors } from '@/constants/app-colors';
@@ -29,35 +29,41 @@ export default function RegisterScreen() {
 
         // 1. Basic Field Check
         if (!emailTrimmed || !passwordTrimmed || !confirmTrimmed || !usernameTrimmed) {
-            Alert.alert('Missing info', 'Please fill in all fields.');
+            if (Platform.OS === 'web') window.alert("Missing info\n\nPlease fill in all fields.");
+            else Alert.alert('Missing info', 'Please fill in all fields.');
             return;
         }
 
         // 2. Identity Validation (Matches Backend)
         if (usernameTrimmed.length < 3 || usernameTrimmed.length > 20) {
-            Alert.alert('Invalid Username', 'Username must be between 3 and 20 characters.');
+            if (Platform.OS === 'web') window.alert("Invalid Username\n\nUsername must be between 3 and 20 characters.");
+            else Alert.alert('Invalid Username', 'Username must be between 3 and 20 characters.');
             return;
         }
 
         // 3. Character Check (Alphanumeric/Underscore only)
         const usernameRegex = /^[a-zA-Z0-9_\.]+$/;
         if (!usernameRegex.test(usernameTrimmed)) {
-            Alert.alert('Invalid Username', 'Usernames can only contain letters, numbers, underscores, and periods.');
+            if (Platform.OS === 'web') window.alert("Invalid Username\n\nUsernames can only contain letters, numbers, underscores, and periods.");
+            else Alert.alert('Invalid Username', 'Usernames can only contain letters, numbers, underscores, and periods.');
             return;
         }
 
         if (!emailTrimmed.includes('@') || !emailTrimmed.includes('.')) {
-            Alert.alert('Invalid email', 'Please enter a valid email address.');
+            if (Platform.OS === 'web') window.alert("Invalid email\n\nPlease enter a valid email address.");
+            else Alert.alert('Invalid email', 'Please enter a valid email address.');
             return;
         }
 
         if (passwordTrimmed.length < 8) {
-            Alert.alert('Weak password', 'Password must be at least 8 characters long.');
+            if (Platform.OS === 'web') window.alert("Weak password\n\nPassword must be at least 8 characters long.");
+            else Alert.alert('Weak password', 'Password must be at least 8 characters long.');
             return;
         }
 
         if (passwordTrimmed !== confirmTrimmed) {
-            Alert.alert('Password mismatch', 'Passwords do not match.');
+            if (Platform.OS === 'web') window.alert("Password mismatch\n\nPasswords do not match.");
+            else Alert.alert('Password mismatch', 'Passwords do not match.');
             return;
         }
 
@@ -85,16 +91,19 @@ export default function RegisterScreen() {
 
             if (response.ok && data?.access_token) {
                 await saveToken(data.access_token);
-                Alert.alert('Account created', 'Welcome to Legends CBB.');
+                if (Platform.OS === 'web') window.alert("Account created\n\nWelcome to Legends CBB.");
+                else Alert.alert('Account created', 'Welcome to Legends CBB.');
                 router.replace('/(tabs)');
             } else {
                 // This will now catch the Backend "Lore-Gate" (Blacklist) errors
                 const detail = data?.detail || 'Could not create account.';
-                Alert.alert('Registration failed', detail);
+                if (Platform.OS === 'web') window.alert(`Registration failed\n\n${detail}`);
+                else Alert.alert('Registration failed', detail);
             }
         } catch (error) {
             console.error(error);
-            Alert.alert('Network error', 'Could not connect to the server.');
+            if (Platform.OS === 'web') window.alert("Network error\n\nCould not connect to the server.");
+            else Alert.alert('Network error', 'Could not connect to the server.');
         } finally {
             setLoading(false);
         }

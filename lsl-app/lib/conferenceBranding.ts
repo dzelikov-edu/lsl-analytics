@@ -126,11 +126,16 @@ const CONFERENCE_BRANDING: Record<string, ConferenceBranding> = {
 export function getConferenceBranding(confId?: string | null, apiName?: string | null): ConferenceBranding {
     if (!confId) return FALLBACK_CONFERENCE_BRANDING;
 
-    // Guard against SSR/Web build crashes
-    if (realismEnabledCache === null && Platform.OS !== 'web') {
-        AsyncStorage.getItem('has_custom_logos').then(val => {
-            setRealismEnabled(val === 'true'); // THE FIX
-        });
+    // Web-safe guard: Check if window exists instead of blocking the entire web platform
+    if (realismEnabledCache === null) {
+        if (Platform.OS !== 'web' || typeof window !== 'undefined') {
+            AsyncStorage.getItem('has_custom_logos').then(val => {
+                setRealismEnabled(val === 'true');
+            }).catch(() => {
+                // Failsafe if storage is blocked
+                setRealismEnabled(false);
+            });
+        }
     }
 
     const normalized = String(confId).trim().toUpperCase();

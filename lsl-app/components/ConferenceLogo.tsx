@@ -1,12 +1,15 @@
 import { AppColors } from '@/constants/app-colors';
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import { getConferenceBranding } from '@/lib/conferenceBranding'; // Import your existing conference branding logic
-import { StyleSheet, View } from 'react-native';
+import { getConferenceBranding } from '@/lib/conferenceBranding';
+import { StyleSheet, View, Platform } from 'react-native'; // <-- Added Platform here
 import { Image } from 'expo-image';
-import { useConferenceLogo } from '@/lib/conferenceLogos'; // Import the new hook
+import { useConferenceLogo } from '@/lib/conferenceLogos';
 
 // Path to your new transparent generic conference icon
 const GENERIC_CONFERENCE_ICON = require('@/assets/images/generic_conference_icon.png');
+
+// GitHub raw content URL for web bypass
+const GITHUB_RAW_BASE_URL = 'https://raw.githubusercontent.com/dzelikov-edu/lsl-realism-mods/main';
 
 type ConferenceLogoProps = {
     confId?: string | null;
@@ -20,11 +23,26 @@ export default function ConferenceLogo({ confId, size = 28 }: ConferenceLogoProp
     // Get conference branding for colors using your existing function
     const branding = getConferenceBranding(confId);
 
-    // This hook now handles checking local storage. Returns {uri: localPath} or null.
+    // This hook handles checking local storage for mobile. Returns {uri: localPath} or null.
     const resolvedLogo = useConferenceLogo(confId);
 
+    // --- NEW WEB LOGIC (Copied from TeamLogo) ---
+    // If running on the web, bypass local storage and fetch directly from GitHub
+    if (Platform.OS === 'web' && confId) {
+        const normalizedId = String(confId).trim().toUpperCase();
+        return (
+            <Image
+                source={{ uri: `${GITHUB_RAW_BASE_URL}/conference-logos/${normalizedId}.png` }}
+                contentFit="contain"
+                transition={0}
+                style={{ width: size, height: size }}
+            />
+        );
+    }
+    // ---------------------
+
     if (resolvedLogo) {
-        // If an imported logo is found, render it normally
+        // If an imported logo is found on mobile, render it normally
         return (
             <Image
                 source={resolvedLogo}
@@ -39,30 +57,29 @@ export default function ConferenceLogo({ confId, size = 28 }: ConferenceLogoProp
     return (
         <View
             style={[
-                styles.fallbackContainer, // Renamed from fallback to be specific
+                styles.fallbackContainer,
                 {
                     width: size,
                     height: size,
-                    borderRadius: size / 2, // Make it a circle
-                    backgroundColor: branding.primary, // Conference's primary color
-                    borderColor: branding.secondary, // Conference's secondary color
+                    borderRadius: size / 2,
+                    backgroundColor: branding.primary,
+                    borderColor: branding.secondary,
                 },
             ]}
         >
-            {/* The transparent conference icon */}
             <Image
                 source={GENERIC_CONFERENCE_ICON}
                 contentFit="contain"
                 transition={0}
-                style={{ width: size * 0.7, height: size * 0.7 }} // Slightly smaller to show background
+                style={{ width: size * 0.7, height: size * 0.7 }}
             />
         </View>
     );
 }
 
 const styles = StyleSheet.create({
-    fallbackContainer: { // Renamed from fallback to be specific
-        borderWidth: 1.5, // A visible border
+    fallbackContainer: {
+        borderWidth: 1.5,
         alignItems: 'center',
         justifyContent: 'center',
     },

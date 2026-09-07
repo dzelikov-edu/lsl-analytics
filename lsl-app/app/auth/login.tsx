@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { View, Text, TextInput, Pressable, StyleSheet, ActivityIndicator, Alert, Image } from 'react-native';
+import { View, Text, TextInput, Pressable, StyleSheet, ActivityIndicator, Alert, Image, Platform } from 'react-native';
 import { router } from 'expo-router';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { AppColors } from '@/constants/app-colors';
@@ -24,7 +24,8 @@ export default function LoginScreen() {
         const passwordTrimmed = password.trim();
 
         if (!identifierTrimmed || !passwordTrimmed) {
-            Alert.alert('Missing info', 'Please enter both your identity and password.');
+            if (Platform.OS === 'web') window.alert("Missing info\n\nPlease enter both your identity and password.");
+            else Alert.alert('Missing info', 'Please enter both your identity and password.');
             return;
         }
 
@@ -52,16 +53,19 @@ export default function LoginScreen() {
 
             if (response.ok && data?.access_token) {
                 await saveToken(data.access_token);
-                Alert.alert('Welcome back', 'You are now logged in.');
+                if (Platform.OS === 'web') window.alert("Welcome back\n\nYou are now logged in.");
+                else Alert.alert('Welcome back', 'You are now logged in.');
                 router.replace('/(tabs)');
             } else {
                 // Updated error message to be more generic for usernames
                 const detail = data?.detail || 'Identity or password is incorrect.';
-                Alert.alert('Login failed', detail);
+                if (Platform.OS === 'web') window.alert(`Login failed\n\n${detail}`);
+                else Alert.alert('Login failed', detail);
             }
         } catch (error) {
             console.error(error);
-            Alert.alert('Network error', 'Could not connect to the server.');
+            if (Platform.OS === 'web') window.alert("Network error\n\nCould not connect to the server.");
+            else Alert.alert('Network error', 'Could not connect to the server.');
         } finally {
             setLoading(false);
         }

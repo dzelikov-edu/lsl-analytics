@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, Pressable, StyleSheet, Alert, ActivityIndicator, Image } from 'react-native';
+import { View, Text, TextInput, Pressable, StyleSheet, Alert, ActivityIndicator, Image, Platform } from 'react-native';
 import { router } from 'expo-router';
 import { API_BASE_URL } from '@/lib/api';
 import { getToken } from '@/lib/auth-storage';
@@ -18,11 +18,13 @@ export default function ClaimIdentityScreen() {
         // Validation (Matches Backend Rules: 3-20, Alphanumeric/Periods)
         const usernameRegex = /^[a-zA-Z0-9_\.]+$/;
         if (sanitizedName.length < 3 || sanitizedName.length > 20) {
-            Alert.alert("Invalid Length", "Your Legend ID must be 3-20 characters.");
+            if (Platform.OS === 'web') window.alert("Invalid Length\n\nYour Legend ID must be 3-20 characters.");
+            else Alert.alert("Invalid Length", "Your Legend ID must be 3-20 characters.");
             return;
         }
         if (!usernameRegex.test(sanitizedName)) {
-            Alert.alert("Invalid Format", "Use only letters, numbers, underscores, and periods.");
+            if (Platform.OS === 'web') window.alert("Invalid Format\n\nUse only letters, numbers, underscores, and periods.");
+            else Alert.alert("Invalid Format", "Use only letters, numbers, underscores, and periods.");
             return;
         }
 
@@ -40,13 +42,18 @@ export default function ClaimIdentityScreen() {
 
             const data = await res.json();
             if (res.ok) {
-                Alert.alert("Identity Claimed", "Welcome to the Universe, " + sanitizedName);
+                if (Platform.OS === 'web') window.alert(`Identity Claimed\n\nWelcome to the Universe, ${sanitizedName}`);
+                else Alert.alert("Identity Claimed", "Welcome to the Universe, " + sanitizedName);
                 router.replace('/(tabs)'); // The gate is now lifted
             } else {
-                Alert.alert("Claim Failed", data.detail || "That ID might already be taken.");
+                const msg = data.detail || "That ID might already be taken.";
+                if (Platform.OS === 'web') window.alert(`Claim Failed\n\n${msg}`);
+                else Alert.alert("Claim Failed", msg);
             }
         } catch (e) {
-            Alert.alert("Error", "Network error. Please try again.");
+            console.error("Failed to claim identity:", e);
+            if (Platform.OS === 'web') window.alert("Error\n\nNetwork error. Please try again.");
+            else Alert.alert("Error", "Network error. Please try again.");
         } finally {
             setLoading(false);
         }
