@@ -39,6 +39,7 @@ export default function TournamentMap({ isMock = false, viewOnly = false, overri
     const isTablet = width >= 768;
     const isAndroid = Platform.OS === 'android';
     const isWeb = Platform.OS === 'web'; // <-- Add web detection
+    const isDesktopWeb = isWeb && width >= 768; // Only apply web constraints if it's a large screen
     const navigation = useNavigation();
     const [phase, setPhase] = useState<string | null>(null);
     const params = useLocalSearchParams();
@@ -74,7 +75,7 @@ export default function TournamentMap({ isMock = false, viewOnly = false, overri
     // iPhone: keep current behavior. (-1250)
     // Android phones: allow much more travel so bottom of bracket is reachable.
     // Web gets its own massive boundaries. Mobile keeps YOUR exact math untouched.
-    const maxY = isWeb
+    const maxY = isDesktopWeb
         ? -1260
         : isTablet
             ? (isMock ? -1035 : -1035)
@@ -82,17 +83,17 @@ export default function TournamentMap({ isMock = false, viewOnly = false, overri
                 ? (isMock ? -1328 : -1420)
                 : (isMock ? -1250 : -1250);
 
-    const minY = isWeb
+    const minY = isDesktopWeb
         ? -85
         : isTablet ? -85 : -60;
 
     // --- HORIZONTAL FORCEFIELD LOGIC ---
     // maxX: The "Right Wall" (How far you can pan to see the right side)
-    const maxX = isWeb
+    const maxX = isDesktopWeb
         ? -1818
         : isTablet ? -2542 : -2920;
     // minX: The "Left Wall" (How far you can pan to see the left side)
-    const minX = isWeb
+    const minX = isDesktopWeb
         ? -325
         : isTablet ? -327 : -327;
 
