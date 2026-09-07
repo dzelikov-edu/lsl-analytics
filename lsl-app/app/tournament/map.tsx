@@ -1,7 +1,7 @@
 /// <reference lib="dom" />
 
 import React, { useState, useEffect, useLayoutEffect, useMemo } from 'react';
-import { StyleSheet, View, Dimensions, Text, ActivityIndicator, Pressable, Alert, useWindowDimensions, Platform, ScrollView, TextInput, KeyboardAvoidingView, } from 'react-native';
+import { StyleSheet, View, Dimensions, Text, ActivityIndicator, Pressable, Alert, useWindowDimensions, Platform, ScrollView, TextInput, KeyboardAvoidingView, Image } from 'react-native';
 import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
 import Animated, { useSharedValue, useAnimatedStyle, withDecay, cancelAnimation } from 'react-native-reanimated';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -817,7 +817,7 @@ export default function TournamentMap({ isMock = false, viewOnly = false, overri
                                 </View>
                             );
                         })}
-                        {hasCustomLogos ? (
+                        {(hasCustomLogos || isWeb) ? (
                             <View
                                 style={{
                                     position: 'absolute',
@@ -829,7 +829,16 @@ export default function TournamentMap({ isMock = false, viewOnly = false, overri
                                     justifyContent: 'center',
                                 }}
                             >
-                                <TeamLogo teamId="LCAA_FOREVER_FOUR" size={190} />
+                                {isWeb ? (
+                                    <Image
+                                        // ⚠️ IMPORTANT: Replace this URL with the exact raw GitHub link to your Final Four logo
+                                        source={{ uri: 'https://raw.githubusercontent.com/dzelikov-edu/lsl-realism-mods/main/team-logos/LCAA_FOREVER_FOUR.png' }}
+                                        style={{ width: 190, height: 190 }}
+                                        resizeMode="contain"
+                                    />
+                                ) : (
+                                    <TeamLogo teamId="LCAA_FOREVER_FOUR" size={190} />
+                                )}
                             </View>
                         ) : (
                             <Text
