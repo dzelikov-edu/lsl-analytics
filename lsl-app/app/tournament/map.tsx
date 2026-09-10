@@ -16,6 +16,7 @@ import { getGameCoordinates, GAME_HEIGHT, CENTER_X, CENTER_Y } from '@/lib/brack
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { getTeamBranding } from '@/lib/teamBranding';
 import { useFocusEffect, router, Stack, useNavigation, useLocalSearchParams } from 'expo-router';
+import Head from 'expo-router/head';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const MAP_SIZE = 5000;

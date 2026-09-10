@@ -5,6 +5,7 @@ import { useCachedApi } from '@/hooks/useCachedApi';
 import { getTeamBranding } from '@/lib/teamBranding';
 import { useMemo } from 'react';
 import { router } from 'expo-router';
+import Head from 'expo-router/head';
 import { ActivityIndicator, SectionList, StyleSheet, Text, View, useWindowDimensions, Pressable, Image } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -392,61 +393,67 @@ export default function AnalyticsScreen() {
     };
 
     return (
-        <View style={{ flex: 1, backgroundColor: theme.background }}>
-            <SectionList
-                sections={sections}
-                renderItem={renderSectionItem}
-                keyExtractor={(item, index) => `${item.team_id || index}-${index}`}
-                contentContainerStyle={[styles.content, { paddingTop: topTabPadding + 2 }]} // Added +2 safety margin
-                stickySectionHeadersEnabled={false}
-                removeClippedSubviews={true}
-                initialNumToRender={10}
-                windowSize={5}
-                ListHeaderComponent={
-                    <>
-                        {/* --- BRANDED HEADER --- */}
-                        <View style={{ alignItems: 'center', marginBottom: 10, marginTop: 8 }}>
-                            <Image
-                                source={require('@/assets/images/index_header_icon.png')}
-                                style={{ width: 140, height: 60 }}
-                                resizeMode="contain"
-                            />
-                            <Text style={{
-                                fontSize: 12,
-                                fontWeight: '800',
-                                color: theme.mutedText,
-                                letterSpacing: 2.5,
-                                marginTop: 8,
-                                textTransform: 'uppercase'
-                            }}>
-                                The Universe Analytics
-                            </Text>
-                        </View>
+        <>
+            <Head>
+                <title>Analytics | Legends CBB</title>
+            </Head>
 
-                        {loading ? (
-                            <View style={styles.centerBlock}>
-                                <ActivityIndicator size="large" />
-                                <Text style={styles.helper}>Loading analytics...</Text>
+            <View style={{ flex: 1, backgroundColor: theme.background }}>
+                <SectionList
+                    sections={sections}
+                    renderItem={renderSectionItem}
+                    keyExtractor={(item, index) => `${item.team_id || index}-${index}`}
+                    contentContainerStyle={[styles.content, { paddingTop: topTabPadding + 2 }]} // Added +2 safety margin
+                    stickySectionHeadersEnabled={false}
+                    removeClippedSubviews={true}
+                    initialNumToRender={10}
+                    windowSize={5}
+                    ListHeaderComponent={
+                        <>
+                            {/* --- BRANDED HEADER --- */}
+                            <View style={{ alignItems: 'center', marginBottom: 10, marginTop: 8 }}>
+                                <Image
+                                    source={require('@/assets/images/index_header_icon.png')}
+                                    style={{ width: 140, height: 60 }}
+                                    resizeMode="contain"
+                                />
+                                <Text style={{
+                                    fontSize: 12,
+                                    fontWeight: '800',
+                                    color: theme.mutedText,
+                                    letterSpacing: 2.5,
+                                    marginTop: 8,
+                                    textTransform: 'uppercase'
+                                }}>
+                                    The Universe Analytics
+                                </Text>
                             </View>
-                        ) : error ? (
-                            <View style={styles.listCard}>
-                                <Text style={styles.errorTitle}>Error</Text>
-                                <Text style={styles.errorText}>{error}</Text>
-                            </View>
-                        ) : (
-                            <View style={[styles.section, { marginBottom: 10 }]}>
-                                <Text style={styles.sectionTitle}>Leaders</Text>
-                                <View style={styles.leadersGrid}>
-                                    {leaderCards.map(({ label, item }) => renderLeaderCard(label, item))}
+
+                            {loading ? (
+                                <View style={styles.centerBlock}>
+                                    <ActivityIndicator size="large" />
+                                    <Text style={styles.helper}>Loading analytics...</Text>
                                 </View>
-                            </View>
-                        )}
-                    </>
-                }
-                renderSectionHeader={({ section: { title } }) => (
-                    <Text style={[styles.sectionTitle, { marginTop: 24 }]}>{title}</Text>
-                )}
-            />
-        </View>
+                            ) : error ? (
+                                <View style={styles.listCard}>
+                                    <Text style={styles.errorTitle}>Error</Text>
+                                    <Text style={styles.errorText}>{error}</Text>
+                                </View>
+                            ) : (
+                                <View style={[styles.section, { marginBottom: 10 }]}>
+                                    <Text style={styles.sectionTitle}>Leaders</Text>
+                                    <View style={styles.leadersGrid}>
+                                        {leaderCards.map(({ label, item }) => renderLeaderCard(label, item))}
+                                    </View>
+                                </View>
+                            )}
+                        </>
+                    }
+                    renderSectionHeader={({ section: { title } }) => (
+                        <Text style={[styles.sectionTitle, { marginTop: 24 }]}>{title}</Text>
+                    )}
+                />
+            </View>
+        </>
     );
 }

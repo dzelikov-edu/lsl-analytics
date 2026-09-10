@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, TextInput, Pressable, StyleSheet, Alert, ActivityIndicator, Image, Platform } from 'react-native';
 import { router } from 'expo-router';
+import Head from 'expo-router/head';
 import { API_BASE_URL } from '@/lib/api';
 import { getToken } from '@/lib/auth-storage';
 import { AppColors } from '@/constants/app-colors';

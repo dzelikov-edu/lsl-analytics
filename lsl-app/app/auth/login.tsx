@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { View, Text, TextInput, Pressable, StyleSheet, ActivityIndicator, Alert, Image, Platform } from 'react-native';
 import { router } from 'expo-router';
+import Head from 'expo-router/head';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { AppColors } from '@/constants/app-colors';
 import Constants from 'expo-constants';

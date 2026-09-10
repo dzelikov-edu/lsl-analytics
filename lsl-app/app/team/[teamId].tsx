@@ -7,6 +7,7 @@ import { useCachedApi } from '@/hooks/useCachedApi';
 import { getTeamBranding } from '@/lib/teamBranding';
 import { getConferenceBranding } from '@/lib/conferenceBranding';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
+import Head from 'expo-router/head';
 import { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 

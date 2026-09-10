@@ -4,6 +4,7 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useCachedApi } from '@/hooks/useCachedApi';
 import { getConferenceBranding } from '@/lib/conferenceBranding';
 import { router } from 'expo-router';
+import Head from 'expo-router/head';
 import { useMemo } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions, Image } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -177,85 +178,91 @@ export default function ConferencesScreen() {
     };
 
     return (
-        <ScrollView contentContainerStyle={styles.content}>
-            {/* --- BRANDED HEADER --- */}
-            <View style={{ alignItems: 'center', marginBottom: 10, marginTop: 10 }}>
-                <Image
-                    source={require('@/assets/images/index_header_icon.png')}
-                    style={{ width: 140, height: 60 }}
-                    resizeMode="contain"
-                />
-                <Text style={{
-                    fontSize: 12,
-                    fontWeight: '800',
-                    color: theme.mutedText,
-                    letterSpacing: 2.5,
-                    marginTop: 8,
-                    textTransform: 'uppercase'
-                }}>
-                    The Universe's Conferences
-                </Text>
-            </View>
+        <>
+            <Head>
+                <title>Conferences | Legends CBB</title>
+            </Head>
 
-            {loading ? (
-                <View style={styles.centerBlock}>
-                    <ActivityIndicator size="large" />
-                    <Text style={styles.helper}>Loading conferences...</Text>
+            <ScrollView contentContainerStyle={styles.content}>
+                {/* --- BRANDED HEADER --- */}
+                <View style={{ alignItems: 'center', marginBottom: 10, marginTop: 10 }}>
+                    <Image
+                        source={require('@/assets/images/index_header_icon.png')}
+                        style={{ width: 140, height: 60 }}
+                        resizeMode="contain"
+                    />
+                    <Text style={{
+                        fontSize: 12,
+                        fontWeight: '800',
+                        color: theme.mutedText,
+                        letterSpacing: 2.5,
+                        marginTop: 8,
+                        textTransform: 'uppercase'
+                    }}>
+                        The Universe's Conferences
+                    </Text>
                 </View>
-            ) : error ? (
-                <View style={styles.card}>
-                    <Text style={styles.errorTitle}>Error</Text>
-                    <Text style={styles.errorText}>{error}</Text>
-                </View>
-            ) : conferences.length === 0 ? (
-                <View style={styles.card}>
-                    <Text style={styles.errorText}>No conferences available.</Text>
-                </View>
-            ) : (
-                conferences.map((conf) => {
-                    const branding = getConferenceBranding(conf.conference_id, conf.conference_name);
 
-                    return (
-                        <Pressable
-                            key={conf.conference_id}
-                            onPress={() => router.push(`/conference/${conf.conference_id}`)}
-                            style={({ pressed }) => [styles.card, pressed && styles.cardPressed]}>
-                            <View style={styles.topRow}>
-                                <View style={styles.leftSide}>
-                                    <ConferenceLogo confId={conf.conference_id} size={30} />
-                                    <View style={styles.nameBlock}>
-                                        <Text style={styles.conferenceName}>
-                                            {branding.displayName}
-                                        </Text>
-                                        <Text style={styles.conferenceId}>
-                                            {/* Logic: If Realism flipped the title to the full name, show the ID (e.g. SEC). 
-            Otherwise show your authored short code (e.g. SAC). */}
-                                            {branding.displayName === branding.headerTitle ? conf.conference_id : branding.headerTitle}
+                {loading ? (
+                    <View style={styles.centerBlock}>
+                        <ActivityIndicator size="large" />
+                        <Text style={styles.helper}>Loading conferences...</Text>
+                    </View>
+                ) : error ? (
+                    <View style={styles.card}>
+                        <Text style={styles.errorTitle}>Error</Text>
+                        <Text style={styles.errorText}>{error}</Text>
+                    </View>
+                ) : conferences.length === 0 ? (
+                    <View style={styles.card}>
+                        <Text style={styles.errorText}>No conferences available.</Text>
+                    </View>
+                ) : (
+                    conferences.map((conf) => {
+                        const branding = getConferenceBranding(conf.conference_id, conf.conference_name);
+
+                        return (
+                            <Pressable
+                                key={conf.conference_id}
+                                onPress={() => router.push(`/conference/${conf.conference_id}`)}
+                                style={({ pressed }) => [styles.card, pressed && styles.cardPressed]}>
+                                <View style={styles.topRow}>
+                                    <View style={styles.leftSide}>
+                                        <ConferenceLogo confId={conf.conference_id} size={30} />
+                                        <View style={styles.nameBlock}>
+                                            <Text style={styles.conferenceName}>
+                                                {branding.displayName}
+                                            </Text>
+                                            <Text style={styles.conferenceId}>
+                                                {/* Logic: If Realism flipped the title to the full name, show the ID (e.g. SEC). 
+                Otherwise show your authored short code (e.g. SAC). */}
+                                                {branding.displayName === branding.headerTitle ? conf.conference_id : branding.headerTitle}
+                                            </Text>
+                                        </View>
+                                    </View>
+
+                                    <View
+                                        style={[
+                                            styles.badge,
+                                            {
+                                                borderColor: branding.accent,
+                                                backgroundColor: theme.card,
+                                            },
+                                        ]}>
+                                        <Text style={[styles.badgeText, { color: theme.text }]}>
+                                            {conf.teams_count ?? 0}T
                                         </Text>
                                     </View>
                                 </View>
 
-                                <View
-                                    style={[
-                                        styles.badge,
-                                        {
-                                            borderColor: branding.accent,
-                                            backgroundColor: theme.card,
-                                        },
-                                    ]}>
-                                    <Text style={[styles.badgeText, { color: theme.text }]}>
-                                        {conf.teams_count ?? 0}T
-                                    </Text>
-                                </View>
-                            </View>
-
-                            <Text style={styles.statsLabel}>Conference Snapshot</Text>
-                            <Text style={styles.statsLine}>{formatContext(conf)}</Text>
-                            <View style={[styles.accentBar, { backgroundColor: branding.primary }]} />
-                        </Pressable>
-                    );
-                })
-            )}
-        </ScrollView>
+                                <Text style={styles.statsLabel}>Conference Snapshot</Text>
+                                <Text style={styles.statsLine}>{formatContext(conf)}</Text>
+                                <View style={[styles.accentBar, { backgroundColor: branding.primary }]} />
+                            </Pressable>
+                        );
+                    })
+                )}
+            </ScrollView>
+        </>
     );
 }

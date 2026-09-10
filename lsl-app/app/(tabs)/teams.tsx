@@ -4,6 +4,7 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useCachedApi } from '@/hooks/useCachedApi';
 import { getTeamBranding } from '@/lib/teamBranding';
 import { router } from 'expo-router';
+import Head from 'expo-router/head';
 import { useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, FlatList, StyleSheet, Text, View, useWindowDimensions, TextInput, Image } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -220,75 +221,81 @@ export default function TeamsScreen() {
     );
 
     return (
-        <View style={{ flex: 1, backgroundColor: theme.background }}>
-            <FlatList
-                data={filteredTeams}
-                renderItem={renderTeamItem}
-                keyExtractor={(item) => item.team_id}
-                contentContainerStyle={styles.content}
-                removeClippedSubviews={true} // High-impact memory optimization
-                initialNumToRender={10}      // Start small
-                maxToRenderPerBatch={5}      // Add items slowly to prevent CPU spikes
-                windowSize={5}               // Keep only 5 screens of data in RAM
-                ListHeaderComponent={
-                    <>
-                        {/* --- BRANDED HEADER --- */}
-                        <View style={{ alignItems: 'center', marginBottom: 10, marginTop: 10 }}>
-                            <Image
-                                source={require('@/assets/images/index_header_icon.png')}
-                                style={{ width: 140, height: 60 }}
-                                resizeMode="contain"
+        <>
+            <Head>
+                <title>Teams | Legends CBB</title>
+            </Head>
+
+            <View style={{ flex: 1, backgroundColor: theme.background }}>
+                <FlatList
+                    data={filteredTeams}
+                    renderItem={renderTeamItem}
+                    keyExtractor={(item) => item.team_id}
+                    contentContainerStyle={styles.content}
+                    removeClippedSubviews={true} // High-impact memory optimization
+                    initialNumToRender={10}      // Start small
+                    maxToRenderPerBatch={5}      // Add items slowly to prevent CPU spikes
+                    windowSize={5}               // Keep only 5 screens of data in RAM
+                    ListHeaderComponent={
+                        <>
+                            {/* --- BRANDED HEADER --- */}
+                            <View style={{ alignItems: 'center', marginBottom: 10, marginTop: 10 }}>
+                                <Image
+                                    source={require('@/assets/images/index_header_icon.png')}
+                                    style={{ width: 140, height: 60 }}
+                                    resizeMode="contain"
+                                />
+                                <Text style={{
+                                    fontSize: 12,
+                                    fontWeight: '800',
+                                    color: theme.mutedText,
+                                    letterSpacing: 2.5,
+                                    marginTop: 8,
+                                    textTransform: 'uppercase'
+                                }}>
+                                    The Universe's Main Programs
+                                </Text>
+                            </View>
+
+                            <TextInput
+                                style={styles.searchInput}
+                                placeholder="Search teams..."
+                                placeholderTextColor={theme.mutedText}
+                                value={searchQuery}
+                                onChangeText={setSearchQuery}
+                                autoCorrect={false}
+                                clearButtonMode="while-editing"
                             />
-                            <Text style={{
-                                fontSize: 12,
-                                fontWeight: '800',
-                                color: theme.mutedText,
-                                letterSpacing: 2.5,
-                                marginTop: 8,
-                                textTransform: 'uppercase'
-                            }}>
-                                The Universe's Main Programs
-                            </Text>
-                        </View>
 
-                        <TextInput
-                            style={styles.searchInput}
-                            placeholder="Search teams..."
-                            placeholderTextColor={theme.mutedText}
-                            value={searchQuery}
-                            onChangeText={setSearchQuery}
-                            autoCorrect={false}
-                            clearButtonMode="while-editing"
-                        />
+                            {loading && (
+                                <View style={styles.centerBlock}>
+                                    <ActivityIndicator size="large" />
+                                    <Text style={styles.helper}>Loading teams...</Text>
+                                </View>
+                            )}
 
-                        {loading && (
-                            <View style={styles.centerBlock}>
-                                <ActivityIndicator size="large" />
-                                <Text style={styles.helper}>Loading teams...</Text>
-                            </View>
-                        )}
+                            {error && !loading && (
+                                <View style={styles.teamCard}>
+                                    <Text style={styles.errorTitle}>Error</Text>
+                                    <Text style={styles.errorText}>{error}</Text>
+                                </View>
+                            )}
 
-                        {error && !loading && (
-                            <View style={styles.teamCard}>
-                                <Text style={styles.errorTitle}>Error</Text>
-                                <Text style={styles.errorText}>{error}</Text>
-                            </View>
-                        )}
+                            {!loading && teams.length === 0 && (
+                                <View style={styles.teamCard}>
+                                    <Text style={styles.errorText}>No teams available.</Text>
+                                </View>
+                            )}
 
-                        {!loading && teams.length === 0 && (
-                            <View style={styles.teamCard}>
-                                <Text style={styles.errorText}>No teams available.</Text>
-                            </View>
-                        )}
-
-                        {!loading && teams.length > 0 && filteredTeams.length === 0 && (
-                            <View style={styles.centerBlock}>
-                                <Text style={styles.helper}>No teams found matching "{searchQuery}"</Text>
-                            </View>
-                        )}
-                    </>
-                }
-            />
-        </View>
+                            {!loading && teams.length > 0 && filteredTeams.length === 0 && (
+                                <View style={styles.centerBlock}>
+                                    <Text style={styles.helper}>No teams found matching "{searchQuery}"</Text>
+                                </View>
+                            )}
+                        </>
+                    }
+                />
+            </View>
+        </>
     );
 }

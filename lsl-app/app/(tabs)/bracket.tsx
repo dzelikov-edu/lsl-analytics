@@ -7,6 +7,7 @@ import { AppColors } from '@/constants/app-colors';
 import TournamentMap from '../tournament/map';
 import { getToken } from '@/lib/auth-storage';
 import { useFocusEffect } from 'expo-router';
+import Head from 'expo-router/head';
 import TeamLogo from '@/components/TeamLogo';
 
 export default function BracketTab() {
@@ -591,208 +592,214 @@ export default function BracketTab() {
 
     // 3. List View (Default LIVE state)
     return (
-        <ScrollView
-            style={{ flex: 1, backgroundColor: theme.background }}
-            contentContainerStyle={{
-                padding: 20,
-                // iPad uses 10px, phones use the dynamic top inset (Notch room)
-                paddingTop: isTablet ? 10 : insets.top
-            }}
-        >
-            {/* --- BRANDED HEADER --- */}
-            <View style={{
-                alignItems: 'center',
-                marginBottom: 20,
-                marginTop: isTablet ? 12 : 18 // 12 for iPad, 18 for all Phones
-            }}>
-                <Image
-                    source={require('@/assets/images/index_header_icon.png')}
-                    style={{ width: 140, height: 60 }}
-                    resizeMode="contain"
-                />
-                <Text style={{
-                    fontSize: 12,
-                    fontWeight: '800',
-                    color: theme.mutedText,
-                    letterSpacing: 2.5,
-                    marginTop: 8,
-                    textTransform: 'uppercase'
+        <>
+            <Head>
+                <title>LCAA Tournament | Legends CBB</title>
+            </Head>
+
+            <ScrollView
+                style={{ flex: 1, backgroundColor: theme.background }}
+                contentContainerStyle={{
+                    padding: 20,
+                    // iPad uses 10px, phones use the dynamic top inset (Notch room)
+                    paddingTop: isTablet ? 10 : insets.top
+                }}
+            >
+                {/* --- BRANDED HEADER --- */}
+                <View style={{
+                    alignItems: 'center',
+                    marginBottom: 20,
+                    marginTop: isTablet ? 12 : 18 // 12 for iPad, 18 for all Phones
                 }}>
-                    Tournament Challenge
+                    <Image
+                        source={require('@/assets/images/index_header_icon.png')}
+                        style={{ width: 140, height: 60 }}
+                        resizeMode="contain"
+                    />
+                    <Text style={{
+                        fontSize: 12,
+                        fontWeight: '800',
+                        color: theme.mutedText,
+                        letterSpacing: 2.5,
+                        marginTop: 8,
+                        textTransform: 'uppercase'
+                    }}>
+                        Tournament Challenge
+                    </Text>
+                </View>
+
+                {/* Existing Title (we keep it but it will now sit below the logo) */}
+                <Text style={{ color: theme.text, fontSize: 30, fontWeight: '800', textAlign: 'center', marginBottom: 5 }}>
+                    LCAA Tournament Bracket Challenge
                 </Text>
-            </View>
 
-            {/* Existing Title (we keep it but it will now sit below the logo) */}
-            <Text style={{ color: theme.text, fontSize: 30, fontWeight: '800', textAlign: 'center', marginBottom: 5 }}>
-                LCAA Tournament Bracket Challenge
-            </Text>
+                {/* --- MODE TOGGLE (NEW) --- */}
+                <View style={{ flexDirection: 'row', backgroundColor: theme.card, borderRadius: 12, padding: 4, marginVertical: 20, borderWidth: 1, borderColor: theme.border }}>
+                    <Pressable
+                        onPress={() => setViewMode('BRACKETS')}
+                        style={{ flex: 1, paddingVertical: 8, borderRadius: 8, backgroundColor: viewMode === 'BRACKETS' ? theme.border : 'transparent', alignItems: 'center' }}
+                    >
+                        <Text style={{ color: theme.text, fontWeight: '700', fontSize: 13 }}>My Brackets</Text>
+                    </Pressable>
+                    <Pressable
+                        onPress={() => setViewMode('GROUPS')}
+                        style={{ flex: 1, paddingVertical: 8, borderRadius: 8, backgroundColor: viewMode === 'GROUPS' ? theme.border : 'transparent', alignItems: 'center' }}
+                    >
+                        <Text style={{ color: theme.text, fontWeight: '700', fontSize: 13 }}>My Groups</Text>
+                    </Pressable>
+                </View>
 
-            {/* --- MODE TOGGLE (NEW) --- */}
-            <View style={{ flexDirection: 'row', backgroundColor: theme.card, borderRadius: 12, padding: 4, marginVertical: 20, borderWidth: 1, borderColor: theme.border }}>
-                <Pressable
-                    onPress={() => setViewMode('BRACKETS')}
-                    style={{ flex: 1, paddingVertical: 8, borderRadius: 8, backgroundColor: viewMode === 'BRACKETS' ? theme.border : 'transparent', alignItems: 'center' }}
-                >
-                    <Text style={{ color: theme.text, fontWeight: '700', fontSize: 13 }}>My Brackets</Text>
-                </Pressable>
-                <Pressable
-                    onPress={() => setViewMode('GROUPS')}
-                    style={{ flex: 1, paddingVertical: 8, borderRadius: 8, backgroundColor: viewMode === 'GROUPS' ? theme.border : 'transparent', alignItems: 'center' }}
-                >
-                    <Text style={{ color: theme.text, fontWeight: '700', fontSize: 13 }}>My Groups</Text>
-                </Pressable>
-            </View>
+                {viewMode === 'BRACKETS' ? (
+                    /* --- EXISTING BRACKETS LIST --- */
+                    <>
+                        <Text style={{ color: theme.mutedText, fontSize: 16, marginBottom: 30 }}>Manage your 2036 Tournament bracket entries. Press and hold down on a bracket you've made to change its name.</Text>
+                        <Text style={{ color: theme.text, fontSize: 18, fontWeight: '700', marginBottom: 15 }}>My Brackets ({brackets.length}/10)</Text>
 
-            {viewMode === 'BRACKETS' ? (
-                /* --- EXISTING BRACKETS LIST --- */
-                <>
-                    <Text style={{ color: theme.mutedText, fontSize: 16, marginBottom: 30 }}>Manage your 2036 Tournament bracket entries. Press and hold down on a bracket you've made to change its name.</Text>
-                    <Text style={{ color: theme.text, fontSize: 18, fontWeight: '700', marginBottom: 15 }}>My Brackets ({brackets.length}/10)</Text>
+                        {brackets.map((b) => (
+                            <Pressable
+                                key={b.id}
+                                onPress={() => setSelectedBracketId(b.id)}
+                                onLongPress={() => handleRenameBracket(b.id, b.name)}
+                                style={{
+                                    backgroundColor: theme.card,
+                                    padding: 16,
+                                    borderRadius: 15,
+                                    marginBottom: 12,
+                                    borderWidth: 1,
+                                    borderColor: theme.border,
+                                    flexDirection: 'row',
+                                    justifyContent: 'space-between',
+                                    alignItems: 'center'
+                                }}
+                            >
+                                <View style={{ flex: 1 }}>
+                                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                        <Text style={{ color: theme.text, fontSize: 18, fontWeight: '800' }}>{b.name}</Text>
+                                        {b.is_locked && <Text style={{ marginLeft: 8, fontSize: 12 }}>🔒</Text>}
+                                    </View>
 
-                    {brackets.map((b) => (
-                        <Pressable
-                            key={b.id}
-                            onPress={() => setSelectedBracketId(b.id)}
-                            onLongPress={() => handleRenameBracket(b.id, b.name)}
-                            style={{
-                                backgroundColor: theme.card,
-                                padding: 16,
-                                borderRadius: 15,
-                                marginBottom: 12,
-                                borderWidth: 1,
-                                borderColor: theme.border,
-                                flexDirection: 'row',
-                                justifyContent: 'space-between',
-                                alignItems: 'center'
-                            }}
-                        >
-                            <View style={{ flex: 1 }}>
-                                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                                    <Text style={{ color: theme.text, fontSize: 18, fontWeight: '800' }}>{b.name}</Text>
-                                    {b.is_locked && <Text style={{ marginLeft: 8, fontSize: 12 }}>🔒</Text>}
-                                </View>
-
-                                <View style={{ flexDirection: 'row', marginTop: 6, alignItems: 'center' }}>
-                                    <View style={{
-                                        backgroundColor: b.is_locked ? '#34C75922' : '#FF950022',
-                                        paddingHorizontal: 8,
-                                        paddingVertical: 2,
-                                        borderRadius: 4,
-                                        marginRight: 10
-                                    }}>
-                                        <Text style={{ color: b.is_locked ? '#34C759' : '#FF9500', fontSize: 10, fontWeight: '900' }}>
-                                            {b.is_locked ? 'LOCKED' : 'DRAFT'}
+                                    <View style={{ flexDirection: 'row', marginTop: 6, alignItems: 'center' }}>
+                                        <View style={{
+                                            backgroundColor: b.is_locked ? '#34C75922' : '#FF950022',
+                                            paddingHorizontal: 8,
+                                            paddingVertical: 2,
+                                            borderRadius: 4,
+                                            marginRight: 10
+                                        }}>
+                                            <Text style={{ color: b.is_locked ? '#34C759' : '#FF9500', fontSize: 10, fontWeight: '900' }}>
+                                                {b.is_locked ? 'LOCKED' : 'DRAFT'}
+                                            </Text>
+                                        </View>
+                                        <Text style={{ color: theme.text, fontSize: 12, fontWeight: '600' }}>
+                                            {b.pick_count ?? 0} / 79 Picks Made
                                         </Text>
                                     </View>
-                                    <Text style={{ color: theme.text, fontSize: 12, fontWeight: '600' }}>
-                                        {b.pick_count ?? 0} / 79 Picks Made
-                                    </Text>
                                 </View>
-                            </View>
 
-                            {/* ONLY SHOW DELETE IF NOT LIVE */}
-                            {phase !== 'LIVE' && (
-                                <Pressable
-                                    onPress={() => handleDeleteBracket(b.id)}
-                                    style={{ padding: 10, marginLeft: 10 }}
-                                >
-                                    <Text style={{ fontSize: 18 }}>🗑️</Text>
-                                </Pressable>
-                            )}
-                        </Pressable>
-                    ))}
-
-                    {/* ONLY SHOW CREATE BUTTON IF PREDICTIONS ARE OPEN */}
-                    {phase === 'SELECTION_SUNDAY' && brackets.length < 10 && (
-                        <Pressable
-                            onPress={handleCreateBracket}
-                            style={{ backgroundColor: '#007AFF', padding: 18, borderRadius: 15, alignItems: 'center', marginTop: 10 }}
-                        >
-                            <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 16 }}>+ Create New Bracket</Text>
-                        </Pressable>
-                    )}
-
-                    {/* Show a "Locked" notice if the tournament has started */}
-                    {phase === 'LIVE' && (
-                        <View style={{ padding: 18, borderRadius: 15, backgroundColor: theme.card, borderWidth: 1, borderColor: theme.border, alignItems: 'center', marginTop: 10 }}>
-                            <Text style={{ color: theme.mutedText, fontWeight: '700' }}>🔒 Tournament Started: Entries Locked</Text>
-                        </View>
-                    )}
-                </>
-            ) : (
-                /* --- GROUPS VIEW --- */
-                <>
-                    <Text style={{ color: theme.mutedText, fontSize: 16, marginBottom: 30 }}>Compete against friends in custom leagues.</Text>
-
-                    {myGroups.length > 0 ? (
-                        myGroups.map((g, index) => {
-                            // Check if the current logged-in user is the creator
-                            const isOwner = g.owner_user_id === currentUserId;
-
-                            return (
-                                <View
-                                    key={`${g.id}-${index}`}
-                                    style={{
-                                        backgroundColor: theme.card,
-                                        padding: 18,
-                                        borderRadius: 15,
-                                        marginBottom: 12,
-                                        borderWidth: 1,
-                                        borderColor: theme.border,
-                                        flexDirection: 'row',
-                                        justifyContent: 'space-between',
-                                        alignItems: 'center'
-                                    }}
-                                >
+                                {/* ONLY SHOW DELETE IF NOT LIVE */}
+                                {phase !== 'LIVE' && (
                                     <Pressable
-                                        style={{ flex: 1 }}
-                                        onPress={() => loadLeaderboard(g.id, g.name)}
+                                        onPress={() => handleDeleteBracket(b.id)}
+                                        style={{ padding: 10, marginLeft: 10 }}
                                     >
-                                        <Text style={{ color: theme.text, fontSize: 17, fontWeight: '800' }}>{g.name}</Text>
-                                        <Text style={{ color: theme.mutedText, fontSize: 12, marginTop: 4 }}>
-                                            {isOwner ? `CODE: ${g.join_code} (OWNER)` : `CODE: ${g.join_code}`}
-                                        </Text>
+                                        <Text style={{ fontSize: 18 }}>🗑️</Text>
                                     </Pressable>
+                                )}
+                            </Pressable>
+                        ))}
 
-                                    {/* DYNAMIC ACTION: Delete for owner, Leave for member (Only visible if NOT live)*/}
-                                    {phase !== 'LIVE' && (
+                        {/* ONLY SHOW CREATE BUTTON IF PREDICTIONS ARE OPEN */}
+                        {phase === 'SELECTION_SUNDAY' && brackets.length < 10 && (
+                            <Pressable
+                                onPress={handleCreateBracket}
+                                style={{ backgroundColor: '#007AFF', padding: 18, borderRadius: 15, alignItems: 'center', marginTop: 10 }}
+                            >
+                                <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 16 }}>+ Create New Bracket</Text>
+                            </Pressable>
+                        )}
+
+                        {/* Show a "Locked" notice if the tournament has started */}
+                        {phase === 'LIVE' && (
+                            <View style={{ padding: 18, borderRadius: 15, backgroundColor: theme.card, borderWidth: 1, borderColor: theme.border, alignItems: 'center', marginTop: 10 }}>
+                                <Text style={{ color: theme.mutedText, fontWeight: '700' }}>🔒 Tournament Started: Entries Locked</Text>
+                            </View>
+                        )}
+                    </>
+                ) : (
+                    /* --- GROUPS VIEW --- */
+                    <>
+                        <Text style={{ color: theme.mutedText, fontSize: 16, marginBottom: 30 }}>Compete against friends in custom leagues.</Text>
+
+                        {myGroups.length > 0 ? (
+                            myGroups.map((g, index) => {
+                                // Check if the current logged-in user is the creator
+                                const isOwner = g.owner_user_id === currentUserId;
+
+                                return (
+                                    <View
+                                        key={`${g.id}-${index}`}
+                                        style={{
+                                            backgroundColor: theme.card,
+                                            padding: 18,
+                                            borderRadius: 15,
+                                            marginBottom: 12,
+                                            borderWidth: 1,
+                                            borderColor: theme.border,
+                                            flexDirection: 'row',
+                                            justifyContent: 'space-between',
+                                            alignItems: 'center'
+                                        }}
+                                    >
                                         <Pressable
-                                            onPress={() => isOwner ? handleDeleteGroup(g.id) : handleLeaveGroup(g.id)}
-                                            style={{ padding: 10, marginLeft: 10 }}
+                                            style={{ flex: 1 }}
+                                            onPress={() => loadLeaderboard(g.id, g.name)}
                                         >
-                                            <Text style={{ fontSize: 18 }}>{isOwner ? '🗑️' : '🚪'}</Text>
+                                            <Text style={{ color: theme.text, fontSize: 17, fontWeight: '800' }}>{g.name}</Text>
+                                            <Text style={{ color: theme.mutedText, fontSize: 12, marginTop: 4 }}>
+                                                {isOwner ? `CODE: ${g.join_code} (OWNER)` : `CODE: ${g.join_code}`}
+                                            </Text>
                                         </Pressable>
-                                    )}
-                                </View>
-                            );
-                        })
-                    ) : (
-                        <View style={{ alignItems: 'center', marginVertical: 40 }}>
-                            <Text style={{ fontSize: 40, marginBottom: 10 }}>🏆</Text>
-                            <Text style={{ color: theme.text, fontWeight: '700' }}>No Groups Joined Yet</Text>
-                        </View>
-                    )}
 
-                    {/* ONLY SHOW GROUP CONTROLS IF NOT LIVE */}
-                    {phase === 'SELECTION_SUNDAY' && (
-                        <>
-                            <Pressable
-                                onPress={handleCreateGroup}
-                                style={{ backgroundColor: '#5856D6', padding: 16, borderRadius: 12, alignItems: 'center', marginTop: 10 }}
-                            >
-                                <Text style={{ color: '#fff', fontWeight: 'bold' }}>+ Create a Group</Text>
-                            </Pressable>
+                                        {/* DYNAMIC ACTION: Delete for owner, Leave for member (Only visible if NOT live)*/}
+                                        {phase !== 'LIVE' && (
+                                            <Pressable
+                                                onPress={() => isOwner ? handleDeleteGroup(g.id) : handleLeaveGroup(g.id)}
+                                                style={{ padding: 10, marginLeft: 10 }}
+                                            >
+                                                <Text style={{ fontSize: 18 }}>{isOwner ? '🗑️' : '🚪'}</Text>
+                                            </Pressable>
+                                        )}
+                                    </View>
+                                );
+                            })
+                        ) : (
+                            <View style={{ alignItems: 'center', marginVertical: 40 }}>
+                                <Text style={{ fontSize: 40, marginBottom: 10 }}>🏆</Text>
+                                <Text style={{ color: theme.text, fontWeight: '700' }}>No Groups Joined Yet</Text>
+                            </View>
+                        )}
 
-                            <Pressable
-                                onPress={handleJoinGroup}
-                                style={{ borderWidth: 1, borderColor: '#5856D6', padding: 16, borderRadius: 12, alignItems: 'center', marginTop: 12 }}
-                            >
-                                <Text style={{ color: '#5856D6', fontWeight: 'bold' }}>Join with Code</Text>
-                            </Pressable>
-                        </>
-                    )}
-                </>
-            )}
-        </ScrollView>
+                        {/* ONLY SHOW GROUP CONTROLS IF NOT LIVE */}
+                        {phase === 'SELECTION_SUNDAY' && (
+                            <>
+                                <Pressable
+                                    onPress={handleCreateGroup}
+                                    style={{ backgroundColor: '#5856D6', padding: 16, borderRadius: 12, alignItems: 'center', marginTop: 10 }}
+                                >
+                                    <Text style={{ color: '#fff', fontWeight: 'bold' }}>+ Create a Group</Text>
+                                </Pressable>
+
+                                <Pressable
+                                    onPress={handleJoinGroup}
+                                    style={{ borderWidth: 1, borderColor: '#5856D6', padding: 16, borderRadius: 12, alignItems: 'center', marginTop: 12 }}
+                                >
+                                    <Text style={{ color: '#5856D6', fontWeight: 'bold' }}>Join with Code</Text>
+                                </Pressable>
+                            </>
+                        )}
+                    </>
+                )}
+            </ScrollView>
+        </>
     );
 }

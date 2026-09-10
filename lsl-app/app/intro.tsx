@@ -3,6 +3,7 @@ import * as Linking from 'expo-linking';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { AppColors } from '@/constants/app-colors';
 import { router } from 'expo-router';
+import Head from 'expo-router/head';
 import { setHasSeenIntro } from '@/lib/firstLaunch';
 
 export default function IntroScreen() {

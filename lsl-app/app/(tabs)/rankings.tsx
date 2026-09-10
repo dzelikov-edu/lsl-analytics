@@ -4,6 +4,7 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useCachedApi } from '@/hooks/useCachedApi';
 import { getTeamBranding } from '@/lib/teamBranding';
 import { router } from 'expo-router';
+import Head from 'expo-router/head';
 import { useMemo, useState, useEffect } from 'react';
 import { ActivityIndicator, Pressable, SectionList, StyleSheet, Text, View, useWindowDimensions, Image } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -219,73 +220,79 @@ export default function RankingsScreen() {
     };
 
     return (
-        <View style={{ flex: 1, backgroundColor: theme.background }}>
-            <SectionList
-                sections={sections}
-                renderItem={renderRankingItem}
-                keyExtractor={(item) => item.team_id}
-                contentContainerStyle={styles.content}
-                stickySectionHeadersEnabled={false} // Keeps the title scrolling with the pod
-                removeClippedSubviews={true}
-                initialNumToRender={15}
-                renderSectionHeader={({ section: { title, data } }) => (
-                    data.length > 0 ? (
-                        <Text style={[styles.sectionTitle, { marginTop: title === 'Next 5' ? 24 : 0 }]}>
-                            {title}
-                        </Text>
-                    ) : null
-                )}
-                ListHeaderComponent={
-                    <>
-                        {/* --- BRANDED HEADER --- */}
-                        <View style={{ alignItems: 'center', marginBottom: 10, marginTop: 10 }}>
-                            <Image
-                                source={require('@/assets/images/index_header_icon.png')}
-                                style={{ width: 140, height: 60 }}
-                                resizeMode="contain"
-                            />
-                            <Text style={{
-                                fontSize: 12,
-                                fontWeight: '800',
-                                color: theme.mutedText,
-                                letterSpacing: 2.5,
-                                marginTop: 8,
-                                textTransform: 'uppercase'
-                            }}>
-                                The Universe Rankings
-                            </Text>
-                        </View>
-                        <View style={styles.switcherRow}>
-                            <Pressable
-                                onPress={() => selectedPoll !== 'LSL' && setSelectedPoll('LSL')}
-                                style={[styles.switchPill, selectedPoll === 'LSL' && styles.switchPillActive]}>
-                                <Text style={[styles.switchText, selectedPoll === 'LSL' && styles.switchTextActive]}>
-                                    LSL Poll
-                                </Text>
-                            </Pressable>
-                            <Pressable
-                                onPress={() => selectedPoll !== 'LCAA' && setSelectedPoll('LCAA')}
-                                style={[styles.switchPill, selectedPoll === 'LCAA' && styles.switchPillActive]}>
-                                <Text style={[styles.switchText, selectedPoll === 'LCAA' && styles.switchTextActive]}>
-                                    LCAA Poll
-                                </Text>
-                            </Pressable>
-                        </View>
+        <>
+            <Head>
+                <title>Rankings | Legends CBB</title>
+            </Head>
 
-                        {loading && !payload && (
-                            <View style={styles.centerBlock}>
-                                <ActivityIndicator size="large" color={theme.text} />
-                                <Text style={styles.helper}>Loading all rankings...</Text>
+            <View style={{ flex: 1, backgroundColor: theme.background }}>
+                <SectionList
+                    sections={sections}
+                    renderItem={renderRankingItem}
+                    keyExtractor={(item) => item.team_id}
+                    contentContainerStyle={styles.content}
+                    stickySectionHeadersEnabled={false} // Keeps the title scrolling with the pod
+                    removeClippedSubviews={true}
+                    initialNumToRender={15}
+                    renderSectionHeader={({ section: { title, data } }) => (
+                        data.length > 0 ? (
+                            <Text style={[styles.sectionTitle, { marginTop: title === 'Next 5' ? 24 : 0 }]}>
+                                {title}
+                            </Text>
+                        ) : null
+                    )}
+                    ListHeaderComponent={
+                        <>
+                            {/* --- BRANDED HEADER --- */}
+                            <View style={{ alignItems: 'center', marginBottom: 10, marginTop: 10 }}>
+                                <Image
+                                    source={require('@/assets/images/index_header_icon.png')}
+                                    style={{ width: 140, height: 60 }}
+                                    resizeMode="contain"
+                                />
+                                <Text style={{
+                                    fontSize: 12,
+                                    fontWeight: '800',
+                                    color: theme.mutedText,
+                                    letterSpacing: 2.5,
+                                    marginTop: 8,
+                                    textTransform: 'uppercase'
+                                }}>
+                                    The Universe Rankings
+                                </Text>
                             </View>
-                        )}
-                        {error && (
-                            <View style={styles.listCard}><Text style={styles.errorText}>{error}</Text></View>
-                        )}
-                    </>
-                }
-                // Add a small spacer at the bottom of each section/pod
-                SectionSeparatorComponent={() => <View style={{ height: 2 }} />}
-            />
-        </View>
+                            <View style={styles.switcherRow}>
+                                <Pressable
+                                    onPress={() => selectedPoll !== 'LSL' && setSelectedPoll('LSL')}
+                                    style={[styles.switchPill, selectedPoll === 'LSL' && styles.switchPillActive]}>
+                                    <Text style={[styles.switchText, selectedPoll === 'LSL' && styles.switchTextActive]}>
+                                        LSL Poll
+                                    </Text>
+                                </Pressable>
+                                <Pressable
+                                    onPress={() => selectedPoll !== 'LCAA' && setSelectedPoll('LCAA')}
+                                    style={[styles.switchPill, selectedPoll === 'LCAA' && styles.switchPillActive]}>
+                                    <Text style={[styles.switchText, selectedPoll === 'LCAA' && styles.switchTextActive]}>
+                                        LCAA Poll
+                                    </Text>
+                                </Pressable>
+                            </View>
+
+                            {loading && !payload && (
+                                <View style={styles.centerBlock}>
+                                    <ActivityIndicator size="large" color={theme.text} />
+                                    <Text style={styles.helper}>Loading all rankings...</Text>
+                                </View>
+                            )}
+                            {error && (
+                                <View style={styles.listCard}><Text style={styles.errorText}>{error}</Text></View>
+                            )}
+                        </>
+                    }
+                    // Add a small spacer at the bottom of each section/pod
+                    SectionSeparatorComponent={() => <View style={{ height: 2 }} />}
+                />
+            </View>
+        </>
     );
 }

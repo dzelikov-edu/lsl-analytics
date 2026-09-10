@@ -2,6 +2,7 @@ import { View, Text, Pressable, StyleSheet, ScrollView, ActivityIndicator, Refre
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { AppColors } from '@/constants/app-colors';
 import { router, useFocusEffect } from 'expo-router'; // Add useFocusEffect
+import Head from 'expo-router/head';
 import { deleteToken, getToken } from '@/lib/auth-storage';
 import { useEffect, useState, useMemo, useCallback } from 'react'; // Add useCallback
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -677,383 +678,389 @@ export default function ProfileScreen() {
     };
 
     return (
-        <ScrollView
-            style={styles.container}
-            contentContainerStyle={styles.content}
-            refreshControl={
-                <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={theme.text} />
-            }
-        >
-            {/* --- BRANDED PROFILE HEADER --- */}
-            <View style={{
-                alignItems: 'center',
-                marginBottom: 10,
-                marginTop: isTablet
-                    ? -38
-                    : insets.top > 0
-                        ? insets.top - 42
-                        : 30
-            }}>
-                <Image
-                    source={require('@/assets/images/index_header_icon.png')}
-                    style={{ width: 140, height: 60 }}
-                    resizeMode="contain"
-                />
-                <Text style={{
-                    fontSize: 12,
-                    fontWeight: '800',
-                    color: theme.mutedText,
-                    letterSpacing: 2.5,
-                    marginTop: 8,
-                    textTransform: 'uppercase'
+        <>
+            <Head>
+                <title>Profile | Legends CBB</title>
+            </Head>
+
+            <ScrollView
+                style={styles.container}
+                contentContainerStyle={styles.content}
+                refreshControl={
+                    <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={theme.text} />
+                }
+            >
+                {/* --- BRANDED PROFILE HEADER --- */}
+                <View style={{
+                    alignItems: 'center',
+                    marginBottom: 10,
+                    marginTop: isTablet
+                        ? -38
+                        : insets.top > 0
+                            ? insets.top - 42
+                            : 30
                 }}>
-                    Legends Universe Account
-                </Text>
-
-                {loading && !user ? (
-                    <ActivityIndicator size="small" color={theme.text} style={{ marginTop: 15 }} />
-                ) : user ? (
-                    <View style={{
-                        marginTop: 4,
-                        alignItems: 'center'
+                    <Image
+                        source={require('@/assets/images/index_header_icon.png')}
+                        style={{ width: 140, height: 60 }}
+                        resizeMode="contain"
+                    />
+                    <Text style={{
+                        fontSize: 12,
+                        fontWeight: '800',
+                        color: theme.mutedText,
+                        letterSpacing: 2.5,
+                        marginTop: 8,
+                        textTransform: 'uppercase'
                     }}>
-                        {/* PRIMARY IDENTITY: USERNAME */}
-                        <Text style={{
-                            fontSize: 22,
-                            fontWeight: '800',
-                            color: theme.text,
-                            letterSpacing: -0.5
-                        }}>
-                            {user.username ? `@${user.username}` : 'Set Username'}
-                        </Text>
+                        Legends Universe Account
+                    </Text>
 
-                        {/* SECONDARY IDENTITY: EMAIL + ADMIN TAG */}
+                    {loading && !user ? (
+                        <ActivityIndicator size="small" color={theme.text} style={{ marginTop: 15 }} />
+                    ) : user ? (
                         <View style={{
-                            flexDirection: 'row',
-                            alignItems: 'center',
                             marginTop: 4,
-                            paddingHorizontal: 8,
-                            paddingVertical: 2,
-                            backgroundColor: theme.card,
-                            borderRadius: 6,
-                            borderWidth: 1,
-                            borderColor: theme.border
+                            alignItems: 'center'
                         }}>
-                            <Text style={{ fontSize: 12, fontWeight: '600', color: theme.mutedText }}>
-                                {user.email}{user.is_admin ? ' • ADMIN' : ''}
+                            {/* PRIMARY IDENTITY: USERNAME */}
+                            <Text style={{
+                                fontSize: 22,
+                                fontWeight: '800',
+                                color: theme.text,
+                                letterSpacing: -0.5
+                            }}>
+                                {user.username ? `@${user.username}` : 'Set Username'}
                             </Text>
+
+                            {/* SECONDARY IDENTITY: EMAIL + ADMIN TAG */}
+                            <View style={{
+                                flexDirection: 'row',
+                                alignItems: 'center',
+                                marginTop: 4,
+                                paddingHorizontal: 8,
+                                paddingVertical: 2,
+                                backgroundColor: theme.card,
+                                borderRadius: 6,
+                                borderWidth: 1,
+                                borderColor: theme.border
+                            }}>
+                                <Text style={{ fontSize: 12, fontWeight: '600', color: theme.mutedText }}>
+                                    {user.email}{user.is_admin ? ' • ADMIN' : ''}
+                                </Text>
+                            </View>
                         </View>
-                    </View>
-                ) : null}
-            </View>
+                    ) : null}
+                </View>
 
-            <Text style={styles.sectionTitle}>My Favorite Teams</Text>
+                <Text style={styles.sectionTitle}>My Favorite Teams</Text>
 
-            {favorites.length > 0 ? (
-                [...favorites]
-                    .sort((a, b) => {
-                        const nameA = teamNames[a] || getTeamBranding(a, null).displayName;
-                        const nameB = teamNames[b] || getTeamBranding(b, null).displayName;
-                        return nameA.localeCompare(nameB);
-                    })
-                    .map((teamId) => (
-                        <Pressable
-                            key={teamId}
-                            style={styles.favCard}
-                            onPress={() => router.push({
-                                pathname: '/team/[teamId]',
-                                params: { teamId: teamId }
-                            })}
-                        >
-                            <TeamLogo teamId={teamId} size={30} />
-                            <Text style={styles.favText}>{teamNames[teamId] || getTeamBranding(teamId, null).displayName}</Text>
-                        </Pressable>
-                    ))
-            ) : (
-                <EmptyState
-                    title="No Favorites Yet"
-                    description="Follow your favorite programs to see their latest results and upcoming schedules here."
-                    buttonText="Find Teams to Follow"
-                    theme={theme}
-                />
-            )}
+                {favorites.length > 0 ? (
+                    [...favorites]
+                        .sort((a, b) => {
+                            const nameA = teamNames[a] || getTeamBranding(a, null).displayName;
+                            const nameB = teamNames[b] || getTeamBranding(b, null).displayName;
+                            return nameA.localeCompare(nameB);
+                        })
+                        .map((teamId) => (
+                            <Pressable
+                                key={teamId}
+                                style={styles.favCard}
+                                onPress={() => router.push({
+                                    pathname: '/team/[teamId]',
+                                    params: { teamId: teamId }
+                                })}
+                            >
+                                <TeamLogo teamId={teamId} size={30} />
+                                <Text style={styles.favText}>{teamNames[teamId] || getTeamBranding(teamId, null).displayName}</Text>
+                            </Pressable>
+                        ))
+                ) : (
+                    <EmptyState
+                        title="No Favorites Yet"
+                        description="Follow your favorite programs to see their latest results and upcoming schedules here."
+                        buttonText="Find Teams to Follow"
+                        theme={theme}
+                    />
+                )}
 
-            {/* --- IDENTITY SETTINGS --- */}
-            <Pressable
-                style={styles.settingRow}
-                onPress={() => {
-                    if (Platform.OS === 'web') {
-                        // 1. Web browser native prompt
-                        const newName = window.prompt(
-                            "Change Username\n\nEnter your new Legends ID (3-20 characters, alphanumeric and periods only).",
-                            user?.username || ""
-                        );
-                        if (newName !== null) {
-                            handleUpdateUsername(newName);
-                        }
-                    } else {
-                        // 2. Hidden mobile prompt to bypass strict web bundlers
-                        const safePrompt = (Alert as any).prompt;
-                        if (safePrompt) {
-                            safePrompt(
-                                "Change Username",
-                                "Enter your new Legends ID (3-20 characters, alphanumeric and periods only).",
-                                [
-                                    { text: "Cancel", style: "cancel" },
-                                    {
-                                        text: "Update",
-                                        onPress: (newName?: string) => handleUpdateUsername(newName)
-                                    }
-                                ],
-                                "plain-text",
+                {/* --- IDENTITY SETTINGS --- */}
+                <Pressable
+                    style={styles.settingRow}
+                    onPress={() => {
+                        if (Platform.OS === 'web') {
+                            // 1. Web browser native prompt
+                            const newName = window.prompt(
+                                "Change Username\n\nEnter your new Legends ID (3-20 characters, alphanumeric and periods only).",
                                 user?.username || ""
                             );
+                            if (newName !== null) {
+                                handleUpdateUsername(newName);
+                            }
                         } else {
-                            // 3. Android fallback (since Android doesn't support Alert.prompt natively)
-                            Alert.alert("Not Supported", "Text prompts are only supported on iOS right now.");
+                            // 2. Hidden mobile prompt to bypass strict web bundlers
+                            const safePrompt = (Alert as any).prompt;
+                            if (safePrompt) {
+                                safePrompt(
+                                    "Change Username",
+                                    "Enter your new Legends ID (3-20 characters, alphanumeric and periods only).",
+                                    [
+                                        { text: "Cancel", style: "cancel" },
+                                        {
+                                            text: "Update",
+                                            onPress: (newName?: string) => handleUpdateUsername(newName)
+                                        }
+                                    ],
+                                    "plain-text",
+                                    user?.username || ""
+                                );
+                            } else {
+                                // 3. Android fallback (since Android doesn't support Alert.prompt natively)
+                                Alert.alert("Not Supported", "Text prompts are only supported on iOS right now.");
+                            }
                         }
-                    }
-                }}
-            >
-                <View style={{ flex: 1 }}>
-                    <Text style={styles.settingLabel}>Edit Legends ID</Text>
-                    <Text style={{ color: theme.mutedText, fontSize: 13, marginTop: 2 }}>
-                        Change your public identity within the simulation universe.
-                    </Text>
-                </View>
-                <Text style={{ color: '#007AFF', fontWeight: '600' }}>Edit</Text>
-            </Pressable>
-
-            {/* --- NOTIFICATION TOGGLE (Sim-League Style) --- */}
-            <View style={styles.settingRow}>
-                <View style={{ flex: 1, paddingRight: 10 }}>
-                    <Text style={styles.settingLabel}>New Result Alerts</Text>
-                    <Text style={{ color: theme.mutedText, fontSize: 13, marginTop: 2 }}>
-                        Get notified when new sim results and rankings are posted.
-                    </Text>
-                </View>
-                <Switch
-                    value={notificationsEnabled}
-                    onValueChange={toggleNotifications}
-                    trackColor={{ false: theme.border, true: '#34C759' }}
-                />
-            </View>
-
-            <Pressable
-                style={styles.settingRow}
-                onPress={handleImportLogos}
-                disabled={allTeamIds.length === 0} // DISABLE HERE
-            >
-                <View style={{ flex: 1 }}>
-                    <Text style={styles.settingLabel}>⚙️ Import LSL Community Pack</Text>
-                    <Text style={{ color: theme.mutedText, fontSize: 13, marginTop: 2 }}>
-                        Download community logos and assets from an external source.
-                    </Text>
-                </View>
-            </Pressable>
-
-            {loading && syncTotal > 0 && ( // Display only when syncing and loading
-                <View style={[styles.settingRow, { justifyContent: 'center', marginBottom: 20 }]}>
-                    <ActivityIndicator size="small" color={theme.text} style={{ marginRight: 10 }} />
-                    <Text style={styles.settingLabel}>
-                        Syncing Logos: {syncProgress}/{syncTotal}
-                    </Text>
-                </View>
-            )}
-
-            {/* --- COMMISSIONER CONSOLE: ADMIN ONLY --- */}
-            {user?.is_admin && (
-                <View style={{ marginTop: 20, borderTopWidth: 1, borderTopColor: theme.border, paddingTop: 20 }}>
-                    <Text style={[styles.sectionTitle, { fontSize: 18 }]}>Commissioner Console</Text>
-
-                    {/* --- COMMISSIONER MEGAPHONE --- */}
-                    <View style={{
-                        marginTop: 10,
-                        padding: 15,
-                        backgroundColor: theme.card,
-                        borderRadius: 12,
-                        borderStyle: 'dashed',
-                        borderWidth: 1,
-                        borderColor: theme.border,
-                        marginBottom: 20
-                    }}>
-                        <Text style={{ fontSize: 15, fontWeight: '800', color: theme.text, marginBottom: 5 }}>
-                            📢 Commissioner Megaphone
+                    }}
+                >
+                    <View style={{ flex: 1 }}>
+                        <Text style={styles.settingLabel}>Edit Legends ID</Text>
+                        <Text style={{ color: theme.mutedText, fontSize: 13, marginTop: 2 }}>
+                            Change your public identity within the simulation universe.
                         </Text>
+                    </View>
+                    <Text style={{ color: '#007AFF', fontWeight: '600' }}>Edit</Text>
+                </Pressable>
 
-                        <TextInput
-                            placeholder="Alert Title (e.g. BREAKING NEWS)"
-                            value={customTitle}
-                            onChangeText={setCustomTitle}
-                            style={{ backgroundColor: theme.background, color: theme.text, padding: 12, borderRadius: 8, marginTop: 10, borderWidth: 1, borderColor: theme.border }}
-                            placeholderTextColor={theme.mutedText}
-                        />
-                        <TextInput
-                            placeholder="Alert Message..."
-                            value={customBody}
-                            onChangeText={setCustomBody}
-                            multiline
-                            style={{ backgroundColor: theme.background, color: theme.text, padding: 12, borderRadius: 8, marginTop: 10, height: 80, textAlignVertical: 'top', borderWidth: 1, borderColor: theme.border }}
-                            placeholderTextColor={theme.mutedText}
-                        />
-                        <TextInput
-                            placeholder="Target Real Team IDs or blank for ALL"
-                            value={targetTeam}
-                            onChangeText={setTargetTeam}
-                            autoCapitalize="characters"
-                            style={{ backgroundColor: theme.background, color: theme.text, padding: 12, borderRadius: 8, marginTop: 10, borderWidth: 1, borderColor: theme.border }}
-                            placeholderTextColor={theme.mutedText}
-                        />
+                {/* --- NOTIFICATION TOGGLE (Sim-League Style) --- */}
+                <View style={styles.settingRow}>
+                    <View style={{ flex: 1, paddingRight: 10 }}>
+                        <Text style={styles.settingLabel}>New Result Alerts</Text>
+                        <Text style={{ color: theme.mutedText, fontSize: 13, marginTop: 2 }}>
+                            Get notified when new sim results and rankings are posted.
+                        </Text>
+                    </View>
+                    <Switch
+                        value={notificationsEnabled}
+                        onValueChange={toggleNotifications}
+                        trackColor={{ false: theme.border, true: '#34C759' }}
+                    />
+                </View>
+
+                <Pressable
+                    style={styles.settingRow}
+                    onPress={handleImportLogos}
+                    disabled={allTeamIds.length === 0} // DISABLE HERE
+                >
+                    <View style={{ flex: 1 }}>
+                        <Text style={styles.settingLabel}>⚙️ Import LSL Community Pack</Text>
+                        <Text style={{ color: theme.mutedText, fontSize: 13, marginTop: 2 }}>
+                            Download community logos and assets from an external source.
+                        </Text>
+                    </View>
+                </Pressable>
+
+                {loading && syncTotal > 0 && ( // Display only when syncing and loading
+                    <View style={[styles.settingRow, { justifyContent: 'center', marginBottom: 20 }]}>
+                        <ActivityIndicator size="small" color={theme.text} style={{ marginRight: 10 }} />
+                        <Text style={styles.settingLabel}>
+                            Syncing Logos: {syncProgress}/{syncTotal}
+                        </Text>
+                    </View>
+                )}
+
+                {/* --- COMMISSIONER CONSOLE: ADMIN ONLY --- */}
+                {user?.is_admin && (
+                    <View style={{ marginTop: 20, borderTopWidth: 1, borderTopColor: theme.border, paddingTop: 20 }}>
+                        <Text style={[styles.sectionTitle, { fontSize: 18 }]}>Commissioner Console</Text>
+
+                        {/* --- COMMISSIONER MEGAPHONE --- */}
+                        <View style={{
+                            marginTop: 10,
+                            padding: 15,
+                            backgroundColor: theme.card,
+                            borderRadius: 12,
+                            borderStyle: 'dashed',
+                            borderWidth: 1,
+                            borderColor: theme.border,
+                            marginBottom: 20
+                        }}>
+                            <Text style={{ fontSize: 15, fontWeight: '800', color: theme.text, marginBottom: 5 }}>
+                                📢 Commissioner Megaphone
+                            </Text>
+
+                            <TextInput
+                                placeholder="Alert Title (e.g. BREAKING NEWS)"
+                                value={customTitle}
+                                onChangeText={setCustomTitle}
+                                style={{ backgroundColor: theme.background, color: theme.text, padding: 12, borderRadius: 8, marginTop: 10, borderWidth: 1, borderColor: theme.border }}
+                                placeholderTextColor={theme.mutedText}
+                            />
+                            <TextInput
+                                placeholder="Alert Message..."
+                                value={customBody}
+                                onChangeText={setCustomBody}
+                                multiline
+                                style={{ backgroundColor: theme.background, color: theme.text, padding: 12, borderRadius: 8, marginTop: 10, height: 80, textAlignVertical: 'top', borderWidth: 1, borderColor: theme.border }}
+                                placeholderTextColor={theme.mutedText}
+                            />
+                            <TextInput
+                                placeholder="Target Real Team IDs or blank for ALL"
+                                value={targetTeam}
+                                onChangeText={setTargetTeam}
+                                autoCapitalize="characters"
+                                style={{ backgroundColor: theme.background, color: theme.text, padding: 12, borderRadius: 8, marginTop: 10, borderWidth: 1, borderColor: theme.border }}
+                                placeholderTextColor={theme.mutedText}
+                            />
+
+                            <Pressable
+                                onPress={handleManualPush}
+                                style={({ pressed }) => ({
+                                    backgroundColor: '#FF9500',
+                                    padding: 14,
+                                    borderRadius: 10,
+                                    marginTop: 15,
+                                    alignItems: 'center',
+                                    opacity: pressed ? 0.8 : 1
+                                })}
+                            >
+                                <Text style={{ color: '#fff', fontWeight: '900', fontSize: 14 }}>FIRE BROADCAST</Text>
+                            </Pressable>
+                        </View>
+
+                        {/* --- ADD THIS GREEN BUTTON --- */}
+                        <Pressable
+                            style={[styles.settingRow, { backgroundColor: '#34C759', marginBottom: 10 }]}
+                            onPress={() => router.push('/tournament/map')}
+                        >
+                            <View style={{ flex: 1 }}>
+                                <Text style={[styles.settingLabel, { color: '#fff' }]}>🗺️ View Tournament Map</Text>
+                                <Text style={{ color: 'rgba(255,255,255,0.8)', fontSize: 12, marginTop: 2 }}>
+                                    Open the infinite canvas bracket view.
+                                </Text>
+                            </View>
+                        </Pressable>
+                        {/* ----------------------------- */}
+
+                        {/* --- RUN SIM (CYAN) --- */}
+                        <Pressable
+                            style={[styles.settingRow, { backgroundColor: '#5AC8FA', marginBottom: 10 }]}
+                            onPress={handleRunBracketSim}
+                        >
+                            <View style={{ flex: 1 }}>
+                                <Text style={[styles.settingLabel, { color: '#fff' }]}>🤖 Run LCAA AI Simulation</Text>
+                                <Text style={{ color: 'rgba(255,255,255,0.8)', fontSize: 12, marginTop: 2 }}>
+                                    Generate fresh projected outcomes for every game.
+                                </Text>
+                            </View>
+                        </Pressable>
+
+                        {/* --- BRACKETOLOGY SYNC (PURPLE) --- */}
+                        <Pressable
+                            style={[styles.settingRow, { backgroundColor: '#5856D6', marginBottom: 10 }]}
+                            onPress={handleBracketologySync}
+                        >
+                            <View style={{ flex: 1 }}>
+                                <Text style={[styles.settingLabel, { color: '#fff' }]}>📊 Sync LCAA Bracketology</Text>
+                                <Text style={{ color: 'rgba(255,255,255,0.8)', fontSize: 12, marginTop: 2 }}>
+                                    Update the projected rankings from Google Sheets.
+                                </Text>
+                            </View>
+                        </Pressable>
+
+                        {/* --- PLAYERS SNAPSHOT SYNC (GREEN) --- */}
+                        <Pressable
+                            style={[styles.settingRow, { backgroundColor: '#34C759', marginBottom: 10 }]}
+                            onPress={handlePlayersSnapshotSync}
+                        >
+                            <View style={{ flex: 1 }}>
+                                <Text style={[styles.settingLabel, { color: '#fff' }]}>👤 Sync Players Snapshot</Text>
+                                <Text style={{ color: 'rgba(255,255,255,0.8)', fontSize: 12, marginTop: 2 }}>
+                                    Refresh all roster & player details from the PlayersSnapshot sheet.
+                                </Text>
+                            </View>
+                        </Pressable>
+
+                        {/* --- TOURNAMENT PHASE CONTROL --- */}
+                        <View style={{ marginTop: 20, marginBottom: 10 }}>
+                            <Text style={[styles.sectionTitle, { fontSize: 16, marginBottom: 12 }]}>
+                                Global Tournament State: {phase?.replace('_', ' ')}
+                            </Text>
+                            <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                                {/* 1. BRACKETOLOGY (Regular Season) */}
+                                <Pressable
+                                    style={[styles.settingRow, { flex: 1, marginRight: 4, backgroundColor: '#8E8E93', marginBottom: 0, paddingVertical: 12 }]}
+                                    onPress={() => handleSetTournamentPhase('BRACKETOLOGY')}
+                                >
+                                    <Text style={{ color: '#fff', fontSize: 11, fontWeight: '900', textAlign: 'center' }}>REGULAR SEASON</Text>
+                                </Pressable>
+
+                                {/* 2. SELECTION SUNDAY (Predictions Open) - This was your original Orange button logic */}
+                                <Pressable
+                                    style={[styles.settingRow, { flex: 1, marginHorizontal: 2, backgroundColor: '#FF9500', marginBottom: 0, paddingVertical: 12 }]}
+                                    onPress={() => handleSetTournamentPhase('SELECTION_SUNDAY')}
+                                >
+                                    <Text style={{ color: '#fff', fontSize: 11, fontWeight: '900', textAlign: 'center' }}>OPEN PICKS</Text>
+                                </Pressable>
+
+                                {/* 3. LIVE (Tournament Tip-off / Locked) */}
+                                <Pressable
+                                    style={[styles.settingRow, { flex: 1, marginLeft: 4, backgroundColor: '#FF3B30', marginBottom: 0, paddingVertical: 12 }]}
+                                    onPress={() => handleSetTournamentPhase('LIVE')}
+                                >
+                                    <Text style={{ color: '#fff', fontSize: 11, fontWeight: '900', textAlign: 'center' }}>🔒 LOCK ALL</Text>
+                                </Pressable>
+                            </View>
+                            <Text style={{ color: theme.mutedText, fontSize: 11, marginTop: 8, textAlign: 'center' }}>
+                                {phase === 'BRACKETOLOGY' ? 'Current Mode: Projections Only' :
+                                    phase === 'SELECTION_SUNDAY' ? 'Current Mode: Users making picks' :
+                                        'Current Mode: Games active, brackets frozen'}
+                            </Text>
+                        </View>
+                        {/* ------------------------------------------- */}
+
+                        {/* --- OFFICIAL TOURNAMENT SYNC (BLUE) --- */}
+                        <Pressable
+                            style={[styles.settingRow, { backgroundColor: '#007AFF' }]}
+                            onPress={handleTournamentSync}
+                        >
+                            <View style={{ flex: 1 }}>
+                                <Text style={[styles.settingLabel, { color: '#fff' }]}>🏆 Sync 2036 LCAA Tournament</Text>
+                                <Text style={{ color: 'rgba(255,255,255,0.8)', fontSize: 12, marginTop: 2 }}>
+                                    Generate the bracket from the Official Field Google Sheet.
+                                </Text>
+                            </View>
+                        </Pressable>
 
                         <Pressable
-                            onPress={handleManualPush}
-                            style={({ pressed }) => ({
-                                backgroundColor: '#FF9500',
-                                padding: 14,
-                                borderRadius: 10,
-                                marginTop: 15,
-                                alignItems: 'center',
-                                opacity: pressed ? 0.8 : 1
-                            })}
+                            style={[styles.logoutButton, { backgroundColor: '#8E8E93', marginTop: 10 }]}
+                            onPress={handleSyncDBSchema}
                         >
-                            <Text style={{ color: '#fff', fontWeight: '900', fontSize: 14 }}>FIRE BROADCAST</Text>
+                            <Text style={styles.buttonText}>🛠️ Sync DB Schema</Text>
+                        </Pressable>
+
+                        <Pressable
+                            style={[styles.logoutButton, { backgroundColor: theme.mutedText, marginTop: 10 }]}
+                            onPress={clearImportedLogos}
+                        >
+                            <Text style={styles.buttonText}>⚠️ Reset to Generic Logos</Text>
                         </Pressable>
                     </View>
+                )}
 
-                    {/* --- ADD THIS GREEN BUTTON --- */}
-                    <Pressable
-                        style={[styles.settingRow, { backgroundColor: '#34C759', marginBottom: 10 }]}
-                        onPress={() => router.push('/tournament/map')}
-                    >
-                        <View style={{ flex: 1 }}>
-                            <Text style={[styles.settingLabel, { color: '#fff' }]}>🗺️ View Tournament Map</Text>
-                            <Text style={{ color: 'rgba(255,255,255,0.8)', fontSize: 12, marginTop: 2 }}>
-                                Open the infinite canvas bracket view.
-                            </Text>
-                        </View>
-                    </Pressable>
-                    {/* ----------------------------- */}
+                <Pressable style={styles.logoutButton} onPress={handleLogout}>
+                    <Text style={styles.buttonText}>Log Out</Text>
+                </Pressable>
 
-                    {/* --- RUN SIM (CYAN) --- */}
-                    <Pressable
-                        style={[styles.settingRow, { backgroundColor: '#5AC8FA', marginBottom: 10 }]}
-                        onPress={handleRunBracketSim}
-                    >
-                        <View style={{ flex: 1 }}>
-                            <Text style={[styles.settingLabel, { color: '#fff' }]}>🤖 Run LCAA AI Simulation</Text>
-                            <Text style={{ color: 'rgba(255,255,255,0.8)', fontSize: 12, marginTop: 2 }}>
-                                Generate fresh projected outcomes for every game.
-                            </Text>
-                        </View>
-                    </Pressable>
-
-                    {/* --- BRACKETOLOGY SYNC (PURPLE) --- */}
-                    <Pressable
-                        style={[styles.settingRow, { backgroundColor: '#5856D6', marginBottom: 10 }]}
-                        onPress={handleBracketologySync}
-                    >
-                        <View style={{ flex: 1 }}>
-                            <Text style={[styles.settingLabel, { color: '#fff' }]}>📊 Sync LCAA Bracketology</Text>
-                            <Text style={{ color: 'rgba(255,255,255,0.8)', fontSize: 12, marginTop: 2 }}>
-                                Update the projected rankings from Google Sheets.
-                            </Text>
-                        </View>
-                    </Pressable>
-
-                    {/* --- PLAYERS SNAPSHOT SYNC (GREEN) --- */}
-                    <Pressable
-                        style={[styles.settingRow, { backgroundColor: '#34C759', marginBottom: 10 }]}
-                        onPress={handlePlayersSnapshotSync}
-                    >
-                        <View style={{ flex: 1 }}>
-                            <Text style={[styles.settingLabel, { color: '#fff' }]}>👤 Sync Players Snapshot</Text>
-                            <Text style={{ color: 'rgba(255,255,255,0.8)', fontSize: 12, marginTop: 2 }}>
-                                Refresh all roster & player details from the PlayersSnapshot sheet.
-                            </Text>
-                        </View>
-                    </Pressable>
-
-                    {/* --- TOURNAMENT PHASE CONTROL --- */}
-                    <View style={{ marginTop: 20, marginBottom: 10 }}>
-                        <Text style={[styles.sectionTitle, { fontSize: 16, marginBottom: 12 }]}>
-                            Global Tournament State: {phase?.replace('_', ' ')}
-                        </Text>
-                        <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                            {/* 1. BRACKETOLOGY (Regular Season) */}
-                            <Pressable
-                                style={[styles.settingRow, { flex: 1, marginRight: 4, backgroundColor: '#8E8E93', marginBottom: 0, paddingVertical: 12 }]}
-                                onPress={() => handleSetTournamentPhase('BRACKETOLOGY')}
-                            >
-                                <Text style={{ color: '#fff', fontSize: 11, fontWeight: '900', textAlign: 'center' }}>REGULAR SEASON</Text>
-                            </Pressable>
-
-                            {/* 2. SELECTION SUNDAY (Predictions Open) - This was your original Orange button logic */}
-                            <Pressable
-                                style={[styles.settingRow, { flex: 1, marginHorizontal: 2, backgroundColor: '#FF9500', marginBottom: 0, paddingVertical: 12 }]}
-                                onPress={() => handleSetTournamentPhase('SELECTION_SUNDAY')}
-                            >
-                                <Text style={{ color: '#fff', fontSize: 11, fontWeight: '900', textAlign: 'center' }}>OPEN PICKS</Text>
-                            </Pressable>
-
-                            {/* 3. LIVE (Tournament Tip-off / Locked) */}
-                            <Pressable
-                                style={[styles.settingRow, { flex: 1, marginLeft: 4, backgroundColor: '#FF3B30', marginBottom: 0, paddingVertical: 12 }]}
-                                onPress={() => handleSetTournamentPhase('LIVE')}
-                            >
-                                <Text style={{ color: '#fff', fontSize: 11, fontWeight: '900', textAlign: 'center' }}>🔒 LOCK ALL</Text>
-                            </Pressable>
-                        </View>
-                        <Text style={{ color: theme.mutedText, fontSize: 11, marginTop: 8, textAlign: 'center' }}>
-                            {phase === 'BRACKETOLOGY' ? 'Current Mode: Projections Only' :
-                                phase === 'SELECTION_SUNDAY' ? 'Current Mode: Users making picks' :
-                                    'Current Mode: Games active, brackets frozen'}
-                        </Text>
-                    </View>
-                    {/* ------------------------------------------- */}
-
-                    {/* --- OFFICIAL TOURNAMENT SYNC (BLUE) --- */}
-                    <Pressable
-                        style={[styles.settingRow, { backgroundColor: '#007AFF' }]}
-                        onPress={handleTournamentSync}
-                    >
-                        <View style={{ flex: 1 }}>
-                            <Text style={[styles.settingLabel, { color: '#fff' }]}>🏆 Sync 2036 LCAA Tournament</Text>
-                            <Text style={{ color: 'rgba(255,255,255,0.8)', fontSize: 12, marginTop: 2 }}>
-                                Generate the bracket from the Official Field Google Sheet.
-                            </Text>
-                        </View>
-                    </Pressable>
-
-                    <Pressable
-                        style={[styles.logoutButton, { backgroundColor: '#8E8E93', marginTop: 10 }]}
-                        onPress={handleSyncDBSchema}
-                    >
-                        <Text style={styles.buttonText}>🛠️ Sync DB Schema</Text>
-                    </Pressable>
-
-                    <Pressable
-                        style={[styles.logoutButton, { backgroundColor: theme.mutedText, marginTop: 10 }]}
-                        onPress={clearImportedLogos}
-                    >
-                        <Text style={styles.buttonText}>⚠️ Reset to Generic Logos</Text>
-                    </Pressable>
+                <View style={{ marginTop: 20, marginBottom: -10, padding: 15, backgroundColor: theme.card, borderRadius: 12, borderStyle: 'dashed', borderWidth: 1, borderColor: theme.border }}>
+                    <Text style={[styles.sectionTitle, { fontSize: 16, marginBottom: 8 }]}>Simulation Engine</Text>
+                    <Text style={{ color: theme.mutedText, fontSize: 13, lineHeight: 18 }}>
+                        Legends CBB results are generated using the <Text style={{ fontWeight: '700' }}>Legacy Simulation Engine</Text>.
+                        Special thanks to the <Text style={{ fontWeight: '700' }}>MML Development Team</Text> for their dedication to simulation realism and community-driven analytics.
+                    </Text>
                 </View>
-            )}
 
-            <Pressable style={styles.logoutButton} onPress={handleLogout}>
-                <Text style={styles.buttonText}>Log Out</Text>
-            </Pressable>
-
-            <View style={{ marginTop: 20, marginBottom: -10, padding: 15, backgroundColor: theme.card, borderRadius: 12, borderStyle: 'dashed', borderWidth: 1, borderColor: theme.border }}>
-                <Text style={[styles.sectionTitle, { fontSize: 16, marginBottom: 8 }]}>Simulation Engine</Text>
-                <Text style={{ color: theme.mutedText, fontSize: 13, lineHeight: 18 }}>
-                    Legends CBB results are generated using the <Text style={{ fontWeight: '700' }}>Legacy Simulation Engine</Text>.
-                    Special thanks to the <Text style={{ fontWeight: '700' }}>MML Development Team</Text> for their dedication to simulation realism and community-driven analytics.
-                </Text>
-            </View>
-
-            {/* --- VERSION NUMBER --- */}
-            <Text style={styles.versionText}>Legends CBB v1.0.0 (Beta)</Text>
-        </ScrollView>
+                {/* --- VERSION NUMBER --- */}
+                <Text style={styles.versionText}>Legends CBB v1.0.0 (Beta)</Text>
+            </ScrollView>
+        </>
     );
 }
