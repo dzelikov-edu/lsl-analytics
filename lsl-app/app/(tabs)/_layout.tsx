@@ -50,7 +50,7 @@ export default function TabLayout() {
     <Tabs
       screenOptions={{
         tabBarActiveTintColor: theme.tint,
-        tabBarInactiveTintColor: theme.tabIconDefault, // <-- Add this line
+        tabBarInactiveTintColor: theme.tabIconDefault,
         headerShown: false,
         tabBarButton: HapticTab,
         tabBarStyle: {
@@ -61,49 +61,56 @@ export default function TabLayout() {
       <Tabs.Screen
         name="index"
         options={{
-          title: 'Home',
+          title: 'Home | Legends CBB',
+          tabBarLabel: 'Home', // Keeps the mobile icon text short!
           tabBarIcon: ({ color }) => <IconSymbol size={28} name="house.fill" color={color} />,
         }}
       />
       <Tabs.Screen
         name="teams"
         options={{
-          title: 'Teams',
+          title: 'Teams | Legends CBB',
+          tabBarLabel: 'Teams',
           tabBarIcon: ({ color }) => <IconSymbol size={28} name="person.3.fill" color={color} />,
         }}
       />
       <Tabs.Screen
         name="analytics"
         options={{
-          title: 'Analytics',
+          title: 'Analytics | Legends CBB',
+          tabBarLabel: 'Analytics',
           tabBarIcon: ({ color }) => <IconSymbol size={28} name="chart.bar.fill" color={color} />,
         }}
       />
       <Tabs.Screen
         name="conferences"
         options={{
-          title: 'Conferences',
+          title: 'Conferences | Legends CBB',
+          tabBarLabel: 'Conferences',
           tabBarIcon: ({ color }) => <IconSymbol size={28} name="building.columns.fill" color={color} />,
         }}
       />
       <Tabs.Screen
         name="bracket"
         options={{
-          title: 'LCAA',
+          title: 'LCAA Tournament | Legends CBB',
+          tabBarLabel: 'LCAA',
           tabBarIcon: ({ color }) => <IconSymbol size={28} name="trophy.fill" color={color} />,
         }}
       />
       <Tabs.Screen
         name="rankings"
         options={{
-          title: 'Rankings',
+          title: 'Rankings | Legends CBB',
+          tabBarLabel: 'Rankings',
           tabBarIcon: ({ color }) => <IconSymbol size={28} name="list.number" color={color} />,
         }}
       />
       <Tabs.Screen
         name="profile"
         options={{
-          title: 'Profile',
+          title: 'Profile | Legends CBB',
+          tabBarLabel: 'Profile',
           tabBarIcon: ({ color }) => (
             <IconSymbol size={28} name="person.crop.circle" color={color} />
           ),
