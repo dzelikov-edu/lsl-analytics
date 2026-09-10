@@ -10,6 +10,7 @@ import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View, useWi
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useCallback, useState } from 'react';
 import { useFocusEffect } from 'expo-router';
+import Head from 'expo-router/head';
 import { getToken } from '@/lib/auth-storage';
 import { API_BASE_URL } from '@/lib/api';
 
@@ -423,333 +424,339 @@ export default function HomeScreen() {
   };
 
   return (
-    <ScrollView
-      contentContainerStyle={styles.content}
-      refreshControl={
-        <RefreshControl
-          refreshing={refreshing}
-          onRefresh={refetch}
-          tintColor={theme.text}
-        />
-      }
-    >
-      {loading ? (
-        <View style={styles.centerBlock}>
-          <ActivityIndicator size="large" />
-          <Text style={styles.helper}>Loading home...</Text>
-        </View>
-      ) : error ? (
-        <View style={styles.card}>
-          <Text style={styles.sectionTitle}>Error</Text>
-          <Text style={styles.body}>{error}</Text>
-        </View>
-      ) : (
-        <>
-          {/* --- BRANDED HEADER --- */}
-          <View style={{ alignItems: 'center', marginBottom: 10, marginTop: 10 }}>
-            <Image
-              source={require('@/assets/images/index_header_icon.png')}
-              style={{ width: 140, height: 60 }}
-              resizeMode="contain"
-            />
-            <Text style={{
-              fontSize: 12,
-              fontWeight: '800',
-              color: theme.mutedText,
-              letterSpacing: 2.5,
-              marginTop: 8,
-              textTransform: 'uppercase'
-            }}>
-              The Legends Universe
-            </Text>
-          </View>
+    <>
+      <Head>
+        <title>Home | Legends CBB</title>
+      </Head>
 
-          {myTeamsSnapshot.length > 0 && (
+      <ScrollView
+        contentContainerStyle={styles.content}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={refetch}
+            tintColor={theme.text}
+          />
+        }
+      >
+        {loading ? (
+          <View style={styles.centerBlock}>
+            <ActivityIndicator size="large" />
+            <Text style={styles.helper}>Loading home...</Text>
+          </View>
+        ) : error ? (
+          <View style={styles.card}>
+            <Text style={styles.sectionTitle}>Error</Text>
+            <Text style={styles.body}>{error}</Text>
+          </View>
+        ) : (
+          <>
+            {/* --- BRANDED HEADER --- */}
+            <View style={{ alignItems: 'center', marginBottom: 10, marginTop: 10 }}>
+              <Image
+                source={require('@/assets/images/index_header_icon.png')}
+                style={{ width: 140, height: 60 }}
+                resizeMode="contain"
+              />
+              <Text style={{
+                fontSize: 12,
+                fontWeight: '800',
+                color: theme.mutedText,
+                letterSpacing: 2.5,
+                marginTop: 8,
+                textTransform: 'uppercase'
+              }}>
+                The Legends Universe
+              </Text>
+            </View>
+
+            {myTeamsSnapshot.length > 0 && (
+              <View style={styles.section}>
+                <Text style={styles.sectionTitle}>My Teams</Text>
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={{ gap: 12, paddingRight: 20 }}
+                >
+                  {myTeamsSnapshot.map((game, index) => (
+                    <Pressable
+                      key={index}
+                      onPress={() => router.push({
+                        pathname: '/game/[gameKey]',
+                        params: { gameKey: game.game_key }
+                      })}
+                      style={({ pressed }) => [
+                        styles.card,
+                        { width: 260, marginBottom: 0 },
+                        pressed && styles.cardPressed
+                      ]}
+                    >
+                      <Text style={styles.cardMeta}>
+                        {game.display_date}{game.type === 'RESULT' ? ' • Final' : ''}
+                      </Text>
+
+                      {/* AWAY TEAM ROW */}
+                      <View style={styles.cardTeamRow}>
+                        <TeamLogo teamId={game.away_id} size={20} />
+                        <View style={styles.cardTeamTextWrap}>
+                          <Text style={styles.cardTeamLine} numberOfLines={1}>
+                            {getDisplayRank(game.away_id, game.lsl_rank_away, game.phase)}
+                            {getTeamBranding(game.away_id, game.away_name).displayName}
+                          </Text>
+                        </View>
+                        {/* ONLY RENDER THIS IF IT IS A RESULT */}
+                        {game.type === 'RESULT' && (
+                          <Text style={[styles.cardTeamLine, { marginLeft: 10, fontWeight: '800' }]}>
+                            {game.a_score}
+                          </Text>
+                        )}
+                      </View>
+
+                      {/* HOME TEAM ROW */}
+                      <View style={styles.cardTeamRow}>
+                        <TeamLogo teamId={game.home_id} size={20} />
+                        <View style={styles.cardTeamTextWrap}>
+                          <Text style={styles.cardTeamLine} numberOfLines={1}>
+                            {getDisplayRank(game.home_id, game.lsl_rank_home, game.phase)}
+                            {getTeamBranding(game.home_id, game.home_name).displayName}
+                          </Text>
+                        </View>
+                        {/* ONLY RENDER THIS IF IT IS A RESULT */}
+                        {game.type === 'RESULT' && (
+                          <Text style={[styles.cardTeamLine, { marginLeft: 10, fontWeight: '800' }]}>
+                            {game.b_score}
+                          </Text>
+                        )}
+                      </View>
+                    </Pressable>
+                  ))}
+                </ScrollView>
+              </View>
+            )}
+
             <View style={styles.section}>
-              <Text style={styles.sectionTitle}>My Teams</Text>
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={{ gap: 12, paddingRight: 20 }}
-              >
-                {myTeamsSnapshot.map((game, index) => (
+              <Text style={styles.sectionTitle}>
+                {phase === 'SELECTION_SUNDAY' || phase === 'LIVE' ? 'LCAA Tournament' : 'Featured Games'}
+              </Text>
+
+              {phase === 'SELECTION_SUNDAY' || phase === 'LIVE' ? (
+                /* BIG BRACKET PORTAL CARD */
+                <Pressable
+                  onPress={() => router.push('/tournament/map?portal=true')}
+                  style={({ pressed }) => [
+                    styles.featuredCard,
+                    { backgroundColor: '#1C1C1E', borderColor: '#007AFF', borderWidth: 2 },
+                    pressed && styles.cardPressed
+                  ]}
+                >
+                  <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={[styles.featuredCardMeta, { color: '#007AFF', fontWeight: '800', marginBottom: 4 }]}>
+                        OFFICIAL 2036 BRACKET
+                      </Text>
+                      <Text style={[styles.featuredTeamLine, { fontSize: 22, color: '#fff' }]}>
+                        The Road to the Forever Four
+                      </Text>
+                      <Text style={{ color: theme.mutedText, marginTop: 4, fontSize: 13 }}>
+                        View the official field and track the live results.
+                      </Text>
+                    </View>
+                    <Image
+                      source={require('@/assets/images/index_header_icon.png')}
+                      style={{ width: 60, height: 60, opacity: 0.8 }}
+                      resizeMode="contain"
+                    />
+                  </View>
+                  <View style={{
+                    marginTop: 15,
+                    backgroundColor: '#007AFF',
+                    paddingVertical: 10,
+                    borderRadius: 8,
+                    alignItems: 'center'
+                  }}>
+                    <Text style={{ color: '#fff', fontWeight: '900', fontSize: 14 }}>VIEW OFFICIAL BRACKET</Text>
+                  </View>
+                </Pressable>
+              ) : (
+                /* ORIGINAL FEATURED GAMES LOGIC */
+                featuredGames.map((game: any, index: number) => (
                   <Pressable
-                    key={index}
-                    onPress={() => router.push({
-                      pathname: '/game/[gameKey]',
-                      params: { gameKey: game.game_key }
-                    })}
-                    style={({ pressed }) => [
-                      styles.card,
-                      { width: 260, marginBottom: 0 },
-                      pressed && styles.cardPressed
-                    ]}
-                  >
-                    <Text style={styles.cardMeta}>
-                      {game.display_date}{game.type === 'RESULT' ? ' • Final' : ''}
+                    key={game.game_key ?? index}
+                    onPress={() =>
+                      router.push({
+                        pathname: '/game/[gameKey]',
+                        params: { gameKey: game.game_key },
+                      })
+                    }
+                    style={({ pressed }) => [styles.featuredCard, pressed && styles.cardPressed]}>
+                    <Text style={styles.featuredCardMeta}>
+                      {game.display_date || game.date_key || 'TBD'} • {game.phase_display || game.phase || '—'} • Week {game.week ?? '—'}
                     </Text>
 
-                    {/* AWAY TEAM ROW */}
-                    <View style={styles.cardTeamRow}>
-                      <TeamLogo teamId={game.away_id} size={20} />
-                      <View style={styles.cardTeamTextWrap}>
-                        <Text style={styles.cardTeamLine} numberOfLines={1}>
+                    <View style={styles.featuredTeamRow}>
+                      <TeamLogo teamId={game.away_id} size={featuredLogoSize} />
+                      <View style={styles.featuredTeamTextWrap}>
+                        <Text style={styles.featuredTeamLine}>
                           {getDisplayRank(game.away_id, game.lsl_rank_away, game.phase)}
                           {getTeamBranding(game.away_id, game.away_name).displayName}
                         </Text>
                       </View>
-                      {/* ONLY RENDER THIS IF IT IS A RESULT */}
-                      {game.type === 'RESULT' && (
-                        <Text style={[styles.cardTeamLine, { marginLeft: 10, fontWeight: '800' }]}>
-                          {game.a_score}
-                        </Text>
-                      )}
                     </View>
 
-                    {/* HOME TEAM ROW */}
-                    <View style={styles.cardTeamRow}>
-                      <TeamLogo teamId={game.home_id} size={20} />
-                      <View style={styles.cardTeamTextWrap}>
-                        <Text style={styles.cardTeamLine} numberOfLines={1}>
+                    <View style={[styles.featuredTeamRow, { marginBottom: 0 }]}>
+                      <TeamLogo teamId={game.home_id} size={featuredLogoSize} />
+                      <View style={styles.featuredTeamTextWrap}>
+                        <Text style={styles.featuredTeamLine}>
                           {getDisplayRank(game.home_id, game.lsl_rank_home, game.phase)}
                           {getTeamBranding(game.home_id, game.home_name).displayName}
                         </Text>
                       </View>
-                      {/* ONLY RENDER THIS IF IT IS A RESULT */}
-                      {game.type === 'RESULT' && (
-                        <Text style={[styles.cardTeamLine, { marginLeft: 10, fontWeight: '800' }]}>
-                          {game.b_score}
-                        </Text>
-                      )}
+                    </View>
+                  </Pressable>
+                ))
+              )}
+            </View>
+
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Rankings</Text>
+              <View style={styles.card}>
+                {rankings.slice(0, 10).map((team: any, index: number) => (
+                  <Pressable
+                    key={team.team_id ?? index}
+                    onPress={() =>
+                      router.push({
+                        pathname: '/team/[teamId]',
+                        params: { teamId: team.team_id },
+                      })
+                    }
+                    style={({ pressed }) => [styles.rankingRow, pressed && styles.rankingRowPressed]}>
+                    <Text style={styles.rankingRank}>
+                      {team.rank ?? index + 1}.
+                    </Text>
+                    <TeamLogo teamId={team.team_id} size={22} />
+                    <View style={styles.rankingTextWrap}>
+                      <Text style={styles.rankingName}>{getTeamBranding(team.team_id, team.team_name).displayName}</Text>
                     </View>
                   </Pressable>
                 ))}
-              </ScrollView>
-            </View>
-          )}
-
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>
-              {phase === 'SELECTION_SUNDAY' || phase === 'LIVE' ? 'LCAA Tournament' : 'Featured Games'}
-            </Text>
-
-            {phase === 'SELECTION_SUNDAY' || phase === 'LIVE' ? (
-              /* BIG BRACKET PORTAL CARD */
-              <Pressable
-                onPress={() => router.push('/tournament/map?portal=true')}
-                style={({ pressed }) => [
-                  styles.featuredCard,
-                  { backgroundColor: '#1C1C1E', borderColor: '#007AFF', borderWidth: 2 },
-                  pressed && styles.cardPressed
-                ]}
-              >
-                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <View style={{ flex: 1 }}>
-                    <Text style={[styles.featuredCardMeta, { color: '#007AFF', fontWeight: '800', marginBottom: 4 }]}>
-                      OFFICIAL 2036 BRACKET
-                    </Text>
-                    <Text style={[styles.featuredTeamLine, { fontSize: 22, color: '#fff' }]}>
-                      The Road to the Forever Four
-                    </Text>
-                    <Text style={{ color: theme.mutedText, marginTop: 4, fontSize: 13 }}>
-                      View the official field and track the live results.
-                    </Text>
-                  </View>
-                  <Image
-                    source={require('@/assets/images/index_header_icon.png')}
-                    style={{ width: 60, height: 60, opacity: 0.8 }}
-                    resizeMode="contain"
-                  />
-                </View>
-                <View style={{
-                  marginTop: 15,
-                  backgroundColor: '#007AFF',
-                  paddingVertical: 10,
-                  borderRadius: 8,
-                  alignItems: 'center'
-                }}>
-                  <Text style={{ color: '#fff', fontWeight: '900', fontSize: 14 }}>VIEW OFFICIAL BRACKET</Text>
-                </View>
-              </Pressable>
-            ) : (
-              /* ORIGINAL FEATURED GAMES LOGIC */
-              featuredGames.map((game: any, index: number) => (
-                <Pressable
-                  key={game.game_key ?? index}
-                  onPress={() =>
-                    router.push({
-                      pathname: '/game/[gameKey]',
-                      params: { gameKey: game.game_key },
-                    })
-                  }
-                  style={({ pressed }) => [styles.featuredCard, pressed && styles.cardPressed]}>
-                  <Text style={styles.featuredCardMeta}>
-                    {game.display_date || game.date_key || 'TBD'} • {game.phase_display || game.phase || '—'} • Week {game.week ?? '—'}
-                  </Text>
-
-                  <View style={styles.featuredTeamRow}>
-                    <TeamLogo teamId={game.away_id} size={featuredLogoSize} />
-                    <View style={styles.featuredTeamTextWrap}>
-                      <Text style={styles.featuredTeamLine}>
-                        {getDisplayRank(game.away_id, game.lsl_rank_away, game.phase)}
-                        {getTeamBranding(game.away_id, game.away_name).displayName}
-                      </Text>
-                    </View>
-                  </View>
-
-                  <View style={[styles.featuredTeamRow, { marginBottom: 0 }]}>
-                    <TeamLogo teamId={game.home_id} size={featuredLogoSize} />
-                    <View style={styles.featuredTeamTextWrap}>
-                      <Text style={styles.featuredTeamLine}>
-                        {getDisplayRank(game.home_id, game.lsl_rank_home, game.phase)}
-                        {getTeamBranding(game.home_id, game.home_name).displayName}
-                      </Text>
-                    </View>
-                  </View>
-                </Pressable>
-              ))
-            )}
-          </View>
-
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Rankings</Text>
-            <View style={styles.card}>
-              {rankings.slice(0, 10).map((team: any, index: number) => (
-                <Pressable
-                  key={team.team_id ?? index}
-                  onPress={() =>
-                    router.push({
-                      pathname: '/team/[teamId]',
-                      params: { teamId: team.team_id },
-                    })
-                  }
-                  style={({ pressed }) => [styles.rankingRow, pressed && styles.rankingRowPressed]}>
-                  <Text style={styles.rankingRank}>
-                    {team.rank ?? index + 1}.
-                  </Text>
-                  <TeamLogo teamId={team.team_id} size={22} />
-                  <View style={styles.rankingTextWrap}>
-                    <Text style={styles.rankingName}>{getTeamBranding(team.team_id, team.team_name).displayName}</Text>
-                  </View>
-                </Pressable>
-              ))}
-            </View>
-          </View>
-
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Analytics</Text>
-            <View style={styles.card}>
-              {[
-                { key: 'power', label: 'Power Leader', metric: analytics?.power },
-                { key: 'resume', label: 'Resume Leader', metric: analytics?.resume },
-                { key: 'form', label: 'Form Leader', metric: analytics?.form },
-                { key: 'sos', label: 'Toughest Schedule', metric: analytics?.sos },
-              ].map((entry, index) => (
-                <View
-                  key={entry.key}
-                  style={[
-                    styles.leaderRow,
-                    index > 0 && { marginTop: 12 }, // add spacing between rows
-                  ]}
-                >
-                  <TeamLogo teamId={entry.metric?.team_id} size={26} />
-                  <View style={styles.leaderTextWrap}>
-                    <Text style={styles.leaderLabel}>{entry.label}</Text>
-                    <Text style={styles.leaderName}>
-                      {entry.metric?.team_id
-                        ? getTeamBranding(entry.metric.team_id, entry.metric.team_name).displayName
-                        : '—'}
-                    </Text>
-                    <Text style={styles.leaderValue}>
-                      {entry.metric?.rank !== null && entry.metric?.rank !== undefined
-                        ? `#${entry.metric.rank}`
-                        : '—'}
-                      {entry.metric?.value !== null && entry.metric?.value !== undefined
-                        ? ` • ${entry.metric.value}`
-                        : ''}
-                    </Text>
-                  </View>
-                </View>
-              ))}
-            </View>
-          </View>
-
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Upcoming Schedule</Text>
-            {calendarDays.map((day: any, index: number) => (
-              <View key={day.date_key ?? index} style={styles.upcomingDayCard}>
-                <Text style={styles.upcomingDayTitle}>
-                  {day.display_date || day.date_key || 'TBD'}
-                </Text>
-                <Text style={styles.upcomingDayMeta}>{day.games_count ?? 0} games</Text>
-
-                <ScrollView
-                  horizontal
-                  showsHorizontalScrollIndicator={false}
-                  contentContainerStyle={{ paddingTop: 4, paddingBottom: 2 }}
-                >
-                  {[...(day.games ?? [])]
-                    .sort((a: any, b: any) => {
-                      const pa = getCalendarGamePriority(a);
-                      const pb = getCalendarGamePriority(b);
-
-                      if (pb.rankedTeamsCount !== pa.rankedTeamsCount) {
-                        return pb.rankedTeamsCount - pa.rankedTeamsCount;
-                      }
-
-                      if (pa.bestRankValue !== pb.bestRankValue) {
-                        return pa.bestRankValue - pb.bestRankValue;
-                      }
-
-                      if (pa.combinedRankValue !== pb.combinedRankValue) {
-                        return pa.combinedRankValue - pb.combinedRankValue;
-                      }
-
-                      return 0;
-                    })
-                    // NOTE: removed .slice(0, 3) so we see all games
-                    .map((game: any, gameIndex: number) => (
-                      <Pressable
-                        key={game.game_key ?? gameIndex}
-                        onPress={() =>
-                          router.push({
-                            pathname: '/game/[gameKey]',
-                            params: { gameKey: game.game_key },
-                          })
-                        }
-                        style={({ pressed }) => [
-                          styles.upcomingGameBlock,
-                          { width: 220, marginRight: 10 }, // fixed card width + spacing
-                          pressed && styles.cardPressed,
-                        ]}
-                      >
-                        <View style={styles.upcomingGameRow}>
-                          <TeamLogo teamId={game.away_id} size={upcomingLogoSize} />
-                          <View style={styles.upcomingGameTextWrap}>
-                            <Text style={styles.upcomingGameLine}>
-                              {getDisplayRank(game.away_id, game.lsl_rank_away, game.phase)}
-                              {getTeamBranding(game.away_id, game.away_name).displayName}
-                            </Text>
-                          </View>
-                        </View>
-
-                        <View style={[styles.upcomingGameRow, { marginBottom: 0 }]}>
-                          <TeamLogo teamId={game.home_id} size={upcomingLogoSize} />
-                          <View style={styles.upcomingGameTextWrap}>
-                            <Text style={styles.upcomingGameLine}>
-                              {getDisplayRank(game.home_id, game.lsl_rank_home, game.phase)}
-                              {getTeamBranding(game.home_id, game.home_name).displayName}
-                            </Text>
-                          </View>
-                        </View>
-                      </Pressable>
-                    ))}
-                </ScrollView>
               </View>
-            ))}
-          </View>
-        </>
-      )}
-    </ScrollView>
+            </View>
+
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Analytics</Text>
+              <View style={styles.card}>
+                {[
+                  { key: 'power', label: 'Power Leader', metric: analytics?.power },
+                  { key: 'resume', label: 'Resume Leader', metric: analytics?.resume },
+                  { key: 'form', label: 'Form Leader', metric: analytics?.form },
+                  { key: 'sos', label: 'Toughest Schedule', metric: analytics?.sos },
+                ].map((entry, index) => (
+                  <View
+                    key={entry.key}
+                    style={[
+                      styles.leaderRow,
+                      index > 0 && { marginTop: 12 }, // add spacing between rows
+                    ]}
+                  >
+                    <TeamLogo teamId={entry.metric?.team_id} size={26} />
+                    <View style={styles.leaderTextWrap}>
+                      <Text style={styles.leaderLabel}>{entry.label}</Text>
+                      <Text style={styles.leaderName}>
+                        {entry.metric?.team_id
+                          ? getTeamBranding(entry.metric.team_id, entry.metric.team_name).displayName
+                          : '—'}
+                      </Text>
+                      <Text style={styles.leaderValue}>
+                        {entry.metric?.rank !== null && entry.metric?.rank !== undefined
+                          ? `#${entry.metric.rank}`
+                          : '—'}
+                        {entry.metric?.value !== null && entry.metric?.value !== undefined
+                          ? ` • ${entry.metric.value}`
+                          : ''}
+                      </Text>
+                    </View>
+                  </View>
+                ))}
+              </View>
+            </View>
+
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Upcoming Schedule</Text>
+              {calendarDays.map((day: any, index: number) => (
+                <View key={day.date_key ?? index} style={styles.upcomingDayCard}>
+                  <Text style={styles.upcomingDayTitle}>
+                    {day.display_date || day.date_key || 'TBD'}
+                  </Text>
+                  <Text style={styles.upcomingDayMeta}>{day.games_count ?? 0} games</Text>
+
+                  <ScrollView
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    contentContainerStyle={{ paddingTop: 4, paddingBottom: 2 }}
+                  >
+                    {[...(day.games ?? [])]
+                      .sort((a: any, b: any) => {
+                        const pa = getCalendarGamePriority(a);
+                        const pb = getCalendarGamePriority(b);
+
+                        if (pb.rankedTeamsCount !== pa.rankedTeamsCount) {
+                          return pb.rankedTeamsCount - pa.rankedTeamsCount;
+                        }
+
+                        if (pa.bestRankValue !== pb.bestRankValue) {
+                          return pa.bestRankValue - pb.bestRankValue;
+                        }
+
+                        if (pa.combinedRankValue !== pb.combinedRankValue) {
+                          return pa.combinedRankValue - pb.combinedRankValue;
+                        }
+
+                        return 0;
+                      })
+                      // NOTE: removed .slice(0, 3) so we see all games
+                      .map((game: any, gameIndex: number) => (
+                        <Pressable
+                          key={game.game_key ?? gameIndex}
+                          onPress={() =>
+                            router.push({
+                              pathname: '/game/[gameKey]',
+                              params: { gameKey: game.game_key },
+                            })
+                          }
+                          style={({ pressed }) => [
+                            styles.upcomingGameBlock,
+                            { width: 220, marginRight: 10 }, // fixed card width + spacing
+                            pressed && styles.cardPressed,
+                          ]}
+                        >
+                          <View style={styles.upcomingGameRow}>
+                            <TeamLogo teamId={game.away_id} size={upcomingLogoSize} />
+                            <View style={styles.upcomingGameTextWrap}>
+                              <Text style={styles.upcomingGameLine}>
+                                {getDisplayRank(game.away_id, game.lsl_rank_away, game.phase)}
+                                {getTeamBranding(game.away_id, game.away_name).displayName}
+                              </Text>
+                            </View>
+                          </View>
+
+                          <View style={[styles.upcomingGameRow, { marginBottom: 0 }]}>
+                            <TeamLogo teamId={game.home_id} size={upcomingLogoSize} />
+                            <View style={styles.upcomingGameTextWrap}>
+                              <Text style={styles.upcomingGameLine}>
+                                {getDisplayRank(game.home_id, game.lsl_rank_home, game.phase)}
+                                {getTeamBranding(game.home_id, game.home_name).displayName}
+                              </Text>
+                            </View>
+                          </View>
+                        </Pressable>
+                      ))}
+                  </ScrollView>
+                </View>
+              ))}
+            </View>
+          </>
+        )}
+      </ScrollView>
+    </>
   );
 }
