@@ -147,9 +147,10 @@ export function getConferenceBranding(confId?: string | null, apiName?: string |
         headerTitle: normalized,
     };
 
-    // LOGIC: Use real MasterIndex name only if cache is confirmed true
-    const finalName = (realismEnabledCache === true && apiName) ? apiName : base.displayName;
-    const finalTitle = (realismEnabledCache === true && apiName) ? apiName : base.headerTitle;
+    // LOGIC: Use real MasterIndex name if cache is confirmed true OR if we are on the web
+    const isWeb = Platform.OS === 'web';
+    const finalName = ((realismEnabledCache === true || isWeb) && apiName) ? apiName : base.displayName;
+    const finalTitle = ((realismEnabledCache === true || isWeb) && apiName) ? apiName : base.headerTitle;
 
     return {
         ...base,
